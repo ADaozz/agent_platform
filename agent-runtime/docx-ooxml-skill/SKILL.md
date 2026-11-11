@@ -1,15 +1,15 @@
 ---
 name: docx-ooxml-author
-description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. One atomic operation at a time, with real LibreOffice pagination.
+description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. Section transactions, document plans, local repairs and asynchronous host visual review, with real LibreOffice pagination.
 compatibility: Python 3.10+, lxml, Pillow, PyMuPDF, LibreOffice. Runs through execute; no separate Agent or MCP server required.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   maintainer: "local"
 ---
 
 # DOCX authoring
 
-This skill does not register a new Agent tool. Run `scripts/office_docx.py` through `execute`, from the task workspace root (the directory that contains `files/` and `tmp/`; `execute` starts there). In the platform the path is `/agent-skills/docx-ooxml-author/scripts/office_docx.py`. One execute call is one operation. Do not add a planner, loop commands, or write the ZIP yourself.
+This skill does not register a new Agent tool. Run `scripts/office_docx.py` through `execute`, from the task workspace root (the directory that contains `files/` and `tmp/`; `execute` starts there). In the platform the path is `/agent-skills/docx-ooxml-author/scripts/office_docx.py`. Use the main Agent only. One execute call submits one bounded atomic operation or one planned section transaction. Do not add an Agent, loop CLI commands, or write the ZIP yourself.
 
 ## Deliverable location (hard rule)
 
@@ -20,6 +20,43 @@ This skill does not register a new Agent tool. Run `scripts/office_docx.py` thro
 - Uploaded files are in `files/`, so an uploaded template is `files/<template>.docx`.
 
 Prefer a template's sections, paragraphs, named styles, content controls and tables. Author a WordprocessingML fragment only when the template has no suitable block and the atomic operations cannot express the change. Do not claim a page was checked unless you inspected its LibreOffice render.
+
+## Workflow (default for multi-section documents)
+
+1. Select an uploaded template first. With no template, run `list-styles` and
+   `inspect-style academic` (also consulting, technical, business), then use
+   `init --document-id report --output files/report.docx --design academic`.
+   An explicit Design MD path is accepted; its `docx-design` JSON block maps to
+   named Word paragraph/table styles and page dimensions. `--template` takes
+   precedence and leaves all template styles intact, even if `--design` is present.
+2. Write `tmp/document-plan.json`, validate it with `validate-plan`, then persist
+   it using `save-plan files/report.docx tmp/plan-request.json`. The plan contains
+   section requirements, stable block IDs, equations/figures/tables, references
+   and styles. Page count is a soft target; never manufacture fixed pages.
+3. Submit each section with `apply-section files/report.docx tmp/section.json
+   --asset-root tmp`. It uses the existing atomic operations in memory, commits
+   once and checkpoints the entire reflow once. Read `status` after each call.
+   Validation/mutation failure rolls the entire transaction back. A render
+   failure after a successful commit leaves that revision recoverable, reports
+   the failure and blocks the next section until checked again.
+4. Run `check-document files/report.docx --final` after the last section. For
+   deterministic `repair_targets`, run `repair-document files/report.docx
+   --base-revision N --operation-id repair-unique`. It edits only identified
+   blocks and rechecks. Report remaining issues; never regenerate the whole file.
+5. In the platform, page screenshots are reviewed asynchronously by the shared
+   host Office service. Suggestions are advisory and cannot edit the file or
+   block normal-mode generation/delivery. Missing image-capable models produce
+   `unavailable`, never a pass. The UI displays version-bound suggestions.
+6. `finalize files/report.docx --base-revision N` delivers an editable DOCX when
+   the new workflow's final structure/layout check passes, with visual status
+   disclosed. Legacy apply-one documents and strict mode retain their review gates.
+
+To change course, submit a replacement plan with a new operation ID and current
+base revision. Unaffected document bytes and section content are retained; affected
+sections are marked `needs_review`. Inspect their existing block IDs and update
+those blocks with apply-section or apply-one. Removing a section from the plan
+never silently deletes existing content. Restore restores the plan associated
+with the selected snapshot. See `references/document-workflow.md` for payloads.
 
 ## 1. Choose a template
 
@@ -49,7 +86,7 @@ python "$S" finalize files/report.docx --base-revision N
 
 ## 2. Template operations
 
-One call is one bounded semantic operation. `section.clone` may copy the blocks of one heading section inside that limit (40 blocks, 20000 characters). It is not permission to submit the whole document, a batch, or a ZIP write.
+`apply-one` remains one bounded semantic operation; `apply-section` is one planned chapter of these operations. `section.clone` may copy the blocks of one heading section inside that limit (40 blocks, 20000 characters). This limit still applies inside a section transaction; do not submit the whole document or a ZIP write.
 
 - `section.clone` copies a heading and the blocks up to the next same-or-higher heading, including their styles.
 - `block.clone` copies one paragraph or table. `rows` replaces cell text and does not leave older paragraphs behind.
@@ -65,7 +102,7 @@ Word repaginates. Do not insert page breaks to manufacture a page count.
 
 ## 3a. Academic content
 
-Reports with formulas, figures and references use these native operations, one per execute call like any other. Do not hand-build OMML, charts, fields or a ZIP in `tmp/` to get them.
+Reports with formulas, figures and references use these native operations, through apply-one or a planned apply-section transaction. Do not hand-build OMML, charts, fields or a ZIP in `tmp/` to get them.
 
 - Headings: `append_paragraph` with `Heading1`, `Heading2` or `Heading3` (multi-level headings feed the table of contents).
 - `insert_toc`: a Word table of contents, rebuilt from the headings after every operation.
@@ -86,13 +123,13 @@ Payloads and limits are in `references/operations.md`.
 
 Use the current `base_revision`, a stable `block_id` and a stable `operation_id`. Repeat the same request after uncertain delivery. A conflict means read `status` and rebase. A failed operation does not increment the revision. Restore creates a new revision.
 
-The engine asks for a checkpoint after three additions and at each section end. Do not skip it by writing the package yourself. Failed automatic checks block further additions until the current content is repaired.
+The legacy apply-one engine asks for a checkpoint after three additions. apply-section checks once at each section end, followed by a final check-document. Do not skip it by writing the package yourself. Failed automatic checks block further additions until the current content is repaired.
 
 ## 5. Render and finish
 
 `checkpoint` renders with LibreOffice and records pages. Inspect those images. A vision-capable reviewer can call `review-page` with notes from that image. Text-only inspection cannot pass a page. A missing renderer is a failed checkpoint.
 
-`finalize --base-revision` requires the final checkpoint and a reviewed final page. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
+For legacy documents, `finalize --base-revision` requires the final checkpoint and a reviewed final page. The planned section workflow uses a final check-document in normal mode; strict mode still requires actual visual approval. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
 
 ## Request
 

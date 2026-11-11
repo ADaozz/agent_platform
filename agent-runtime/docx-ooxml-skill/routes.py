@@ -22,7 +22,7 @@ def create_router(host):
                 state = store.status(committed=True)
                 if state.get('preview_revision', -1) < state['revision']:
                     documents.schedule_preview(store.path)
-                result.append(dict(document_id=document_id, path=record['documents'][document_id]['path'], **{k: state.get(k) for k in ('revision','sha256','pages','gate','render_revision','render_error','finalized','preview_revision','preview_pages','preview_page_hashes','preview_error','external_conflict')}))
+                result.append(dict(document_id=document_id, path=record['documents'][document_id]['path'], **{k: state.get(k) for k in ('revision','sha256','pages','gate','render_revision','render_error','finalized','preview_revision','preview_pages','preview_page_hashes','preview_error','external_conflict','document_check','aesthetic_reviews','document_plan','sections')}))
             except (ValueError, OSError):
                 continue
         return result

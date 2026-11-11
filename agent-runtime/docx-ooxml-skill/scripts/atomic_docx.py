@@ -117,12 +117,14 @@ class DocumentStore(_shared.ArtifactStore):
             gate = 'checkpoint'
         if 'external' in request:
             result.update(external_unreviewed=True, gate='checkpoint')
+        state['aesthetic_reviews'] = {}
+        state['document_check'] = None
         state.update(revision=revision, sha256=digest, pending_publish=True, finalized=False,
             dirty=dirty, pages=[], preview_ready=False, gate=gate)
         self.persist_revision(c, state, data, result, request, operation_id, kind)
         return result
 
-    def init(self, document_id, template=None, mode='normal'):
+    def init(self, document_id, template=None, mode='normal', design=None):
         identifier(document_id)
         if mode not in ('normal', 'strict'):
             raise ValueError('Unknown review mode')
@@ -134,11 +136,16 @@ class DocumentStore(_shared.ArtifactStore):
             if self.path.exists():
                 raise ValueError('Document exists; use track_external or a different output path')
             parts = o.read_parts(template) if template else o.default_package()
+            selected_design = None
+            if design and not template:
+                helper = _sibling('document_design')
+                selected_design = helper.inspect_style(design)
+                parts = helper.apply(parts, selected_design, o)
             parts = mark_blocks(parts)
             manifest = _template_manifest(parts, template) if template else None
             data = packed(parts)
             state = dict(document_id=document_id, revision=-1, mode=mode, dirty=-1, pages=[], gate='open',
-                template_manifest=manifest)
+                template_manifest=manifest, selected_design=selected_design)
             self.commit(c, state, data, '__init__', {'template': str(template)}, [], 'document_initialized')
             return state
 
@@ -200,6 +207,59 @@ class DocumentStore(_shared.ArtifactStore):
                 raise ValueError('Invalid atomic operation: ' + str(exc)) from exc
             return self.commit(c, state, packed(parts), request['operation_id'], request, changed, extra=extra)
 
+    def _workflow(self, name, *args, **kwargs):
+        from types import SimpleNamespace
+        api = SimpleNamespace(o=o, identifier=identifier, BLOCK_ID=BLOCK_ID,
+            BLOCK_NS=BLOCK_NS, packed=packed, mutate=mutate, _sibling=_sibling)
+        return getattr(_sibling('document_workflow'), name)(self, *args, a=api, **kwargs)
+
+    def save_plan(self, request):
+        return self._workflow('save_plan', request)
+
+    def apply_section(self, request, asset_root=None):
+        result = self._workflow('apply_section', request, asset_root)
+        # The durable transaction is already committed. Render failure is reported
+        # as a failed check, never disguised as a rolled-back transaction.
+        current = self.status(committed=True)
+        if current['revision'] == result['revision'] and current.get('render_revision') != result['revision']:
+            try:
+                self.check_document(section_id=request['section_id'])
+            except ValueError:
+                # A newer commit supersedes this check; the accepted transaction
+                # still has a stable idempotent result. Other check errors surface.
+                if self.status(committed=True)['revision'] == result['revision']:
+                    raise
+        return result
+
+    def check_document(self, final=False, section_id=None):
+        return self._workflow('check_document', final, section_id=section_id)
+
+    def repair_document(self, base_revision, operation_id):
+        return self._workflow('repair_document', base_revision, operation_id)
+
+    def prepare_restore(self, c, state, revision):
+        # Replay metadata transitions, including restores followed by more edits.
+        # Looking up only the most recent plan edit would resurrect a superseded
+        # plan after restoring a revision that was itself built from a restore.
+        metadata = {}
+        plan, workflow = None, False
+        for row in c.execute('SELECT revision,request,result FROM revisions WHERE revision<=? ORDER BY revision', (revision,)):
+            request, result = json.loads(row['request']), json.loads(row['result'])
+            if 'restore' in request:
+                plan, workflow = metadata[request['restore']]
+            else:
+                if 'plan' in result:
+                    plan = result['plan']
+                if 'section_id' in request:
+                    workflow = True
+            metadata[row['revision']] = (plan, workflow)
+        state.update(document_plan=plan, sections={}, document_check=None)
+        if workflow:
+            state['workflow_version'] = 1
+        else:
+            state.pop('workflow_version', None)
+        return state
+
     def track_external(self, document_id=None):
         """Observe native write/execute changes without calling them reviewed/atomic."""
         with self.locked() as (c, state):
@@ -239,11 +299,13 @@ class DocumentStore(_shared.ArtifactStore):
                     return output, manifest
             source = output / self.path.name
             publish(source, data)
+            render_started = time.monotonic()
             manifest = o.run_render(source, output)
             if manifest is None:  # deterministic renderer used by storage tests
                 import pymupdf as fitz
                 with fitz.open(output / 'preview.pdf') as pdf:
                     manifest = dict(sha256=digest, page_count=len(pdf), images=[f'page-{i+1:03d}.png' for i in range(len(pdf))])
+            manifest['render_ms'] = round((time.monotonic() - render_started) * 1000, 2)
             manifest['sha256'] = digest
             self._share_pages(output, manifest)
             publish(manifest_file, json.dumps(manifest).encode())
@@ -282,7 +344,7 @@ class DocumentStore(_shared.ArtifactStore):
     def preview(self, revision):
         output, manifest = self.render_snapshot(revision)
         with self.locked() as (c, state):
-            if state is None or revision <= state.get('preview_revision', -1):
+            if state is None or revision != state['revision'] or revision <= state.get('preview_revision', -1):
                 return None
             state.update(preview_revision=revision, preview_pages=manifest['page_count'], preview_page_hashes=manifest['page_hashes'],
                 preview_error=None, preview_ready=True)
@@ -371,7 +433,9 @@ class DocumentStore(_shared.ArtifactStore):
     def finalize(self, base_revision):
         with self.locked() as (c, state):
             self.assert_current(state, base_revision)
-            if state.get('render_revision') != base_revision or not state['pages'] or state['gate'] != 'open' or any(p['status'] != 'passed' for p in state['pages']):
+            workflow = state.get('workflow_version') == 1
+            check = state.get('document_check') or {}
+            if state.get('render_revision') != base_revision or not state['pages'] or state['gate'] != 'open' or (not workflow and any(p['status'] != 'passed' for p in state['pages'])) or (workflow and (check.get('revision') != base_revision or not check.get('passed') or not check.get('final'))):
                 raise ValueError('Final checkpoint and actual visual review of every page required')
             render_dir = self.render_directory(base_revision)
             if not (render_dir / 'render.json').is_file() or any(not (render_dir / p['image']).is_file() for p in state['pages']):
@@ -381,7 +445,13 @@ class DocumentStore(_shared.ArtifactStore):
             self.save_state(c, state)
             c.execute('INSERT INTO events(data) VALUES (?)', (json.dumps(dict(type='document_finalized', document_id=state['document_id'], revision=base_revision, path=self.path.name, finalized=True)),))
             c.commit()
-            return dict(status='finalized', document_id=state['document_id'], revision=base_revision, sha256=state['sha256'])
+            return dict(status='finalized', document_id=state['document_id'], revision=base_revision, sha256=state['sha256'],
+                structure=(state.get('document_check') or {}).get('structure_passed'),
+                layout=(state.get('document_check') or {}).get('layout_passed'),
+                visual_review=state.get('aesthetic_reviews', {}),
+                visual_status='pending' if len(state.get('aesthetic_reviews', {})) < len(state['pages']) else
+                    'unavailable' if any(r.get('status') == 'unavailable' for r in state['aesthetic_reviews'].values()) else
+                    'completed', editable=True)
 
 
 def mutate(parts, op, asset_root):

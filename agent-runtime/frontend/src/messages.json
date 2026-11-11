@@ -1858,5 +1858,29 @@
   "docx.changedPages": {
     "zh": "已更新第 {pages} 页",
     "en": "Updated page {pages}"
+  },
+  "docx.workflowStatus": {
+    "zh": "结构、排版与后台视觉审查",
+    "en": "Structure, layout and visual review"
+  },
+  "docx.structure": {
+    "zh": "结构",
+    "en": "Structure"
+  },
+  "docx.layout": {
+    "zh": "排版",
+    "en": "Layout"
+  },
+  "docx.checkPassed": {
+    "zh": "通过",
+    "en": "Passed"
+  },
+  "docx.backgroundReviewPending": {
+    "zh": "后台视觉审查等待中",
+    "en": "Background visual review pending"
+  },
+  "docx.visualAdvisory": {
+    "zh": "视觉建议供参考，不会自动修改文档。",
+    "en": "Visual suggestions are advisory and do not edit the document."
   }
 }

@@ -1,0 +1,22 @@
+{
+  "metrics": {
+    "commit_to_sse_p95_ms": 315.99,
+    "commit_to_paginated_preview_p95_ms": 4591.15,
+    "page_decode_and_swap_p95_ms": 142.7,
+    "rendered_samples": 78
+  },
+  "revision": 112,
+  "pages": 12,
+  "errors": [],
+  "tests": [
+    "formatted_generation",
+    "live_sse",
+    "steering_to_table",
+    "read_only",
+    "focus",
+    "closed_state",
+    "scroll",
+    "natural_A4_pagination",
+    "reload_restores_review_state"
+  ]
+}

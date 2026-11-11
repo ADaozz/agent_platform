@@ -12,11 +12,14 @@ spec = importlib.util.spec_from_file_location('atomic_docx', SCRIPTS / 'atomic_d
 engine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(engine)
 DocumentStore = engine.DocumentStore
+review_spec = importlib.util.spec_from_file_location('docx_visual_review', Path(__file__).with_name('visual_review.py'))
+review_module = importlib.util.module_from_spec(review_spec)
+review_spec.loader.exec_module(review_module)
 PREVIEWS = ThreadPoolExecutor(max_workers=2, thread_name_prefix='docx-preview')
 
 
 class Documents:
-    def __init__(self, root, emit=None, live_preview=False, temporary_root=None):
+    def __init__(self, root, emit=None, live_preview=False, temporary_root=None, host=None):
         self.root = Path(root).resolve()
         self.temporary_root = temporary_root
         self.emit = emit or (lambda event: None)
@@ -27,6 +30,8 @@ class Documents:
         self.preview_jobs = {}
         self.preview_active = set()
         self.closed = False
+        self.engine_store = DocumentStore
+        self.reviews = review_module.DocumentReviews(self, host)
 
     def store(self, path):
         return DocumentStore(path, temporary_root=self.temporary_root)
@@ -40,6 +45,9 @@ class Documents:
                 if (path.parent/'.docx-state'/path.name/'history.sqlite').exists():
                     events=self.store(path).events()
                     self.cursors[relative]=events[-1]['store_seq'] if events else 0
+
+        for path in self.paths():
+            if (path.parent/'.docx-state'/path.name/'history.sqlite').exists(): self.reviews.resume(path)
 
     def document_path(self, identity):
         if identity not in self.bound_paths: raise ValueError('Unknown document')
@@ -94,6 +102,7 @@ class Documents:
 
     def close(self):
         self.closed = True
+        self.reviews.close()
         for job in list(self.preview_jobs.values()):
             job.result(timeout=130)
 
@@ -127,6 +136,8 @@ class Documents:
                     if identity: self.bound_paths[identity] = relative
                     self.emit(event)
                     self.cursors[relative] = seq
+                    self.reviews.observe(path, event)
+                    if event.get('needs_preview'): self.schedule_preview(path)
 
     def detect_external(self):
         with self.lock:
@@ -154,8 +165,8 @@ class Documents:
             self.sync()
 
 
-def create_service(root, emit, temporary_root=None):
-    return Documents(root, emit, live_preview=True, temporary_root=temporary_root)
+def create_service(root, emit, temporary_root=None, host=None):
+    return Documents(root, emit, live_preview=True, temporary_root=temporary_root, host=host)
 
 
 def create_router(host):

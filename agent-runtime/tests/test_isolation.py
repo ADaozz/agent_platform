@@ -140,7 +140,9 @@ def test_file_api_and_office_services_never_cross_threads(store):
     assert store.get(f'/api/agent/sessions/{a}/files/'+path).content==b'ONLY_A'
     assert store.get(f'/api/agent/sessions/{b}/files/'+path).status_code==404
     assert store.post(f'/api/agent/sessions/{b}/messages',json={'text':'steal','upload_ids':[upload['id']]}).status_code==404
-    assert store.get('/api/agent/files').status_code==404
+    aggregate=store.get('/api/agent/files')
+    assert aggregate.status_code==200
+    assert [(item['session_id'],item['path']) for item in aggregate.json()]==[(a,path)]
     assert store.post('/api/agent/uploads',files={'file':('global.txt',b'no')}).status_code==404
     for tid in (a,b):
         service=runtime.runtime(tid).ensure_artifact_services()
@@ -196,10 +198,12 @@ def test_unsupported_layout_is_rejected_without_import_or_deletion(store,tmp_pat
     assert not (untouched/'workspaces').exists()
 
 
-def test_legacy_task_and_global_file_api_are_absent(store):
+def test_legacy_task_and_global_upload_api_are_absent(store):
     assert store.get('/api/tasks').status_code==404
     assert store.post('/api/tasks',json={'prompt':'removed'}).status_code==404
-    assert store.get('/api/agent/files').status_code==404
+    aggregate=store.get('/api/agent/files')
+    assert aggregate.status_code==200
+    assert aggregate.json()==[]
     assert store.post('/api/agent/uploads',files={'file':('no.txt',b'no')}).status_code==404
 
 

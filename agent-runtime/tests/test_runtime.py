@@ -388,8 +388,10 @@ def test_file_library_download_and_guards(client, tmp_path):
     assert response.status_code == 200
     assert response.content == payload
     assert response.headers['content-disposition'].startswith('attachment;')
-    assert client.get(file_api()).json() == [
+    listed = client.get(file_api()).json()
+    assert [{k: row[k] for k in ('path','size')} for row in listed] == [
         {'path': 'nested/notes.md', 'size': len(payload)}]
+    assert isinstance(listed[0]['modified_at'],(int,float))
     outside = tmp_path / 'outside.md'
     outside.write_text('private')
     (root / 'link.md').symlink_to(outside)
@@ -883,7 +885,9 @@ def test_native_conversation_storage_is_not_an_output_or_download(client):
     (root/'report.txt').write_text('public output')
     assert rt.changed_files(root,{})==[{'path':'report.txt','size':13}]
     assert client.get(file_api() + '/.deepagents/conversation_history/session_private.md').status_code==404
-    assert client.get(file_api()).json()==[{'path':'report.txt','size':13}]
+    listed=client.get(file_api()).json()
+    assert [{k:row[k] for k in ('path','size')} for row in listed]==[{'path':'report.txt','size':13}]
+    assert isinstance(listed[0]['modified_at'],(int,float))
     event=rt.public_event(dict(type='output_files',files=[dict(path='.deepagents/conversation_history/session_private.md'),dict(path='report.txt')]))
     assert event['files']==[dict(path='report.txt')]
 

@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "document_id": "report",
+  "title": "academic acceptance report",
+  "page_target": 20,
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Scope and evidence",
+      "requirements": "Define observable outcomes and establish a reproducible evidence baseline.",
+      "block_ids": [
+        "toc",
+        "s1-h",
+        "s1-h2",
+        "s1-p0",
+        "s1-p1",
+        "s1-p2",
+        "s1-p3",
+        "s1-p4",
+        "s1-p5",
+        "s1-p6",
+        "s1-eq",
+        "s1-chart",
+        "s1-cap",
+        "s1-refs"
+      ],
+      "equations": [
+        "s1-eq"
+      ],
+      "figures": [
+        "s1-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Data collection",
+      "requirements": "Measure source quality, coverage, completeness and the limits of each observation.",
+      "block_ids": [
+        "s2-h",
+        "s2-h2",
+        "s2-p0",
+        "s2-p1",
+        "s2-p2",
+        "s2-p3",
+        "s2-p4",
+        "s2-p5",
+        "s2-p6",
+        "s2-eq",
+        "s2-chart",
+        "s2-cap",
+        "s2-refs"
+      ],
+      "equations": [
+        "s2-eq"
+      ],
+      "figures": [
+        "s2-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Method and assumptions",
+      "requirements": "Document model assumptions, compare alternatives and justify the selected approach.",
+      "block_ids": [
+        "s3-h",
+        "s3-h2",
+        "s3-p0",
+        "s3-p1",
+        "s3-p2",
+        "s3-p3",
+        "s3-p4",
+        "s3-p5",
+        "s3-p6",
+        "s3-eq",
+        "s3-chart",
+        "s3-cap",
+        "s3-refs"
+      ],
+      "equations": [
+        "s3-eq"
+      ],
+      "figures": [
+        "s3-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Evaluation protocol",
+      "requirements": "Separate experimental observations from assumptions and describe the evaluation protocol.",
+      "block_ids": [
+        "s4-h",
+        "s4-h2",
+        "s4-p0",
+        "s4-p1",
+        "s4-p2",
+        "s4-p3",
+        "s4-p4",
+        "s4-p5",
+        "s4-p6",
+        "s4-eq",
+        "s4-chart",
+        "s4-cap",
+        "s4-refs"
+      ],
+      "equations": [
+        "s4-eq"
+      ],
+      "figures": [
+        "s4-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "Results and uncertainty",
+      "requirements": "Report uncertainty alongside measured effects and compare baseline performance.",
+      "block_ids": [
+        "s5-h",
+        "s5-h2",
+        "s5-p0",
+        "s5-p1",
+        "s5-p2",
+        "s5-p3",
+        "s5-p4",
+        "s5-p5",
+        "s5-p6",
+        "s5-eq",
+        "s5-chart",
+        "s5-cap",
+        "s5-refs"
+      ],
+      "equations": [
+        "s5-eq"
+      ],
+      "figures": [
+        "s5-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Reliability and recovery",
+      "requirements": "Explain concurrency control, immutable snapshots and failure recovery boundaries.",
+      "block_ids": [
+        "s6-h",
+        "s6-h2",
+        "s6-p0",
+        "s6-p1",
+        "s6-p2",
+        "s6-p3",
+        "s6-p4",
+        "s6-p5",
+        "s6-p6",
+        "s6-eq",
+        "s6-chart",
+        "s6-cap",
+        "s6-refs"
+      ],
+      "equations": [
+        "s6-eq"
+      ],
+      "figures": [
+        "s6-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "Implementation guidance",
+      "requirements": "Translate evidence into specific implementation steps and verifiable outcomes.",
+      "block_ids": [
+        "s7-h",
+        "s7-h2",
+        "s7-p0",
+        "s7-p1",
+        "s7-p2",
+        "s7-p3",
+        "s7-p4",
+        "s7-p5",
+        "s7-p6",
+        "s7-eq",
+        "s7-chart",
+        "s7-cap",
+        "s7-refs"
+      ],
+      "equations": [
+        "s7-eq"
+      ],
+      "figures": [
+        "s7-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "Conclusions and references",
+      "requirements": "Connect the conclusions to evidence and identify remaining research questions.",
+      "block_ids": [
+        "s8-h",
+        "s8-h2",
+        "s8-p0",
+        "s8-p1",
+        "s8-p2",
+        "s8-p3",
+        "s8-p4",
+        "s8-p5",
+        "s8-p6",
+        "s8-eq",
+        "s8-chart",
+        "s8-cap",
+        "s8-refs"
+      ],
+      "equations": [
+        "s8-eq"
+      ],
+      "figures": [
+        "s8-chart"
+      ],
+      "tables": [],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "methodology",
+      "text": "Acceptance benchmark methodology; repository fixture."
+    }
+  ]
+}

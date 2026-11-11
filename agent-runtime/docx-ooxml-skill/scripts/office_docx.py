@@ -428,7 +428,7 @@ def set_para_format(p, op):
         ppr = etree.Element(q(W, 'pPr'))
         p.insert(0, ppr)
     # Element ordering is part of the OOXML schema. Preserve its common ordering.
-    rank = {'pStyle': 0, 'keepNext': 1, 'keepLines': 2, 'pageBreakBefore': 3,
+    rank = {'pStyle': 0, 'keepNext': 1, 'keepLines': 2, 'pageBreakBefore': 3, 'widowControl': 4,
             'spacing': 10, 'ind': 11, 'jc': 12, 'rPr': 50}
     def ensure(name):
         el = ppr.find(q(W, name))
@@ -451,7 +451,7 @@ def set_para_format(p, op):
             spacing.set(q(W, attr), str(v))
             if inp == 'line_twips': spacing.set(q(W, 'lineRule'), 'exact')
     for inp, name in [('keep_next', 'keepNext'),
-                      ('keep_lines','keepLines'),('page_break_before','pageBreakBefore')]:
+                      ('keep_lines','keepLines'),('page_break_before','pageBreakBefore'),('widow_control','widowControl')]:
         if inp in op:
             ensure(name).set(q(W, 'val'), '1' if op[inp] else '0')
 
@@ -608,7 +608,7 @@ def run_compare(before, after, output):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest='command', required=True)
-    x = sub.add_parser('init'); x.add_argument('--output', required=True); x.add_argument('--template'); x.add_argument('--document-id'); x.add_argument('--mode', choices=['normal','strict'], default='normal')
+    x = sub.add_parser('init'); x.add_argument('--output', required=True); x.add_argument('--template'); x.add_argument('--document-id'); x.add_argument('--mode', choices=['normal','strict'], default='normal'); x.add_argument('--design')
     x = sub.add_parser('import-template'); x.add_argument('--template', required=True); x.add_argument('--template-id'); x.add_argument('--output'); x.add_argument('--license-note', default='')
     x = sub.add_parser('inspect'); x.add_argument('docx'); x.add_argument('--output')
     x = sub.add_parser('discover'); x.add_argument('--templates', required=True); x.add_argument('--query', required=True); x.add_argument('--limit', type=int, default=15)
@@ -619,6 +619,13 @@ def main(argv=None):
     x = sub.add_parser('review-template'); x.add_argument('--render-dir', required=True); x.add_argument('--output', required=True)
     x = sub.add_parser('finalize'); x.add_argument('docx'); x.add_argument('--render-dir'); x.add_argument('--review'); x.add_argument('--output'); x.add_argument('--base-revision', type=int)
     x = sub.add_parser('apply-one'); x.add_argument('docx'); x.add_argument('request'); x.add_argument('--asset-root', default='.')
+    sub.add_parser('list-styles')
+    x = sub.add_parser('inspect-style'); x.add_argument('style')
+    x = sub.add_parser('validate-plan'); x.add_argument('plan')
+    x = sub.add_parser('save-plan'); x.add_argument('docx'); x.add_argument('request')
+    x = sub.add_parser('apply-section'); x.add_argument('docx'); x.add_argument('request'); x.add_argument('--asset-root', default='.')
+    x = sub.add_parser('check-document'); x.add_argument('docx'); x.add_argument('--final', action='store_true'); x.add_argument('--section-id')
+    x = sub.add_parser('repair-document'); x.add_argument('docx'); x.add_argument('--base-revision', type=int, required=True); x.add_argument('--operation-id', required=True)
     x = sub.add_parser('status'); x.add_argument('docx')
     x = sub.add_parser('restore'); x.add_argument('docx'); x.add_argument('--revision', type=int, required=True); x.add_argument('--base-revision', type=int, required=True); x.add_argument('--operation-id', required=True)
     x = sub.add_parser('checkpoint'); x.add_argument('docx'); x.add_argument('--final', action='store_true')
@@ -626,6 +633,13 @@ def main(argv=None):
     x = sub.add_parser('publish'); x.add_argument('docx'); x.add_argument('--base-revision', type=int, required=True)
     a = p.parse_args(argv)
     try:
+        if a.command in ('list-styles', 'inspect-style', 'validate-plan'):
+            from atomic_docx import _sibling
+            if a.command == 'validate-plan': result = _sibling('document_plan').validate(json.loads(Path(a.plan).read_text(encoding='utf-8')))
+            elif a.command == 'list-styles': result = _sibling('document_design').list_styles()
+            else: result = _sibling('document_design').inspect_style(a.style)
+            json_print(result)
+            return 0
         if a.command == 'import-template':
             import importlib.util
             spec = importlib.util.spec_from_file_location('docx_template_importer', Path(__file__).with_name('template_importer.py'))
@@ -633,11 +647,15 @@ def main(argv=None):
             spec.loader.exec_module(importer)
             json_print(importer.import_template(a.template, a.template_id, a.output, a.license_note))
             return 0
-        if a.command in ('apply-one', 'status', 'restore', 'checkpoint', 'review-page', 'publish') or (a.command == 'init' and a.document_id) or (a.command == 'finalize' and a.base_revision is not None):
+        if a.command in ('apply-one', 'apply-section', 'save-plan', 'check-document', 'repair-document', 'status', 'restore', 'checkpoint', 'review-page', 'publish') or (a.command == 'init' and a.document_id) or (a.command == 'finalize' and a.base_revision is not None):
             from atomic_docx import DocumentStore
             store = DocumentStore(a.output if a.command == 'init' else a.docx)
-            if a.command == 'init': result = store.init(a.document_id, a.template, a.mode)
+            if a.command == 'init': result = store.init(a.document_id, a.template, a.mode, a.design)
             elif a.command == 'apply-one': result = store.apply_one(json.loads(Path(a.request).read_text(encoding='utf-8')), a.asset_root)
+            elif a.command == 'save-plan': result = store.save_plan(json.loads(Path(a.request).read_text(encoding='utf-8')))
+            elif a.command == 'apply-section': result = store.apply_section(json.loads(Path(a.request).read_text(encoding='utf-8')), a.asset_root)
+            elif a.command == 'check-document': result = store.check_document(a.final, a.section_id)
+            elif a.command == 'repair-document': result = store.repair_document(a.base_revision, a.operation_id)
             elif a.command == 'restore': result = store.restore(a.revision, a.base_revision, a.operation_id)
             elif a.command == 'checkpoint': result = store.checkpoint(a.final)
             elif a.command == 'review-page': result = store.visual_review(a.revision, a.page, a.passed, a.reviewer, a.notes)

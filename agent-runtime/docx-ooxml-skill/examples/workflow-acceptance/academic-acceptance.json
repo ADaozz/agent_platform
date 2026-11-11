@@ -1,0 +1,118 @@
+{
+  "case": "academic",
+  "page_target": 20,
+  "actual_pages": 20,
+  "passed": true,
+  "new_tool_calls": 13,
+  "revision": 9,
+  "calls": [
+    {
+      "command": "init",
+      "revision": 0,
+      "duration_ms": 26.05
+    },
+    {
+      "command": "validate-plan",
+      "revision": null,
+      "duration_ms": 0.36
+    },
+    {
+      "command": "save-plan",
+      "revision": 1,
+      "duration_ms": 19.3
+    },
+    {
+      "command": "apply-section",
+      "revision": 2,
+      "duration_ms": 1869.9
+    },
+    {
+      "command": "apply-section",
+      "revision": 3,
+      "duration_ms": 1984.73
+    },
+    {
+      "command": "apply-section",
+      "revision": 4,
+      "duration_ms": 2965.35
+    },
+    {
+      "command": "apply-section",
+      "revision": 5,
+      "duration_ms": 3495.04
+    },
+    {
+      "command": "apply-section",
+      "revision": 6,
+      "duration_ms": 3920.18
+    },
+    {
+      "command": "apply-section",
+      "revision": 7,
+      "duration_ms": 4659.9
+    },
+    {
+      "command": "apply-section",
+      "revision": 8,
+      "duration_ms": 5449.31
+    },
+    {
+      "command": "apply-section",
+      "revision": 9,
+      "duration_ms": 5962.54
+    },
+    {
+      "command": "check-document --final",
+      "revision": 9,
+      "duration_ms": 668.86
+    },
+    {
+      "command": "finalize",
+      "revision": 9,
+      "duration_ms": 5.05
+    }
+  ],
+  "repair_successes": 0,
+  "repair_targets": [],
+  "visual_review": "pending; requires configured host vision service",
+  "editable": true,
+  "forced_page_breaks": false,
+  "render_timings_ms": [
+    {
+      "revision": 2,
+      "render_ms": 1455.87
+    },
+    {
+      "revision": 3,
+      "render_ms": 1513.6
+    },
+    {
+      "revision": 4,
+      "render_ms": 2409.06
+    },
+    {
+      "revision": 5,
+      "render_ms": 2818.11
+    },
+    {
+      "revision": 6,
+      "render_ms": 3114.91
+    },
+    {
+      "revision": 7,
+      "render_ms": 3819.39
+    },
+    {
+      "revision": 8,
+      "render_ms": 4230.58
+    },
+    {
+      "revision": 9,
+      "render_ms": 4737.54
+    }
+  ],
+  "sha256": "1d58d057cbb0eb8d880ed9d83579d839b79b87f577d8d35944b417d599e1ce24",
+  "artifact": "academic.docx",
+  "measured_legacy_tool_calls": 142,
+  "measured_call_reduction": 0.908451
+}

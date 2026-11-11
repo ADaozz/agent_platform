@@ -17,3 +17,7 @@ python "$S" finalize files/report.docx --base-revision N
 ```
 
 The older candidate/plan batch commands (`apply`, `render`, `review-template`, `finalize --render-dir`) are kept for compatibility only and are described in `references/legacy-operations.md`; do not use them for new work. The input DOCX is never overwritten. Outputs are editable Office files, not page screenshots.
+
+## Planned section workflow
+
+See [the workflow contract](references/document-workflow.md) for Design MD, document-plan.json, apply-section transactions, full-document checks, local repair and shared asynchronous visual review. Existing atomic/legacy interfaces remain supported.
