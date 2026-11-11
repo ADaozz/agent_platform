@@ -20,13 +20,26 @@ def create_router(host):
                 if not store.path.is_file():
                     continue
                 state = store.metadata(external=True)
+                state['delivery']=documents.quality_delivery(state)
+                state['delivery_status']=state['delivery']['status'] if state.get('quality_contract',1)>=2 else state.get('delivery_status')
                 if state.get('preview_revision', -1) < state['revision']:
                     documents.schedule_preview(store.path)
-                result.append(dict(document_id=document_id, path=record['documents'][document_id]['path'], **{k: state.get(k) for k in ('revision','sha256','pages','gate','render_revision','render_error','finalized','preview_revision','preview_pages','preview_page_hashes','preview_error','external_conflict','document_check','aesthetic_reviews','document_plan','sections')}))
+                result.append(dict(document_id=document_id, path=record['documents'][document_id]['path'], **{k: state.get(k) for k in ('revision','sha256','pages','gate','render_revision','render_error','finalized','preview_revision','preview_pages','preview_page_hashes','preview_error','external_conflict','document_check','aesthetic_reviews','document_plan','sections','selected_design','quality_contract','document_review','delivery','delivery_status','repair_summary','visual_request')}))
             except (ValueError, OSError):
                 continue
         return result
 
+
+    class ReviewRequest(BaseModel):
+        revision:int=Field(ge=0)
+
+    @router.post('/sessions/{session_id}/documents/{document_id}/visual-review')
+    def request_visual_review(session_id:str,document_id:str,value:ReviewRequest):
+        store=document_store(session_id,document_id)
+        service=host.service(session_id,'docx')
+        try:result=service.reviews.request(store.path,value.revision)
+        except ValueError as exc:raise HTTPException(409,str(exc))
+        service.sync();return result
 
     def document_store(session_id, document_id):
         host.service(session_id,'docx')

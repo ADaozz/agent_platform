@@ -78,7 +78,12 @@ def _text_width(root, o):
     width = int(size.get(o.q(o.W, 'w'), 11906)) if size is not None else 11906
     left = int(margin.get(o.q(o.W, 'left'), 1440)) if margin is not None else 1440
     right = int(margin.get(o.q(o.W, 'right'), 1440)) if margin is not None else 1440
-    return max(2000, width - left - right)
+    available=width-left-right
+    columns=section.find(o.q(o.W,'cols')) if section is not None else None
+    if columns is not None:
+        count=int(columns.get(o.q(o.W,'num'),'1'));gap=int(columns.get(o.q(o.W,'space'),'720'))
+        if count>1:available=(available-(count-1)*gap)//count
+    return max(2000, available)
 
 
 def _run(o, text):

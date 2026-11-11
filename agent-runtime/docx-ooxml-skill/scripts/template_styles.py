@@ -173,3 +173,35 @@ def _add(unhandled, seen, part, color, reason, status, location):
         return
     seen.add(key)
     unhandled.append(dict(part=part, color=color, reason=reason, status=status, location=location))
+
+
+def design_deviations(parts, design, o, block_attribute):
+    """Resolve inherited and direct Word formatting; never rewrite a user template."""
+    if not design or design.get('version',1)<2:return []
+    root=o.parse_xml(parts[o.MAIN]);styles=o.parse_xml(parts['word/styles.xml'])
+    index={s.get(o.q(o.W,'styleId')):s for s in styles}
+    def inherited(style,tag,attr):
+        seen=set()
+        while style in index and style not in seen:
+            seen.add(style);node=index[style]
+            value=node.xpath('string(./w:rPr/w:'+tag+'/@w:'+attr+')',namespaces=o.NS)
+            if value:return value
+            style=node.xpath('string(./w:basedOn/@w:val)',namespaces=o.NS)
+        return ''
+    issues=[]
+    for paragraph in root.iter(o.q(o.W,'p')):
+        style=paragraph.xpath('string(./w:pPr/w:pStyle/@w:val)',namespaces=o.NS) or 'Normal'
+        expected=design['styles'].get(style)
+        if not expected:continue
+        for run in paragraph.findall(o.q(o.W,'r')):
+            text=''.join(t.text or '' for t in run.iter(o.q(o.W,'t')))
+            if not text.strip():continue
+            for script,attr,font in [('Chinese','eastAsia',expected.get('east_asia_font')),('Latin','ascii',expected.get('font'))]:
+                import re
+                if not font or not re.search(r'[\u3400-\u9fff]' if script=='Chinese' else r'[A-Za-z0-9]',text):continue
+                actual=run.xpath('string(./w:rPr/w:rFonts/@w:'+attr+')',namespaces=o.NS) or inherited(style,'rFonts',attr)
+                size=run.xpath('string(./w:rPr/w:sz/@w:val)',namespaces=o.NS) or inherited(style,'sz','val')
+                scripted=bool(run.xpath('./w:rPr/w:vertAlign[@w:val="superscript" or @w:val="subscript"]',namespaces=o.NS))
+                if actual!=font or (not scripted and size!=str(expected['size_half_points'])):
+                    issues.append(dict(code='style_deviation',block_id=paragraph.get(block_attribute),deterministic=False,operation=None,detail=dict(style=style,script=script,expected_font=font,actual_font=actual,expected_size=expected['size_half_points'],actual_size=size)))
+    return issues

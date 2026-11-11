@@ -78,7 +78,26 @@ def apply_section(store,request,asset_root,a):
                 if path not in resources:
                     resources.add(path);resource_size+=path.stat().st_size
                 if resource_size>limits.MAX_RESOURCE_BYTES:raise ValueError('Section resource budget exceeded')
+            design=state.get('selected_design')
+            if design and design.get('version',1)>=2 and design['page'].get('columns',1)==2:
+                # Size only unspecified new components to the actual text column.
+                # Explicit user dimensions remain authoritative and are audited.
+                import copy
+                op=copy.deepcopy(op)
+                width=a._sibling('academic_blocks')._text_width(a.o.parse_xml(parts[a.o.MAIN]),a.o)
+                if op['type']=='insert_chart' and 'width_cm' not in op.get('chart',{}):
+                    chart=op.setdefault('chart',{});chart['width_cm']=round(width/567,2)
+                    chart.setdefault('height_cm',round(chart['width_cm']*8/14,2))
+                elif op['type']=='insert_image':op.setdefault('width_cm',round(width/567,2))
+                elif op['type']=='append_table' and 'column_widths_twips' not in op:
+                    count=max(len(row) for row in op['rows']);op['column_widths_twips']=[width//count]*count
             parts,ids,_=a.mutate(parts,op,base); changed.extend(ids)
+            if design and design.get('version',1)>=2 and op['type']=='insert_equation':
+                document=a.o.parse_xml(parts[a.o.MAIN]);node=document.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])[0]
+                prop=node.find(a.o.q(a.o.W,'pPr'))
+                if prop is None:prop=a.o.etree.Element(a.o.q(a.o.W,'pPr'));node.insert(0,prop)
+                prop.insert(0,a.o.etree.Element(a.o.q(a.o.W,'pStyle'),{a.o.q(a.o.W,'val'):'Equation'}))
+                parts[a.o.MAIN]=a.o.xml_bytes(document)
             design=state.get('selected_design')
             if design and op.get('type') in ('append_table','insert_table'):
                 document=a.o.parse_xml(parts[a.o.MAIN]); table=document.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])[0]
@@ -91,6 +110,13 @@ def apply_section(store,request,asset_root,a):
                     border.set(a.o.q(a.o.W,'color'),design['table']['border_color'])
                 for shade in table.xpath('./w:tr[1]//w:shd',namespaces=a.o.NS):
                     shade.set(a.o.q(a.o.W,'fill'),design['table']['header_fill'])
+                if design.get('version',1)>=2:
+                    for paragraph in table.iter(a.o.q(a.o.W,'p')):
+                        ppr=paragraph.find(a.o.q(a.o.W,'pPr'))
+                        if ppr is None:ppr=a.o.etree.Element(a.o.q(a.o.W,'pPr'));paragraph.insert(0,ppr)
+                        style=ppr.find(a.o.q(a.o.W,'pStyle'))
+                        if style is None:style=a.o.etree.SubElement(ppr,a.o.q(a.o.W,'pStyle'))
+                        style.set(a.o.q(a.o.W,'val'),'TableText')
                 parts[a.o.MAIN]=a.o.xml_bytes(document)
             if sum(len(v) for v in parts.values())>64*1024*1024:raise ValueError('Section package size exceeds limit')
         # Forward references resolve after the final mutation, not at intermediate steps.
@@ -171,6 +197,7 @@ def check_document(store,final,a,section_id=None):
     if section_id and (not plan or section_id not in {s['id'] for s in plan['sections']}):raise ValueError('Unknown section')
     parts=a.o.read_parts(io.BytesIO(store.snapshot(revision)))
     findings=inspect_parts(parts,a)
+    findings.extend(a._sibling('template_styles').design_deviations(parts,current.get('selected_design'),a.o,a.BLOCK_ID))
     event=store.checkpoint(final)
     if event['revision']!=revision:raise ValueError('Revision conflict during document check')
     for page in event['pages']:
@@ -198,25 +225,51 @@ def check_document(store,final,a,section_id=None):
                     node=nodes.get(block)
                     if node is not None and not any(a.o.etree.QName(n).localname==tag for n in node.iter()):
                         findings.append(dict(code='planned_resource_type',block_id=block,deterministic=False,operation=None,detail=key))
+    geometry={}
+    if final and not event['render_error']:
+        import pymupdf as fitz
+        with fitz.open(store.render_directory(revision)/'preview.pdf') as pdf:
+            geometry=a._sibling('layout_review').inspect(parts,pdf,a.o,a.BLOCK_ID,plan,current.get('selected_design'))
+        findings.extend(geometry['findings'])
+        for page in event['pages']:
+            page['block_ids']=sorted(set(page.get('block_ids',[]))|{b for b,pages in geometry['block_pages'].items() if page['page'] in pages})
     targets=[]
     for finding in findings:
+        finding.update(revision=revision,severity=finding.get('severity','error'),repairable=finding.get('deterministic',False),page=finding.get('page'))
         finding['target_id']=hashlib.sha256(json.dumps(finding,sort_keys=True).encode()).hexdigest()[:24]
         targets.append(finding)
     result=dict(document_id=current['document_id'],revision=revision,structure_passed=not any(f['code'] not in {'content_overflow','table_split','heading_orphan','margins_abnormal','blank_page','widow_orphan','fonts_missing'} for f in findings),layout_passed=not event['render_error'] and bool(event['pages']) and all(p['checks']['automatic_passed'] for p in event['pages']),repair_targets=targets,render_error=event['render_error'],pages=event['pages'],scope=section_id or 'document',duration_ms=round((time.monotonic()-started)*1000,2))
+    layout_codes={'text_image_collision','text_collision','content_clipped','content_outside_margins','image_clipped','image_outside_margins','image_distortion','cover_overflow','component_overflow','table_row_split','table_header_missing','vector_clipped'}
+    if any(t['code'] in layout_codes for t in targets):result['layout_passed']=False
+    result['geometry']=geometry
+    result['collision_check_executed']=bool(final and geometry)
     result['final']=final
     result['passed']=not targets and result['layout_passed']
     with store.locked() as(c,state):
         store.assert_current(state,revision)
         state['document_check']=result
-        if not result['passed']:state['gate']='failed'
+        state['pages']=result['pages']
+        if result['passed'] and state.get('repair_summary'):state['repair_summary'].update(remaining=[],exhausted=False,stop_reason=None)
+        if not result['passed']:state.update(gate='failed',finalized=False)
+        state['delivery_status']='draft_pending_visual' if result['passed'] else 'draft_failed_layout'
+        if final and current.get('quality_contract',1)>=2:
+            prior=state.get('visual_request') or {}
+            fingerprints=[p['fingerprint'] for p in result['pages']]
+            if prior.get('revision')==revision and prior.get('fingerprints')==fingerprints:
+                state['visual_request']=dict(prior,eligible=result['passed'])
+            else:
+                import uuid
+                state['visual_request']=dict(document_id=state['document_id'],revision=revision,sha256=state['sha256'],fingerprints=fingerprints,eligible=result['passed'],request_id=uuid.uuid4().hex)
+        state['delivery']=a._sibling('quality_status').delivery(state)
+        state['delivery_status']=state['delivery']['status']
         if section_id:state.setdefault('sections',{}).setdefault(section_id,{})['status']='checked' if result['passed'] else 'failed'
         store.save_state(c,state)
-        c.execute('INSERT INTO events(data) VALUES (?)',(json.dumps(dict(type='document_checked',document_id=state['document_id'],revision=revision,path=store.path.name,gate=state['gate'],document_check=result)),))
+        c.execute('INSERT INTO events(data) VALUES (?)',(json.dumps(dict(type='document_checked',document_id=state['document_id'],revision=revision,path=store.path.name,gate=state['gate'],document_check=result,delivery_status=state['delivery_status'],visual_request=state.get('visual_request'),delivery=state['delivery'],finalized=state.get('finalized',False),selected_design=state.get('selected_design'))),))
         c.commit()
     return result
 
 
-def repair_document(store,base_revision,operation_id,a):
+def _repair_once(store,base_revision,operation_id,a):
     state=store.status()
     # A retry after a committed repair remains idempotent even if rechecking crashed.
     with store.locked() as(c,current):
@@ -226,19 +279,43 @@ def repair_document(store,base_revision,operation_id,a):
             if req.get('repair')!=base_revision:raise ValueError('Operation ID reused')
             committed=json.loads(previous[1])
         else:committed=None
-    if committed:return dict(committed,recheck=check_document(store,True,a))
+    if committed:
+        if committed['revision']!=state['revision']:raise ValueError('Revision conflict after interrupted repair')
+        return dict(committed,recheck=check_document(store,True,a))
     check=state.get('document_check')
     if not check or check['revision']!=base_revision or state['revision']!=base_revision:raise ValueError('A current check-document is required')
     operations=[]
     for target in check['repair_targets']:
-        if target['deterministic'] and target.get('block_id') and target.get('operation') not in operations:operations.append(target['operation'])
+        if target['deterministic'] and target.get('block_id') and (target.get('operation') or {}).get('type') in {'set_paragraph_format','repair_table_pagination','keep_component','refresh_toc_pages','repair_section_numbering'} and target.get('operation') not in operations:operations.append(target['operation'])
+    operations.sort(key=lambda op:op['type']=='refresh_toc_pages')
     if not operations:return dict(status='unrepairable',revision=base_revision,remaining=check['repair_targets'])
     a.identifier(operation_id)
     with store.locked() as(c,state):
         store.assert_current(state,base_revision)
         parts=a.o.read_parts(store.path);changed=[]
         for op in operations:
-            if op['type']=='repair_table_pagination':
+            if op['type'] in ('keep_component','refresh_toc_pages','repair_section_numbering'):
+                root=a.o.parse_xml(parts[a.o.MAIN])
+                if op['type']=='keep_component':
+                    for i,block in enumerate(op['block_ids']):
+                        matches=root.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=block)
+                        if len(matches)!=1 or matches[0].tag!=a.o.q(a.o.W,'p'):raise ValueError('Component repair requires paragraph blocks')
+                        a.o.set_para_format(matches[0],dict(keep_next=i<len(op['block_ids'])-1,keep_lines=True,space_before_twips=0,space_after_twips=120))
+                elif op['type']=='refresh_toc_pages':
+                    targets=root.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])
+                    if len(targets)!=1:raise ValueError('TOC repair target missing')
+                    import re
+                    for field in targets[0].iter(a.o.q(a.o.W,'fldSimple')):
+                        match=re.match(r'\s*PAGEREF\s+(\S+)',field.get(a.o.q(a.o.W,'instr'),''))
+                        if match and match[1] in op['pages']:
+                            a._sibling('academic_blocks')._set_cached(field,a.o,op['pages'][match[1]])
+                else:
+                    sections=list(root.iter(a.o.q(a.o.W,'sectPr')));target=sections[op['section_index']]
+                    n=target.find(a.o.q(a.o.W,'pgNumType'))
+                    if n is None:n=a.o.etree.SubElement(target,a.o.q(a.o.W,'pgNumType'))
+                    n.set(a.o.q(a.o.W,'fmt'),op['format']);n.set(a.o.q(a.o.W,'start'),str(op['start']))
+                parts[a.o.MAIN]=a.o.xml_bytes(root)
+            elif op['type']=='repair_table_pagination':
                 root=a.o.parse_xml(parts[a.o.MAIN]);matches=root.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])
                 if len(matches)!=1:raise ValueError('Repair target no longer exists')
                 table=matches[0]
@@ -253,5 +330,79 @@ def repair_document(store,base_revision,operation_id,a):
                 parts[a.o.MAIN]=a.o.xml_bytes(root)
             else:parts,_,_=a.mutate(parts,op,store.path.parent)
             changed.append(op['block_id'])
-        result=store.commit(c,state,a.packed(parts),operation_id,dict(repair=base_revision),changed,extra=dict(repaired=len(operations),attempted=len(check['repair_targets'])))
+        data=a.packed(parts)
+        if a.repair_policy.package_fingerprint(data)==a.repair_policy.package_fingerprint(store.path.read_bytes()):
+            return dict(status='unrepairable',stop_reason='no_progress',revision=base_revision,remaining=check['repair_targets'])
+        result=store.commit(c,state,data,operation_id,dict(repair=base_revision),changed,extra=dict(repaired=len(operations),attempted=len(check['repair_targets'])))
     return dict(result,recheck=check_document(store,True,a))
+
+
+
+def repair_observations(check,policy):
+    issues=[]
+    for target in check.get('repair_targets',[]):
+        detail=target.get('detail');magnitude=None
+        if isinstance(detail,dict):
+            if target['code'] in ('cover_overflow','component_overflow','table_row_split'):
+                magnitude=max(0,len(detail.get('pages',[]))-1)
+            elif target['code']=='toc_page_results':magnitude=len(detail.get('expected',{}))
+            elif target['code'] in ('text_image_collision','text_collision'):
+                first=detail.get('text_bbox',detail.get('first_bbox'));second=detail.get('image_bbox',detail.get('second_bbox'))
+                if first and second:magnitude=max(0,min(first[2],second[2])-max(first[0],second[0]))*max(0,min(first[3],second[3])-max(first[1],second[1]))
+        key=dict(code=target['code'],block=target.get('block_id'),related=sorted(target.get('related_blocks',[])))
+        if not key['block']:key['page']=target.get('page')
+        issues.append(policy.issue(key,detail,magnitude))
+    return issues
+
+
+def repair_document(store,base_revision,operation_id,a):
+    policy=a.repair_policy;a.identifier(operation_id)
+    with store.locked() as(c,state):
+        old=(state.get('repair_runs') or {}).get(operation_id)
+        if old and old['base_revision']!=base_revision:raise ValueError('Repair operation ID reused')
+        if old and old.get('done'):
+            result=dict(old['result'])
+            result.setdefault('stop_reason','unrepairable' if result.get('exhausted') else None)
+            return result
+        run=old or dict(base_revision=base_revision,policy_version=2,attempts=[],steps=[])
+        if not old:store.assert_current(state,base_revision)
+        state.setdefault('repair_runs',{})[operation_id]=run;store.save_state(c,state);c.commit()
+    result=None;reason=None
+    while True:
+        current=store.status();run=current['repair_runs'][operation_id]
+        i=len(run['attempts']);pending=i<len(run.get('steps',[]))
+        check=current.get('document_check')
+        if not check or check['revision']!=current['revision']:check=check_document(store,True,a)
+        # Replay an interrupted committed step before evaluating its new check.
+        if not pending:
+            if check['passed']:break
+            if check.get('render_error'):reason='render_failed';break
+            observations=repair_observations(check,policy)
+            if not observations:reason='unrepairable';break
+            content=policy.package_fingerprint(store.snapshot(current['revision']))
+            history,control=policy.observe(run.get('progress'),observations,content,current['revision'])
+            with store.locked() as(c,state):
+                store.assert_current(state,current['revision'])
+                state['repair_runs'][operation_id]['progress']=history;store.save_state(c,state);c.commit()
+            if not control['autonomous_repair_allowed']:reason=control['stop_reason'];break
+            opid=operation_id if i==0 else operation_id[:60]+'-retry-'+str(i)
+            with store.locked() as(c,state):
+                store.assert_current(state,current['revision'])
+                state['repair_runs'][operation_id].setdefault('steps',[]).append(dict(base_revision=current['revision'],operation_id=opid))
+                store.save_state(c,state);c.commit()
+            step=dict(base_revision=current['revision'],operation_id=opid)
+        else:step=run['steps'][i]
+        result=_repair_once(store,step['base_revision'],step['operation_id'],a)
+        if result.get('status')=='unrepairable':reason=result.get('stop_reason','unrepairable');break
+        with store.locked() as(c,state):
+            store.assert_current(state,result['revision'])
+            state['repair_runs'][operation_id]['attempts'].append(dict(revision=result['revision'],operation_id=step['operation_id'],repaired=result.get('repaired',0)))
+            store.save_state(c,state);c.commit()
+    latest=store.status();check=latest.get('document_check') or {};attempts=latest['repair_runs'][operation_id]['attempts']
+    result=dict(result or dict(status='checked' if check.get('passed') else 'unrepairable'),revision=latest['revision'],recheck=check,repaired=sum(r.get('repaired',0) for r in attempts),repair_attempts=len(attempts),remaining=check.get('repair_targets',[]),exhausted=not check.get('passed',False),stop_reason=reason)
+    with store.locked() as(c,state):
+        store.assert_current(state,latest['revision'])
+        state['repair_runs'][operation_id].update(done=True,result=result)
+        state['repair_summary']=dict(revision=latest['revision'],attempts=sum(len(r['attempts']) for r in state['repair_runs'].values()),remaining=result['remaining'],exhausted=result['exhausted'],stop_reason=reason)
+        store.save_state(c,state);c.commit()
+    return result

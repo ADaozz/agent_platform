@@ -12,7 +12,7 @@ Usage: follow `SKILL.md`. Run from the task workspace root (the directory contai
 S=scripts/office_docx.py
 python "$S" init --document-id report --output files/report.docx
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
-python "$S" checkpoint files/report.docx
+python "$S" check-document files/report.docx --final
 python "$S" finalize files/report.docx --base-revision N
 ```
 
@@ -21,3 +21,20 @@ The older candidate/plan batch commands (`apply`, `render`, `review-template`, `
 ## Planned section workflow
 
 See [the workflow contract](references/document-workflow.md) for Design MD, document-plan.json, apply-section transactions, full-document checks, local repair and shared asynchronous visual review. Existing atomic/legacy interfaces remain supported.
+
+## Research quality acceptance
+
+New CLI documents require final OOXML/PDF geometry checks, local repairs with progress and cycle detection,
+all-page visual review and a separate whole-document visual review. The platform
+shows the three statuses independently. Missing models remain Unavailable; pending
+reviews and visual issues remain downloadable drafts. Uploaded templates retain
+their styles. Four optional CN designs document separate Chinese/Latin fonts and
+the source/verification scope of national and institutional requirements.
+
+Reproduce the long-document acceptance (LibreOffice and CJK fonts required):
+
+```sh
+python agent-runtime/scripts/accept_docx_research.py --output /tmp/research-accept
+# --live prompts for a DeepSeek key without storing it; actual model verdicts
+# are retained, including issues. --review-existing retries the same document.
+```

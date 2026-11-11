@@ -3,6 +3,7 @@ import {ref,computed,watch} from 'vue'
 import Icon from '../../Icon.vue'
 import PreviewFileSelect from '../../PreviewFileSelect.vue'
 import DocxPreview from './DocxPreview.vue'
+import QualityReview from './QualityReview.vue'
 import {t} from '../../preferences'
 import {mergeDocument,previewKey} from './state'
 import {api} from '../../featureApi'
@@ -12,7 +13,6 @@ const selected=computed(()=>props.session)
 async function guard(fn){try{return await fn()}catch(error){emit('error',error.message)}}
 const documents = ref({}), activeDocumentId = ref(''), documentOpen = ref(false), reviewPage = ref(null), reviewNotes = ref(''), renderedRevision = ref(null)
 const activeDocument = computed(() => documents.value[activeDocumentId.value])
-const aestheticReviews = computed(() => Object.values(activeDocument.value?.aesthetic_reviews || {}).filter(review => review.revision === activeDocument.value?.revision))
 const documentUrl = computed(() => activeDocument.value && selected.value ? `/api/agent/sessions/${selected.value.id}/documents/${encodeURIComponent(activeDocumentId.value)}/revisions/${activeDocument.value.revision}` : '')
 const documentStorageKey = computed(() => previewKey(selected.value?.id, activeDocumentId.value))
 function receiveDocuments(updates) {
@@ -52,6 +52,14 @@ async function reviewDocumentPage(passed) {
 }
 watch(() => [activeDocumentId.value, activeDocument.value?.revision], () => { reviewPage.value = null; reviewNotes.value = '' })
 watch(activeDocumentId, () => { renderedRevision.value = null })
+async function retryVisualReview() {
+  const id = selected.value.id, identity = activeDocumentId.value
+  await guard(async () => {
+    await api(`/agent/sessions/${id}/documents/${encodeURIComponent(identity)}/visual-review`, {method:'POST', body:{revision:activeDocument.value.revision}})
+    const values = await api(`/agent/sessions/${id}/documents`)
+    if (selected.value?.id === id) receiveDocuments(values)
+  })
+}
 function resetDocuments() { renderedRevision.value = null; documents.value = {}; activeDocumentId.value = ''; documentOpen.value = false; reviewPage.value = null }
 
 let cursor=0
@@ -78,17 +86,7 @@ watch(()=>[activeDocument.value?.revision,renderedRevision.value,props.active],(
       <p v-if="activeDocument.preview_error" class="docx-gate-error">{{ t('docx.previewUnavailable') }}</p>
       <p v-if="activeDocument.render_error" class="docx-gate-error" role="alert">{{ t('docx.checkFailed') }} {{ activeDocument.render_error }}</p>
       <p v-else-if="activeDocument.gate && activeDocument.gate !== 'open'" class="docx-gate-note">{{ t('docx.gate.' + activeDocument.gate) }}</p>
-      <details v-if="activeDocument.document_check || aestheticReviews.length" class="docx-review-controls">
-        <summary>{{ t('docx.workflowStatus') }}</summary>
-        <p v-if="activeDocument.document_check">{{ t('docx.structure') }}: {{ activeDocument.document_check.structure_passed ? t('docx.checkPassed') : t('docx.checkFailed') }} · {{ t('docx.layout') }}: {{ activeDocument.document_check.layout_passed ? t('docx.checkPassed') : t('docx.checkFailed') }}</p>
-        <p v-if="!aestheticReviews.length">{{ t('docx.backgroundReviewPending') }}</p>
-        <div v-for="review in aestheticReviews" :key="review.review_id">
-          <p>{{ t('docx.page', {page:review.page}) }} · {{ t('pptx.aesthetic.' + review.status) }} · {{ review.summary }}</p>
-          <p v-if="review.error">{{ review.error.code }}: {{ review.error.message }}</p>
-          <p v-for="(issue, index) in review.issues" :key="index">{{ issue.block_id || '' }} {{ issue.observation }} — {{ issue.suggestion }}</p>
-        </div>
-        <p>{{ t('docx.visualAdvisory') }}</p>
-      </details>
+      <QualityReview :document="activeDocument" @retry="retryVisualReview" />
       <DocxPreview :key="selected.id + activeDocumentId" :revision="activeDocument.revision" :render-revision="activeDocument.preview_revision" :render-pages="activeDocument.preview_pages" :page-hashes="activeDocument.preview_page_hashes" :render-base-url="`/api/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders`" :image-base-url="`/api/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/page-images`" :pages="activeDocument.pages || []" :storage-key="documentStorageKey" @rendered="renderedRevision = $event" />
       <div v-if="activeDocument.pages?.length" class="docx-review-controls"><span>{{ t('docx.layoutNote') }}</span><button v-for="page in activeDocument.pages.filter(p => p.checks?.automatic_passed && p.checks?.visual_review !== 'passed')" :key="page.page" type="button" class="text-button" @click="reviewPage = page.page; reviewNotes = ''">{{ t('docx.inspectPage', { page: page.page }) }}</button></div>
       <div v-if="reviewPage" class="docx-human-review"><button class="icon-button" type="button" :aria-label="t('docx.close')" @click="reviewPage = null"><Icon name="X" :size="16" /></button><p>{{ t('docx.actualReview') }}</p><a :href="`/api/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders/${activeDocument.revision}/page-${String(reviewPage).padStart(3, '0')}.png`" target="_blank" rel="noopener">{{ t('docx.fullPage') }}</a><img :src="`/api/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders/${activeDocument.revision}/page-${String(reviewPage).padStart(3, '0')}.png`" :alt="t('docx.page', { page: reviewPage })"><textarea v-model="reviewNotes" :placeholder="t('docx.reviewNotes')"></textarea><div><button class="secondary" type="button" :disabled="!reviewNotes.trim()" @click="reviewDocumentPage(false)">{{ t('docx.reject') }}</button><button class="primary" type="button" :disabled="!reviewNotes.trim()" @click="reviewDocumentPage(true)">{{ t('docx.approve') }}</button></div></div>

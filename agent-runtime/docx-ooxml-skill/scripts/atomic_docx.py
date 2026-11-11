@@ -119,13 +119,18 @@ class DocumentStore(_shared.ArtifactStore):
             result.update(external_unreviewed=True, gate='checkpoint')
         state['aesthetic_reviews'] = {}
         state['document_check'] = None
+        state['document_review'] = None
+        state['visual_request'] = None
+        state['delivery_status'] = 'draft_pending_check'
+        state['delivery_requested'] = False
         state.update(revision=revision, sha256=digest, pending_publish=True, finalized=False,
             dirty=dirty, pages=[], preview_ready=False, gate=gate)
         self.persist_revision(c, state, data, result, request, operation_id, kind)
         return result
 
-    def init(self, document_id, template=None, mode='normal', design=None):
+    def init(self, document_id, template=None, mode='normal', design=None, columns=None, quality_contract=None):
         identifier(document_id)
+        if quality_contract is not None and (type(quality_contract) is not int or quality_contract not in (1,2)):raise ValueError('Unknown quality contract')
         if mode not in ('normal', 'strict'):
             raise ValueError('Unknown review mode')
         with self.locked() as (c, state):
@@ -140,12 +145,13 @@ class DocumentStore(_shared.ArtifactStore):
             if design and not template:
                 helper = _sibling('document_design')
                 selected_design = helper.inspect_style(design)
+                if columns is not None:selected_design['page']['columns']=columns
                 parts = helper.apply(parts, selected_design, o)
             parts = mark_blocks(parts)
             manifest = _template_manifest(parts, template) if template else None
             data = packed(parts)
             state = dict(document_id=document_id, revision=-1, mode=mode, dirty=-1, pages=[], gate='open',
-                template_manifest=manifest, selected_design=selected_design)
+                template_manifest=manifest, selected_design=selected_design, quality_contract=quality_contract or (2 if selected_design and selected_design.get('version',1)>=2 else 1))
             self.commit(c, state, data, '__init__', {'template': str(template)}, [], 'document_initialized')
             return state
 
@@ -212,7 +218,7 @@ class DocumentStore(_shared.ArtifactStore):
             if state['gate'] != 'open' and kind not in repairs:
                 raise ValueError('Page checkpoint required before adding content: ' + state['gate'])
             if state['dirty'] >= MAX_DIRTY * 2:
-                raise ValueError('Repair budget exhausted; checkpoint before further changes')
+                raise ValueError('Checkpoint required before further changes')
             parts = o.read_parts(self.path)
             try:
                 parts, changed, extra = mutate(parts, op, Path(asset_root or self.path.parent))
@@ -223,7 +229,7 @@ class DocumentStore(_shared.ArtifactStore):
     def _workflow(self, name, *args, **kwargs):
         from types import SimpleNamespace
         api = SimpleNamespace(o=o, identifier=identifier, BLOCK_ID=BLOCK_ID,
-            BLOCK_NS=BLOCK_NS, packed=packed, mutate=mutate, _sibling=_sibling)
+            BLOCK_NS=BLOCK_NS, packed=packed, mutate=mutate, _sibling=_sibling, repair_policy=repair_policy())
         return getattr(_sibling('document_workflow'), name)(self, *args, a=api, **kwargs)
 
     def save_plan(self, request):
@@ -244,10 +250,25 @@ class DocumentStore(_shared.ArtifactStore):
                     raise
         return result
 
-    def check_document(self, final=False, section_id=None):
-        return self._workflow('check_document', final, section_id=section_id)
+    def check_document(self, final=False, section_id=None, auto_repair=True):
+        result=self._workflow('check_document', final, section_id=section_id)
+        state=self.metadata()
+        if final and auto_repair and state.get('quality_contract',1)>=2 and not result['passed']:
+            if state.get('auto_repair_stopped_revision')==result['revision']:
+                summary=state.get('repair_summary') or {}
+                return dict(result,repair_summary=dict(repair_attempts=summary.get('attempts',0),remaining=result['repair_targets'],stop_reason=summary.get('stop_reason'),exhausted=True))
+            report=self.repair_document(result['revision'],'auto-repair-r'+str(result['revision']))
+            if report['exhausted']:
+                with self.locked() as(c,current):
+                    self.assert_current(current,report['revision'])
+                    current['auto_repair_stopped_revision']=report['revision']
+                    self.save_state(c,current);c.commit()
+            return dict(report['recheck'],repair_summary={k:report[k] for k in ('repair_attempts','remaining','exhausted','stop_reason')})
+        return result
 
-    def repair_document(self, base_revision, operation_id):
+    def repair_document(self, base_revision, operation_id, max_attempts=None):
+        # Deprecated argument retained for existing callers; progress governs stopping.
+        if max_attempts is not None and (type(max_attempts) is not int or max_attempts<1):raise ValueError('Invalid legacy max_attempts')
         return self._workflow('repair_document', base_revision, operation_id)
 
     def prepare_restore(self, c, state, revision):
@@ -397,6 +418,10 @@ class DocumentStore(_shared.ArtifactStore):
                         page['status'] = 'failed'
                     elif page['complete']:
                         page['status'] = 'passed'
+            previous_check=state.get('document_check') or {}
+            changed=bool(previous_check and (failure or [p['fingerprint'] for p in previous_check.get('pages',[])]!=[p['fingerprint'] for p in pages]))
+            if changed:
+                state.update(document_check=None,visual_request=None,document_review=None,aesthetic_reviews={},delivery=None,delivery_status='draft_pending_check',finalized=False)
             state.update(pages=pages, last_pages=pages, render_revision=revision, render_error=failure, dirty=0)
             if not failure:
                 state.update(preview_revision=revision, preview_pages=len(pages), preview_page_hashes=hashes, preview_error=None, preview_ready=True)
@@ -410,6 +435,7 @@ class DocumentStore(_shared.ArtifactStore):
             self.save_state(c, state)
             event = dict(type='document_review', document_id=state['document_id'], revision=revision,
                 pages=pages, gate=state['gate'], render_error=failure, path=self.path.name,
+                **(dict(document_check=None,visual_request=None,document_review=None,aesthetic_reviews={},delivery=None,delivery_status='draft_pending_check',finalized=False) if changed else {}),
                 **({} if failure else dict(preview_revision=revision, preview_pages=len(pages), preview_page_hashes=hashes,
                     preview_ready=True, render_directory=str(output))))
             c.execute('INSERT INTO events(data) VALUES (?)', (json.dumps(event),))
@@ -446,13 +472,23 @@ class DocumentStore(_shared.ArtifactStore):
     def finalize(self, base_revision):
         with self.locked() as (c, state):
             self.assert_current(state, base_revision)
-            workflow = state.get('workflow_version') == 1
+            workflow = state.get('workflow_version') == 1 or state.get('quality_contract',1)>=2
             check = state.get('document_check') or {}
             if state.get('render_revision') != base_revision or not state['pages'] or state['gate'] != 'open' or (not workflow and any(p['status'] != 'passed' for p in state['pages'])) or (workflow and (check.get('revision') != base_revision or not check.get('passed') or not check.get('final'))):
                 raise ValueError('Final checkpoint and actual visual review of every page required')
             render_dir = self.render_directory(base_revision)
             if not (render_dir / 'render.json').is_file() or any(not (render_dir / p['image']).is_file() for p in state['pages']):
                 raise ValueError('Reviewed render artifacts are missing; render and review again')
+            if state.get('quality_contract',1)>=2:
+                if not check.get('collision_check_executed'):raise ValueError('Final collision and layout audit required')
+                summary=_sibling('quality_status').delivery(state)
+                state['delivery_status']=summary['status']
+                state['finalized']=summary['status']=='accepted'
+                state['delivery']=summary
+                state['delivery_requested']=True
+                self.save_state(c,state)
+                c.execute('INSERT INTO events(data) VALUES (?)',(json.dumps(dict(type='document_finalized',document_id=state['document_id'],revision=base_revision,path=self.path.name,finalized=state['finalized'],delivery_status=state['delivery_status'],delivery=summary)),));c.commit()
+                return dict(summary,publication_status='finalized' if state['finalized'] else 'draft',document_id=state['document_id'],editable=True)
             state['finalized'] = True
             state['external_unreviewed'] = False
             self.save_state(c, state)
@@ -662,3 +698,10 @@ def _template_manifest(parts, template):
     if not manifest.get('blocks'):
         raise ValueError('Template has no paragraphs or tables to index')
     return manifest
+
+
+def repair_policy():
+    path=Path(__file__).resolve().parents[2]/'platform_app'/'office_repair.py'
+    if not path.is_file():path=Path(__file__).with_name('office_repair.py')
+    spec=importlib.util.spec_from_file_location('docx_office_repair',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module

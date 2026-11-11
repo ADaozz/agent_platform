@@ -1890,5 +1890,101 @@
   "docx.changedPages": {
     "zh": "已更新第 {pages} 页",
     "en": "Updated page {pages}"
+  },
+  "docx.quality.deterministic": {
+    "zh": "确定性布局检查",
+    "en": "Deterministic layout"
+  },
+  "docx.quality.pageVisual": {
+    "zh": "单页视觉验收",
+    "en": "Page visual review"
+  },
+  "docx.quality.documentVisual": {
+    "zh": "整稿视觉验收",
+    "en": "Document visual review"
+  },
+  "docx.quality.passed": {
+    "zh": "通过",
+    "en": "Passed"
+  },
+  "docx.quality.failed": {
+    "zh": "失败",
+    "en": "Failed"
+  },
+  "docx.quality.pending": {
+    "zh": "待检查",
+    "en": "Pending"
+  },
+  "docx.quality.issues": {
+    "zh": "有问题",
+    "en": "Issues"
+  },
+  "docx.quality.unavailable": {
+    "zh": "不可用",
+    "en": "Unavailable"
+  },
+  "docx.quality.repairs": {
+    "zh": "自动修复次数",
+    "en": "Repair attempts"
+  },
+  "docx.quality.template": {
+    "zh": "用户模板／旧版设计",
+    "en": "User template / legacy design"
+  },
+  "docx.quality.retry": {
+    "zh": "重新进行视觉验收",
+    "en": "Retry visual review"
+  },
+  "docx.quality.draft_failed_layout": {
+    "zh": "草稿：确定性检查未通过",
+    "en": "Draft: deterministic checks failed"
+  },
+  "docx.quality.draft_pending_check": {
+    "zh": "草稿：待确定性检查",
+    "en": "Draft: deterministic checks pending"
+  },
+  "docx.quality.draft_visual_unavailable": {
+    "zh": "草稿：视觉模型不可用",
+    "en": "Draft: visual review unavailable"
+  },
+  "docx.quality.draft_pending_visual": {
+    "zh": "草稿：待视觉验收",
+    "en": "Draft: visual review pending"
+  },
+  "docx.quality.draft_visual_issues": {
+    "zh": "草稿：视觉验收有待处理问题",
+    "en": "Draft: visual issues remain"
+  },
+  "docx.workflowStatus": {
+    "zh": "结构、排版与后台视觉审查",
+    "en": "Structure, layout and visual review"
+  },
+  "docx.visualAdvisory": {
+    "zh": "视觉建议供参考，不会自动修改文档。",
+    "en": "Visual suggestions are advisory and do not edit the document."
+  },
+  "docx.quality.repairStopped": {
+    "zh": "自主修复已停止",
+    "en": "Autonomous repair stopped"
+  },
+  "docx.quality.stop.no_progress": {
+    "zh": "检查结果无进展",
+    "en": "No measurable progress"
+  },
+  "docx.quality.stop.repeated_errors": {
+    "zh": "重复出现相同错误",
+    "en": "The same errors persist"
+  },
+  "docx.quality.stop.repair_cycle": {
+    "zh": "检测到修复循环",
+    "en": "Repair cycle detected"
+  },
+  "docx.quality.stop.unrepairable": {
+    "zh": "没有可安全自动执行的局部修复",
+    "en": "No safe deterministic local repair"
+  },
+  "docx.quality.stop.render_failed": {
+    "zh": "渲染失败，无法验证修复",
+    "en": "Rendering failed; repair cannot be verified"
   }
 }

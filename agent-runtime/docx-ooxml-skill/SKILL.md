@@ -3,7 +3,7 @@ name: docx-ooxml-author
 description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. Section transactions, document plans, local repairs and asynchronous host visual review, with real LibreOffice pagination.
 compatibility: Python 3.10+, lxml, Pillow, PyMuPDF, LibreOffice. Runs through execute; no separate Agent or MCP server required.
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
   maintainer: "local"
 ---
 
@@ -39,17 +39,54 @@ Prefer a template's sections, paragraphs, named styles, content controls and tab
    Validation/mutation failure rolls the entire transaction back. A render
    failure after a successful commit leaves that revision recoverable, reports
    the failure and blocks the next section until checked again.
-4. Run `check-document files/report.docx --final` after the last section. For
-   deterministic `repair_targets`, run `repair-document files/report.docx
-   --base-revision N --operation-id repair-unique`. It edits only identified
-   blocks and rechecks. Report remaining issues; never regenerate the whole file.
-5. In the platform, page screenshots are reviewed asynchronously by the shared
-   host Office service. Suggestions are advisory and cannot edit the file or
-   block normal-mode generation/delivery. Missing image-capable models produce
-   `unavailable`, never a pass. The UI displays version-bound suggestions.
-6. `finalize files/report.docx --base-revision N` delivers an editable DOCX when
-   the new workflow's final structure/layout check passes, with visual status
-   disclosed. Legacy apply-one documents and strict mode retain their review gates.
+4. Run `check-document files/report.docx --final`. **Mandatory:** the current
+   immutable revision must undergo actual PDF geometry/collision and layout checks.
+   New documents use quality contract 2, including user templates. Final checks
+   automatically run deterministic, Block-ID-local repair transactions without a
+   fixed round cap, re-rendering and rechecking each time. `--diagnostic-only`
+   reports without repairs
+   and never waives the gate. `repair-document` can explicitly resume repairs.
+   Each attempt must re-render
+   and recheck. Continue only while deterministic evidence makes progress; stop on
+   unchanged content, repeated errors or recurring document/error states, and report
+   the stop reason with the remaining targets. Revision increments alone are not
+   progress. After a no-progress/repeated-error/cycle stop, report the remaining
+   issues and retain the draft; do not make unrelated edits or add a Revision to
+   restart autonomy without user direction.
+   Unrepairable findings require a local Agent edit or an explicit
+   failure report; never silently ignore them, delete necessary content or shrink
+   all text. A failed final check cannot be accepted. Keep the downloadable draft.
+5. After the deterministic final pass, the shared platform Office service queues
+   **every page** for visual review concurrently, then separately executes
+   `document_review` over all numbered thumbnails, section mapping and page results.
+   Both are actual model invocations, bound to Document ID, Revision, pixels and
+   request ID. Missing/failed image models return unavailable. Visual advice never
+   edits the file. A revision or reflow invalidates affected review evidence; stale
+   jobs cannot update new content. Do not replace model review with guessed verdicts.
+6. `finalize files/report.docx --base-revision N` records DOCX + three independent
+   states, design ID, repair counts and unresolved findings. Formal acceptance
+   requires the final deterministic pass and completed page AND document visual
+   passes. Pending/unavailable visual results and remaining visual issues remain
+   clearly labelled downloadable drafts. CLI-only execution has no host visual model,
+   so cannot claim visual completion. Persisted legacy contract 1 documents retain
+   their old APIs and gates; do not select legacy mode to bypass acceptance.
+
+For domestic research documents without a template, inspect and select
+`cn-thesis-general`, `cn-engineering-thesis`, `cn-journal-paper` (default two
+columns; `init --columns 1` also supported), or `cn-research-report`. The original
+academic/technical/business/consulting designs remain available. Chinese/Latin
+fonts and named component styles are separate. Read sources and their verification
+scope; default sizes are design choices, not universal national mandates. Official
+institution/journal templates override generic designs. Do not assert GB/T citation
+compliance or bibliographic truth without actual source information.
+
+Declare section `kind` (cover/abstract/toc/body/references/appendix), `single_page`
+where appropriate, `numbering` format/start and any required `continued_label` in
+the plan. Use CoverTitle/CoverDate, AbstractTitle/AbstractBody, Caption, Equation,
+Reference and TableText styles. Numbering switches require real OOXML sections or
+a supplied template; if lossless section edits are unavailable, report the issue.
+The final audit compares section numbering and rendered TOC destinations rather
+than treating visible leader dots as a valid TOC. Page targets remain soft goals.
 
 To change course, submit a replacement plan with a new operation ID and current
 base revision. Unaffected document bytes and section content are retained; affected
@@ -69,7 +106,7 @@ python "$S" import-template --template files/input.docx --template-id report --l
 python "$S" init --document-id report --output files/report.docx --template files/input.docx
 python "$S" status files/report.docx
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
-python "$S" checkpoint files/report.docx
+python "$S" check-document files/report.docx --final
 python "$S" finalize files/report.docx --base-revision N
 ```
 
@@ -78,7 +115,7 @@ Blank path, only when nothing suitable exists:
 ```sh
 python "$S" init --document-id report --output files/report.docx
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
-python "$S" checkpoint files/report.docx
+python "$S" check-document files/report.docx --final
 python "$S" finalize files/report.docx --base-revision N
 ```
 
@@ -129,7 +166,7 @@ The legacy apply-one engine asks for a checkpoint after three additions. apply-s
 
 `checkpoint` renders with LibreOffice and records pages. Inspect those images. A vision-capable reviewer can call `review-page` with notes from that image. Text-only inspection cannot pass a page. A missing renderer is a failed checkpoint.
 
-For legacy documents, `finalize --base-revision` requires the final checkpoint and a reviewed final page. The planned section workflow uses a final check-document in normal mode; strict mode still requires actual visual approval. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
+For legacy documents, `finalize --base-revision` requires the final checkpoint and a reviewed final page. New documents require final collision/layout checks plus both host visual reviews for formal acceptance; strict mode also retains its actual page approval gates. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
 
 ## Request
 

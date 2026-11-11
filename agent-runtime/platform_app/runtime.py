@@ -244,7 +244,7 @@ class Runtime:
                 previous=items.get(artifact['id'],{})
                 if event.get('revision',-1)>=previous.get('revision',-1):
                     newer=event.get('revision',-1)>previous.get('revision',-1)
-                    items[artifact['id']]={**previous,**({'pages':[],'finalized':False,'render_error':None,'document_check':None,'aesthetic_reviews':{}} if newer else {}),**event}
+                    items[artifact['id']]={**previous,**({'pages':[],'finalized':False,'render_error':None,'document_check':None,'aesthetic_reviews':{},'document_review':None,'delivery':None,'delivery_status':'draft_pending_check'} if newer else {}),**event}
                 if event.get('store_seq') and event.get('path'):
                     record.setdefault('artifact_cursors',{}).setdefault(artifact['feature'],{})[event['path']]=event['store_seq']
             # Event journal is durable; reconnecting clients resume by sequence.

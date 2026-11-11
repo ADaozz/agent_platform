@@ -24,8 +24,14 @@ def validate(plan):
     if not isinstance(sections,list) or not 1<=len(sections)<=200: raise ValueError('Plan requires 1-200 sections')
     ids=set(); blocks=set(); assets=set()
     for section in sections:
-        if not isinstance(section,dict) or set(section)-{'id','title','requirements','block_ids','equations','figures','tables','citations','styles'} or not {'id','title','requirements','block_ids'} <= set(section):
+        if not isinstance(section,dict) or set(section)-{'id','title','requirements','block_ids','equations','figures','tables','citations','styles','kind','single_page','numbering','continued_label'} or not {'id','title','requirements','block_ids'} <= set(section):
             raise ValueError('Unknown or missing section fields')
+        if section.get('kind','body') not in ('cover','abstract','toc','body','references','appendix'):raise ValueError('Invalid section component kind')
+        if 'single_page' in section and type(section['single_page']) is not bool:raise ValueError('Invalid single_page')
+        if 'numbering' in section:
+            n=section['numbering']
+            if not isinstance(n,dict) or set(n)-{'format','start'} or n.get('format') not in ('decimal','lowerRoman','upperRoman','none') or type(n.get('start',1)) is not int or not 1<=n.get('start',1)<=9999:raise ValueError('Invalid section numbering')
+        if 'continued_label' in section and (not isinstance(section['continued_label'],str) or not 1<=len(section['continued_label'])<=40):raise ValueError('Invalid continued table label')
         ident(section['id'])
         if section['id'] in ids: raise ValueError('Duplicate section ID')
         ids.add(section['id'])

@@ -18,7 +18,7 @@ def inspect_style(value):
     if not match:
         raise ValueError('Design MD requires a docx-design JSON fenced block')
     config = json.loads(match[1])
-    if not isinstance(config, dict) or set(config) != {'id', 'page', 'styles', 'table'}:
+    if not isinstance(config, dict) or (not {'id','page','styles','table'} <= set(config) or set(config)-{'id','page','styles','table','version','sources','components'}):
         raise ValueError('Unknown or missing design parameters')
     if not isinstance(config['id'],str) or not re.fullmatch(r'[\w.-]{1,80}',config['id']): raise ValueError('Invalid design ID')
     if not all(isinstance(config[k],dict) and config[k] for k in ('page','styles','table')): raise ValueError('Design parameters must be nonempty objects')
@@ -27,7 +27,7 @@ def inspect_style(value):
 
 def apply(parts, config, o):
     page = config['page']
-    if set(page) != {'width_twips', 'height_twips', 'margin_twips'} or any(type(v) is not int for v in page.values()):
+    if not {'width_twips','height_twips','margin_twips'} <= set(page) or set(page)-{'width_twips','height_twips','margin_twips','columns','column_space_twips'} or any(type(v) is not int for v in page.values()):
         raise ValueError('Invalid page parameters')
     w, h, m = (page[k] for k in ('width_twips', 'height_twips', 'margin_twips'))
     if not (5000 <= w <= 24000 and 5000 <= h <= 32000 and 180 <= m < min(w,h)/2):
@@ -38,8 +38,14 @@ def apply(parts, config, o):
             node = section.find(o.q(o.W,tag))
             if node is None: node = o.etree.SubElement(section,o.q(o.W,tag))
             for k,v in values.items(): node.set(o.q(o.W,k),str(v))
+    columns=page.get('columns',1)
+    if columns not in (1,2):raise ValueError('Only one or two columns are supported')
+    for section in document.iter(o.q(o.W,'sectPr')):
+        old=section.find(o.q(o.W,'cols'))
+        if old is None:old=o.etree.SubElement(section,o.q(o.W,'cols'))
+        old.set(o.q(o.W,'num'),str(columns));old.set(o.q(o.W,'space'),str(page.get('column_space_twips',420)))
     styles = o.parse_xml(parts['word/styles.xml'])
-    allowed = {'font','size_half_points','color','line_twips','space_after_twips','keep_next'}
+    allowed = {'font','size_half_points','color','line_twips','space_after_twips','space_before_twips','keep_next','east_asia_font','bold','alignment','line_rule','widow_control','hanging_indent_twips'}
     for name, values in config['styles'].items():
         if not isinstance(values,dict) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9]{0,79}',name) or set(values)-allowed:
             raise ValueError('Unsupported named style parameters')
@@ -50,14 +56,33 @@ def apply(parts, config, o):
         for tag in ('rPr','pPr'):
             old=style.find(o.q(o.W,tag))
             if old is not None: style.remove(old)
-        rp=o.etree.SubElement(style,o.q(o.W,'rPr')); pp=o.etree.SubElement(style,o.q(o.W,'pPr'))
+        pp=o.etree.SubElement(style,o.q(o.W,'pPr')); rp=o.etree.SubElement(style,o.q(o.W,'rPr'))
         for k,v in values.items():
-            if k=='font':
+            if k=='east_asia_font':
+                if not isinstance(v,str) or not 1<=len(v)<=100:raise ValueError('Invalid Chinese font')
+                fonts=rp.find(o.q(o.W,'rFonts'))
+                if fonts is None:fonts=o.etree.SubElement(rp,o.q(o.W,'rFonts'))
+                fonts.set(o.q(o.W,'eastAsia'),v)
+            elif k=='font':
                 if not isinstance(v,str) or not 1 <= len(v) <= 100: raise ValueError('Invalid font')
                 o.etree.SubElement(rp,o.q(o.W,'rFonts'),{o.q(o.W,a):v for a in ('ascii','hAnsi','eastAsia')})
             elif k=='color':
                 if not isinstance(v,str) or not re.fullmatch('[0-9A-Fa-f]{6}',v): raise ValueError('Invalid colour')
                 o.etree.SubElement(rp,o.q(o.W,'color'),{o.q(o.W,'val'):v})
+            elif k in ('bold','widow_control'):
+                if type(v) is not bool:raise ValueError('Invalid style boolean')
+                o.etree.SubElement(rp if k=='bold' else pp,o.q(o.W,'b' if k=='bold' else 'widowControl'),{o.q(o.W,'val'):'1' if v else '0'})
+            elif k=='alignment':
+                if v not in ('left','right','center','both'):raise ValueError('Invalid alignment')
+                o.etree.SubElement(pp,o.q(o.W,'jc'),{o.q(o.W,'val'):v})
+            elif k=='line_rule':
+                if v not in ('auto','exact','atLeast'):raise ValueError('Invalid line rule')
+                spacing=pp.find(o.q(o.W,'spacing'))
+                if spacing is None:spacing=o.etree.SubElement(pp,o.q(o.W,'spacing'))
+                spacing.set(o.q(o.W,'lineRule'),v)
+            elif k=='hanging_indent_twips':
+                if type(v) is not int or not 0<=v<=2400:raise ValueError('Invalid hanging indent')
+                o.etree.SubElement(pp,o.q(o.W,'ind'),{o.q(o.W,'left'):str(v),o.q(o.W,'hanging'):str(v)})
             elif k=='keep_next':
                 if type(v) is not bool: raise ValueError('Invalid keep_next')
                 o.etree.SubElement(pp,o.q(o.W,'keepNext'),{o.q(o.W,'val'):'1' if v else '0'})
@@ -67,7 +92,9 @@ def apply(parts, config, o):
                 else:
                     spacing=pp.find(o.q(o.W,'spacing'))
                     if spacing is None: spacing=o.etree.SubElement(pp,o.q(o.W,'spacing'))
-                    spacing.set(o.q(o.W,'line' if k=='line_twips' else 'after'),str(v))
+                    spacing.set(o.q(o.W,'line' if k=='line_twips' else 'before' if k=='space_before_twips' else 'after'),str(v))
+        if values.get('east_asia_font'):
+            rp.find(o.q(o.W,'rFonts')).set(o.q(o.W,'eastAsia'),values['east_asia_font'])
         if name.startswith('Heading') and name[-1:] in '123456789':
             o.etree.SubElement(pp,o.q(o.W,'outlineLvl'),{o.q(o.W,'val'):str(int(name[-1])-1)})
     table=config['table']

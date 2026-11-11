@@ -113,6 +113,46 @@
             },
             "uniqueItems": true,
             "maxItems": 500
+          },
+          "kind": {
+            "enum": [
+              "cover",
+              "abstract",
+              "toc",
+              "body",
+              "references",
+              "appendix"
+            ]
+          },
+          "single_page": {
+            "type": "boolean"
+          },
+          "numbering": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "enum": [
+                  "decimal",
+                  "lowerRoman",
+                  "upperRoman",
+                  "none"
+                ]
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9999
+              }
+            }
+          },
+          "continued_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
           }
         }
       }
