@@ -42,13 +42,14 @@ async function update() {
   const started = performance.now()
   try {
     const next = pageList(revision)
-    const known = new Set(images.value.map(item => item.key))
-    // Unchanged pages keep their URL and decoded image; only new page images are fetched
-    // before the swap, so a late older render cannot replace newer pages.
-    await Promise.all(next.filter(item => !known.has(item.key)).map(item => decode(item.url)))
-    if (ticket !== generation || disposed || revision < shownRevision.value) return
     const firstLoad = !images.value.length
     const updated = next.filter((item, i) => images.value[i]?.key !== item.key).map(item => item.page)
+    const target = follow.value && !firstLoad && updated.length ? updated[0] : Math.min(selected.value, next.length)
+    const priority = next[Math.max(0, target - 1)]
+    // Wait only for the page being shown. Thumbnails load on demand; a long
+    // document must not decode every full-resolution page before its first paint.
+    if (priority && priority.key !== current.value?.key) await decode(priority.url)
+    if (ticket !== generation || disposed || revision < shownRevision.value) return
     images.value = next; shownRevision.value = revision
     changed.value = new Set(firstLoad ? [] : updated)
     if (follow.value && !firstLoad && updated.length) show(updated[0])
@@ -81,12 +82,12 @@ function onKey(event) {
   <div class="docx-workbench">
     <nav ref="thumbs" class="docx-thumbnails" :aria-label="t('docx.pages')">
       <button v-for="image in images" :key="image.page" type="button" :data-page="image.page" :class="{ selected: image.page === current?.page }" @click="select(image.page)">
-        <span class="docx-thumb"><img :src="image.url" alt="" loading="lazy" draggable="false"><i v-if="changed.has(image.page)" class="docx-changed-dot"></i></span>
+        <span class="docx-thumb"><img :src="image.url" alt="" loading="lazy" decoding="async" width="210" height="297" draggable="false"><i v-if="changed.has(image.page)" class="docx-changed-dot"></i></span>
         <span class="docx-thumb-label">{{ String(image.page).padStart(2, '0') }}<template v-if="states[image.page]"> · {{ t('docx.' + states[image.page]) }}</template></span>
       </button>
     </nav>
     <div ref="stage" class="docx-stage" tabindex="0" @keydown="onKey">
-      <figure v-if="current" class="docx-paper" :style="{ width: paperWidth + 'px' }"><img :src="current.url" :alt="t('docx.page', { page: current.page })" draggable="false"><figcaption>{{ t('docx.page', { page: current.page }) }} / {{ images.length }}</figcaption></figure>
+      <figure v-if="current" class="docx-paper" :style="{ width: paperWidth + 'px' }"><img :src="current.url" :alt="t('docx.page', { page: current.page })" decoding="async" draggable="false"><figcaption>{{ t('docx.page', { page: current.page }) }} / {{ images.length }}</figcaption></figure>
       <figure v-else class="docx-paper" :style="{ width: paperWidth + 'px' }"><div class="docx-blank-sheet"></div><figcaption>{{ t('docx.page', { page: 1 }) }}</figcaption></figure>
     </div>
   </div>

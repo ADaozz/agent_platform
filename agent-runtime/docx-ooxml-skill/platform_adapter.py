@@ -79,7 +79,7 @@ class Documents:
         try:
             while not self.closed:
                 try:
-                    state = store.status(committed=True)
+                    state = store.metadata()
                     if state.get('preview_revision', -1) >= state['revision']:
                         break
                     validate_embedded_resources(path)
@@ -96,7 +96,7 @@ class Documents:
                 # Close the final-commit race: a request arriving while this job
                 # was returning must still get a renderer, even without another tool.
                 if not failed and not self.closed:
-                    state = store.status(committed=True)
+                    state = store.metadata()
                     if state.get('preview_revision', -1) < state['revision']:
                         self.schedule_preview(path)
 

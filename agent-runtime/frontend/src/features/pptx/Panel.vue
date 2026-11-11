@@ -16,7 +16,7 @@ const route=computed(()=>base.value.replace(/^\/api/,''))
 let cursor=0
 function key(id){return `pptx-preview:${props.session?.id}:${id}:closed`}
 function receive(updates){for(const update of updates){if(!update.presentation_id||!Number.isInteger(update.revision))continue;const old=decks.value[update.presentation_id];if(old&&old.revision>update.revision)continue;const next={...old,...update};decks.value={...decks.value,[update.presentation_id]:next};if(!old){identity.value=update.presentation_id;opened.value=sessionStorage.getItem(key(identity.value))!=='true';emit('open',opened.value)}if(follow.value&&update.slide_id)selectedSlide.value=update.slide_id;if(!selectedSlide.value&&next.manifest?.slides.length)selectedSlide.value=next.manifest.slides[0].slide_id}}
-watch(decks,values=>emit('catalog',Object.values(values).filter(file=>file.path)),{deep:true})
+watch(decks,values=>emit('catalog',Object.values(values).filter(file=>file.path)))
 watch(()=>props.openRequest,async request=>{
  if(!request||!props.session)return
  const id=props.session.id

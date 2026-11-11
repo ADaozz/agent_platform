@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import MarkdownContent from './MarkdownContent.vue'
 import Icon from './Icon.vue'
 import FileBlock from './FileBlock.vue'
 import FeaturePanels from './FeaturePanels.vue'
@@ -86,8 +85,7 @@ function approvalFields(call) {
   return Object.entries(call.args || {}).filter(([key]) => !hidden(key)).map(([key, value]) => ({ label: t(labels[key] || key.replaceAll('_', ' ')), content: text(value) })).filter(field => field.content)
 }
 
-function html(text) { return DOMPurify.sanitize(marked.parse(text || '')) }
-function sessionTitle(s) { return s.messages?.[0]?.content?.split('\n')[0] || t('New chat') }
+function sessionTitle(s) { return s.title || s.messages?.[0]?.content?.split('\n')[0] || t('New chat') }
 function dateLabel(s) { const date = new Date(s.updated_at || s.created_at); return date.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' }) }
 function fileIcon(name) { return /\.(docx?|pptx?|xlsx?|pdf|md|txt|csv|json|log|py|js|ts|vue|html?|css|zip|png|jpe?g|gif|webp)$/i.test(name) ? 'FileText' : 'FileBox' }
 function toast(text) { notice.value = text; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => notice.value = '', 4500) }
@@ -124,7 +122,18 @@ async function refreshModels() {
     effort.value = profiles.value.find(p => p.id === modelId.value)?.default_reasoning_effort || ''
   }
 }
-async function refreshSessions() { sessions.value = await api('/agent/sessions'); if (selected.value) { const s = sessions.value.find(s => s.id === selected.value.id); if (s) selected.value = s } }
+let sessionRefresh = null
+async function refreshSessions() {
+  if (sessionRefresh) return sessionRefresh
+  const id = selected.value?.id
+  sessionRefresh = (async () => {
+    await Promise.all([
+      api('/agent/sessions?summary=true').then(values => { sessions.value = values }),
+      id ? api(`/agent/sessions/${id}`).then(value => { if (selected.value?.id === id) selected.value = value }) : null,
+    ])
+  })().finally(() => { sessionRefresh = null })
+  return sessionRefresh
+}
 async function init() {
   await guard(async () => {
     toolCatalog.value = await api('/tool-catalog')
@@ -378,7 +387,7 @@ onUnmounted(() => { source?.close(); clearInterval(poll); clearTimeout(noticeTim
             <div v-if="b.lead" class="message-label agent-label"><img class="mark-light" src="/deep-agent-mark-light.svg" alt=""><img class="mark-dark" src="/deep-agent-mark-dark.svg" alt=""> {{ t("Agent") }}</div>
             <article v-if="b.kind === 'user'" class="user-message"><div class="message-label">{{ t("You") }}</div><div>{{ b.content }}</div><div v-if="b.attachments?.length" class="message-attachments"><a v-for="file in b.attachments" :key="file.id" :href="fileUrl(file.path)" download><Icon name="Paperclip" :size="13" />{{ file.name }}</a></div></article>
             <WorkProcess v-else-if="b.kind === 'process'" :process="b" :action-label="actionLabel" :status-labels="statusLabels" />
-            <article v-else-if="b.kind === 'assistant'" class="assistant-message"><div v-html="html(b.content)" class="markdown"></div></article>
+            <article v-else-if="b.kind === 'assistant'" class="assistant-message"><MarkdownContent :content="b.content" /></article>
             <div v-else class="turn-note"><Icon name="CornerDownRight" :size="14" />{{ b.type === 'steer' ? t('追加指令') : t('后续任务') }}：{{ b.content }}</div>
           </template>
           <div v-if="selected.error" class="session-error"><Icon name="CircleAlert" />{{ t(selected.error) }}</div>

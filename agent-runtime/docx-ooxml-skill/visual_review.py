@@ -38,7 +38,7 @@ class DocumentReviews(vision.BackgroundReviews):
         if event.get('type') == 'document_review': self.resume(path)
 
     def resume(self, path):
-        state = self.service.store(path).status(committed=True)
+        state = self.service.store(path).metadata()
         if state.get('render_revision') != state['revision']: return
         results = state.get('aesthetic_reviews', {})
         for page in state.get('pages', []):
