@@ -196,3 +196,28 @@ def test_native_chart_audit_rejects_shape_based_statistics_and_accepts_real_char
     engine.native_charts.create(slide,payload,(Inches(1),Inches(1),Inches(6),Inches(4)))
     assert engine.native_charts.audit(prs,plan)['status']=='passed'
     assert engine.native_charts.audit(prs)['status']=='inventory'
+
+
+def test_deck_repair_progress_has_no_round_cap_and_stops_cycles(tmp_path):
+    path=tmp_path/'progress.pptx';prs=Presentation();slide=prs.slides.add_slide(prs.slide_layouts[6])
+    from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+    for left in (1,2):
+        shape=slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE,Inches(left),Inches(1),Inches(4),Inches(2));shape.text=f'Object {left}'
+    prs.save(path);store=engine.PresentationStore(path);store.track_external('progress')
+    sid=store.status()['manifest']['slides'][0]['slide_id'];notes={sid:'核对两个矩形的位置和遮挡，保留两个对象的内容与尺寸'}
+    result=store.check_deck(notes)
+    assert result['repair_targets'] and not result['other_errors'],result
+    assert result['repair_control']['autonomous_repair_allowed']
+    for left in (2.5,3,3.5,4,4.5):
+        prs=Presentation(path);prs.slides[0].shapes[1].left=Inches(left);prs.save(path);store.track_external('progress')
+        result=store.check_deck(notes)
+        assert result['repair_control']['autonomous_repair_allowed'],result
+    # Return to the initial geometry: a new Revision cannot hide an old error state.
+    prs=Presentation(path);prs.slides[0].shapes[1].left=Inches(2);prs.save(path);store.track_external('progress')
+    result=store.check_deck(notes)
+    assert result['repair_control']['stop_reason']=='repair_cycle'
+    assert 'Stop autonomous repairs' in result['next_action']
+    # A user-directed local correction can still pass, clearing the repair episode.
+    prs=Presentation(path);prs.slides[0].shapes[1].left=Inches(6);prs.save(path);store.track_external('progress')
+    result=store.check_deck(notes)
+    assert result['status']=='passed' and result['repair_control']['status']=='passed'

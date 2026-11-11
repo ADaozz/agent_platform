@@ -4,7 +4,7 @@ The deterministic checks prove that a slide is intact; they cannot judge composi
 
 ## Flow
 
-Finish the whole deck → `check-deck` → local overlap repair and recheck until passed → single-slide and deck vision reviews → suggestions only. The request is `{"content_notes":{"slide-id":"specific content checks"}}`. Results include repair_targets, other_errors and overlap_passed. Passing unchanged pages are reused; deferred vision jobs stay deferred across restarts until the deck passes.
+Finish the whole deck → `check-deck` → local deterministic overlap repair and recheck while progress continues → single-slide and deck vision reviews → suggestions only. The request is `{"content_notes":{"slide-id":"specific content checks"}}`. Results include repair_targets, other_errors and overlap_passed. Passing unchanged pages are reused; deferred vision jobs stay deferred across restarts until the deck passes.
 
 1. At the end of generation, `check-deck` uses the page checker to store `technical_review`, `visual_integrity` and `aesthetic_review: pending`. A slide with deterministic errors is `blocked` and is not sent to the model.
 2. The host sees the check event, re-renders the revision into a host-private directory (the sandbox cannot swap the screenshot), verifies the revision hash and calls the model.
@@ -52,7 +52,7 @@ Each answer is stored in the host-private ledger (`<session>/artifact-review/ppt
 
 ## Repair policy and delivery
 
-- Only deterministic overlap findings trigger autonomous repairs. Edit listed slide/element IDs in the existing PPT, then repeat `check-deck` until passed. Never regenerate unrelated pages or silently suppress errors.
+- Only deterministic overlap findings trigger autonomous repairs. Edit listed slide/element IDs in the existing PPT, then re-render and repeat `check-deck`. There is no fixed round cap: continue while `repair_control.autonomous_repair_allowed` is true. Shared Office progress detection stops on unchanged content, repeated errors, stationary/worsening geometry or a repair cycle. Report the stop reason and unresolved issues and retain the editable draft. Never regenerate unrelated pages, restart a stopped loop without a real correction, or silently suppress errors.
 - All visual findings are advice, including critical ones. Reviews carry `auto_repair: false, advisory_only: true`. Only a user repair request authorizes edits based on these suggestions.
 - A slide shows `needs_attention` only while a critical finding is open. That status is informational.
 - Slide creation/import/clone has no intermediate check gate, including strict mode. Check after the whole deck is ready.

@@ -626,7 +626,7 @@ def main(argv=None):
     x = sub.add_parser('apply-section'); x.add_argument('docx'); x.add_argument('request'); x.add_argument('--asset-root', default='.')
     x = sub.add_parser('check-document'); x.add_argument('docx'); x.add_argument('--final', action='store_true'); x.add_argument('--section-id'); x.add_argument('--diagnostic-only',action='store_true')
     x = sub.add_parser('repair-document'); x.add_argument('docx'); x.add_argument('--base-revision', type=int, required=True); x.add_argument('--operation-id', required=True)
-    x.add_argument('--max-attempts',type=int,default=3)
+    x.add_argument('--max-attempts',type=int,help='Deprecated compatibility option; stopping is based on repair progress')
     x = sub.add_parser('status'); x.add_argument('docx')
     x = sub.add_parser('restore'); x.add_argument('docx'); x.add_argument('--revision', type=int, required=True); x.add_argument('--base-revision', type=int, required=True); x.add_argument('--operation-id', required=True)
     x = sub.add_parser('checkpoint'); x.add_argument('docx'); x.add_argument('--final', action='store_true')

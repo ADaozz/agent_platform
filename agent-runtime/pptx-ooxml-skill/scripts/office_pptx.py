@@ -38,8 +38,12 @@ from design import design_quality, diagram_presets, layout_registry, layout_reso
 
 def load(name):
     path=Path(__file__).with_name(name+'.py')
+    if name=='office_repair':
+        shared_path=SKILL_ROOT.parent/'platform_app'/'office_repair.py'
+        if shared_path.is_file():path=shared_path
     spec=importlib.util.spec_from_file_location(name,path); mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
 
+repair_policy=load('office_repair')
 shared=load('artifact_runtime'); renderer=load('slide_renderer'); validator=load('slide_validator'); component_renderer=load('component_renderer')
 style_library=load('style_library'); review_design=load('review_design'); native_charts=load('native_charts'); native_math=load('native_math'); native_style=load('native_style'); native_diagram=load('native_diagram')
 template_importer=load('template_importer'); template_clone=load('template_clone')
@@ -1220,6 +1224,22 @@ class PresentationStore(shared.ArtifactStore):
                     if issue.get('severity','error')!='error':continue
                     item=dict(slide_id=sid,**issue)
                     (targets if issue.get('type')=='unexpected_overlap' else blockers).append(item)
+            observations=[]
+            for target in targets+blockers:
+                magnitude=None
+                if target.get('type')=='unexpected_overlap':
+                    slide=next(s for s in slides if s['slide_id']==target['slide_id'])
+                    elements={e['id']:e for e in slide['elements']}
+                    pair=[elements[e]['geometry'] for e in target.get('elements',[]) if e in elements]
+                    if len(pair)==2:
+                        left,right=pair
+                        area=max(0,min(left['x']+left['w'],right['x']+right['w'])-max(left['x'],right['x']))*max(0,min(left['y']+left['h'],right['y']+right['h'])-max(left['y'],right['y']))
+                        magnitude=area/max(1e-12,min(left['w']*left['h'],right['w']*right['h']))
+                key=dict(slide_id=target['slide_id'],type=target['type'],elements=sorted(target.get('elements',[])),element_id=target.get('element_id'))
+                observations.append(repair_policy.issue(key,target,magnitude))
+            content=repair_policy.package_fingerprint(self.snapshot_unlocked(c,revision))
+            state['repair_progress'],repair_control=repair_policy.observe(state.get('repair_progress'),observations,content,revision)
+            self.save_state(c,state);c.commit()
             if not targets and not blockers:
                 for slide in slides:
                     sid=slide['slide_id'];review=state['reviews'][sid]
@@ -1229,8 +1249,8 @@ class PresentationStore(shared.ArtifactStore):
                         self.review_event(c,state,'presentation_review_requested',sid,requested_by='deck_check')
         if not targets and not blockers and len(slides)>1:self.request_deck_review(revision)
         return dict(revision=revision,status='needs_repair' if targets or blockers else 'passed',
-            overlap_passed=not targets,repair_targets=targets,other_errors=blockers,
-            next_action=('Fix only listed overlapping elements on the listed slides, preserve all other slides, then run check-deck again. Repeat until overlap_passed. Never regenerate the whole deck.' if targets else
+            overlap_passed=not targets,repair_targets=targets,other_errors=blockers,repair_control=repair_control,
+            next_action=(('Stop autonomous repairs: '+repair_control['stop_reason']+'. Report the remaining deterministic issues; retain the editable draft.') if repair_control['status']=='stopped' else 'Fix only listed overlapping elements on the listed slides, preserve all other slides, then run check-deck again. Re-render and recheck after every repair; continue only while repair_control allows progress. Never regenerate the whole deck.' if targets else
                          'Resolve the listed check errors locally and run check-deck again.' if blockers else
                          'Checks passed. Visual review is advice only; report suggestions without modifying the PPT.'))
     def current_manifest(self,c,state):
@@ -1414,7 +1434,7 @@ def critical_issues(aesthetic):
 def next_action(review):
     """Only structural failures permit automatic local repairs; vision is advice."""
     if not review:return 'Finish generating all slides, then run check-deck.'
-    if not review.get('automatic_passed'):return 'Fix only the listed automatic check errors on this slide, preserve other pages, then run check-deck again until checks pass.'
+    if not review.get('automatic_passed'):return 'Fix only the listed automatic check errors on this slide, preserve other pages, then re-render and run check-deck again; follow repair_control and stop on no progress, repeated errors or a repair cycle.'
     aesthetic=review.get('aesthetic_review') or {}
     status=reviewer().effective_aesthetic(review)
     if status=='pending':return 'Complete check-deck after generation. Visual review is advisory; never change the PPT based on it unless the user asks.'

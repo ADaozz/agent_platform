@@ -218,7 +218,7 @@ class DocumentStore(_shared.ArtifactStore):
             if state['gate'] != 'open' and kind not in repairs:
                 raise ValueError('Page checkpoint required before adding content: ' + state['gate'])
             if state['dirty'] >= MAX_DIRTY * 2:
-                raise ValueError('Repair budget exhausted; checkpoint before further changes')
+                raise ValueError('Checkpoint required before further changes')
             parts = o.read_parts(self.path)
             try:
                 parts, changed, extra = mutate(parts, op, Path(asset_root or self.path.parent))
@@ -229,7 +229,7 @@ class DocumentStore(_shared.ArtifactStore):
     def _workflow(self, name, *args, **kwargs):
         from types import SimpleNamespace
         api = SimpleNamespace(o=o, identifier=identifier, BLOCK_ID=BLOCK_ID,
-            BLOCK_NS=BLOCK_NS, packed=packed, mutate=mutate, _sibling=_sibling)
+            BLOCK_NS=BLOCK_NS, packed=packed, mutate=mutate, _sibling=_sibling, repair_policy=repair_policy())
         return getattr(_sibling('document_workflow'), name)(self, *args, a=api, **kwargs)
 
     def save_plan(self, request):
@@ -254,20 +254,22 @@ class DocumentStore(_shared.ArtifactStore):
         result=self._workflow('check_document', final, section_id=section_id)
         state=self.metadata()
         if final and auto_repair and state.get('quality_contract',1)>=2 and not result['passed']:
-            if state.get('auto_repair_exhausted_revision')==result['revision']:
+            if state.get('auto_repair_stopped_revision')==result['revision']:
                 summary=state.get('repair_summary') or {}
-                return dict(result,repair_summary=dict(repair_attempts=summary.get('attempts',0),remaining=result['repair_targets'],exhausted=True))
+                return dict(result,repair_summary=dict(repair_attempts=summary.get('attempts',0),remaining=result['repair_targets'],stop_reason=summary.get('stop_reason'),exhausted=True))
             report=self.repair_document(result['revision'],'auto-repair-r'+str(result['revision']))
             if report['exhausted']:
                 with self.locked() as(c,current):
                     self.assert_current(current,report['revision'])
-                    current['auto_repair_exhausted_revision']=report['revision']
+                    current['auto_repair_stopped_revision']=report['revision']
                     self.save_state(c,current);c.commit()
-            return dict(report['recheck'],repair_summary={k:report[k] for k in ('repair_attempts','remaining','exhausted')})
+            return dict(report['recheck'],repair_summary={k:report[k] for k in ('repair_attempts','remaining','exhausted','stop_reason')})
         return result
 
-    def repair_document(self, base_revision, operation_id, max_attempts=3):
-        return self._workflow('repair_document', base_revision, operation_id, max_attempts=max_attempts)
+    def repair_document(self, base_revision, operation_id, max_attempts=None):
+        # Deprecated argument retained for existing callers; progress governs stopping.
+        if max_attempts is not None and (type(max_attempts) is not int or max_attempts<1):raise ValueError('Invalid legacy max_attempts')
+        return self._workflow('repair_document', base_revision, operation_id)
 
     def prepare_restore(self, c, state, revision):
         # Replay metadata transitions, including restores followed by more edits.
@@ -696,3 +698,10 @@ def _template_manifest(parts, template):
     if not manifest.get('blocks'):
         raise ValueError('Template has no paragraphs or tables to index')
     return manifest
+
+
+def repair_policy():
+    path=Path(__file__).resolve().parents[2]/'platform_app'/'office_repair.py'
+    if not path.is_file():path=Path(__file__).with_name('office_repair.py')
+    spec=importlib.util.spec_from_file_location('docx_office_repair',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module

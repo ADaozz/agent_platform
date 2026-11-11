@@ -19,6 +19,7 @@ const overall = computed(() => props.document?.document_review?.revision === pro
     <button type="button" class="text-button" :aria-expanded="open" @click="open = !open">{{ t('docx.workflowStatus') }} · {{ delivery.reviewed_pages || 0 }}/{{ delivery.total_pages || 0 }} · R{{ document.revision }}</button>
     <div v-if="open" class="docx-quality-details">
       <p>{{ document.selected_design?.id || t('docx.quality.template') }} · {{ t('docx.quality.repairs') }}: {{ delivery.repair_attempts || 0 }}</p>
+      <p v-if="document.repair_summary?.revision === document.revision && document.repair_summary?.stop_reason">{{ t('docx.quality.repairStopped') }}: {{ t('docx.quality.stop.' + document.repair_summary.stop_reason) }}</p>
       <p v-if="delivery.status && delivery.status !== 'accepted'">{{ t('docx.quality.' + delivery.status) }}</p>
       <p v-for="(issue, i) in delivery.unresolved || []" :key="i">{{ issue.page || '—' }} · {{ issue.block_id || '' }} · {{ issue.code }} · {{ typeof issue.detail === 'string' ? issue.detail : '' }}</p>
       <div v-for="review in reviews" :key="review.review_id || review.page"><p>{{ t('docx.page', {page:review.page}) }} · {{ t('docx.quality.' + (['failed', 'uncertain'].includes(review.status) ? 'issues' : review.status)) }} · {{ review.summary }}</p><p v-if="review.error">{{ review.error.code }}: {{ review.error.message }}</p><p v-for="(issue,i) in review.issues" :key="i">{{ issue.block_id || '' }} {{ issue.observation }} — {{ issue.suggestion }}</p></div>

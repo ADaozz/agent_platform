@@ -24,7 +24,7 @@ See [the workflow contract](references/document-workflow.md) for Design MD, docu
 
 ## Research quality acceptance
 
-New CLI documents require final OOXML/PDF geometry checks, bounded local repairs,
+New CLI documents require final OOXML/PDF geometry checks, local repairs with progress and cycle detection,
 all-page visual review and a separate whole-document visual review. The platform
 shows the three statuses independently. Missing models remain Unavailable; pending
 reviews and visual issues remain downloadable drafts. Uploaded templates retain

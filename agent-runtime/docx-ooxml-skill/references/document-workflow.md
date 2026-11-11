@@ -96,12 +96,14 @@ Normal wrapping, same-paragraph superscripts, table-cell text and header/footer
 furniture are excluded from naive box-overlap claims. Ambiguous geometry is
 reported without fabricated IDs. Complex edits continue to reject lossily.
 
-`check-document --final` automatically repairs safe targets in at most three
-commits. Each commit re-renders; all prior revision review results become invalid.
+`check-document --final` repairs only safe deterministic targets, with no fixed
+round limit. Each commit re-renders; all prior revision review results become invalid.
 A remaining finding blocks formal acceptance and leaves the draft downloadable.
-Exhaustion is persisted for the current revision: repeating the final check does
-not reset the automatic repair budget. A content edit creates a new revision.
-`--diagnostic-only` and `repair-document --max-attempts` support investigation,
+Stop reasons are persisted for the current revision. Unchanged content, repeated
+error evidence, worsening/stationary geometry, and recurring states terminate
+autonomous repair; repeating a final check does not restart a stopped revision.
+A real local content edit creates a new revision, which must be checked again.
+`--diagnostic-only` and `repair-document` support investigation,
 not bypasses. New CLI init defaults to contract 2; persisted legacy contract 1
 state remains backward compatible.
 
@@ -117,3 +119,16 @@ A plan section may set `kind`, `single_page`, `numbering:{format,start}` and
 `continued_label`. These express component requirements; sections are authoring
 units and physical pages are review units. `numbering` audits real Word section
 properties; it does not silently insert new section boundaries into templates.
+
+### Shared DOCX / PPTX repair progress policy
+
+Both formats use platform_app/office_repair.py. It compares stable deterministic
+issue identities and evidence, optional measured defect magnitudes, and package
+contents excluding ZIP timestamps. Visual model suggestions never enter repair
+progress or authorize an edit. Every local repair must be rendered and checked.
+Continue beyond three attempts when targets resolve or measured geometry improves.
+Stop and retain the draft on no_progress, repeated_errors, repair_cycle, an unsafe
+repair target or render failure; disclose remaining issues and the stop reason.
+The former max_attempts Python/CLI argument is accepted for compatibility only
+and no longer caps the loop. PPTX check-deck returns repair_control and a stopping
+next_action for the main Agent; it never rewrites a deck or applies visual advice.

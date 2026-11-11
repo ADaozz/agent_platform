@@ -57,4 +57,5 @@ def delivery(state):
                 visual_complete=complete, reviewed_pages=len(current), total_pages=len(pages),
                 issue_pages=[review['page'] for review in current if review.get('issues') or review.get('status') in ('failed', 'uncertain', 'issues')],
                 repair_attempts=(state.get('repair_summary') or {}).get('attempts', 0),
+                repair_stop_reason=(state.get('repair_summary') or {}).get('stop_reason'),
                 unresolved=check.get('repair_targets', []), document_review=document if document_current else None)

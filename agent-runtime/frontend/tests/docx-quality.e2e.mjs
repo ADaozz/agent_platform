@@ -28,9 +28,11 @@ createApp({setup(){const session={id:'fixture'};return()=>h(Panel,{session,activ
   await page.getByRole('button',{name:/Structure, layout and visual review/}).click()
   await page.getByText('Inconsistent heading spacing across pages',{exact:false}).waitFor()
   assert.match(await page.locator('.docx-quality').innerText(),/Document visual review: Issues/)
+  await page.evaluate(()=>window.qualityEvent({revision:4,repair_summary:{revision:4,stop_reason:'repair_cycle'}}))
+  await page.getByText('Autonomous repair stopped: Repair cycle detected',{exact:true}).waitFor()
   await page.evaluate(()=>{window.qualityEvent({revision:5});window.qualityEvent({revision:4,finalized:true,delivery:{revision:4,deterministic:'passed',page_visual:'passed',document_visual:'passed'}})})
   await page.waitForFunction(()=>document.querySelector('.docx-quality').innerText.includes('R5'))
   assert.match(await page.locator('.docx-quality').innerText(),/Deterministic layout: Pending/)
-  assert.doesNotMatch(await page.locator('.docx-quality').innerText(),/Inconsistent heading spacing/)
+  assert.doesNotMatch(await page.locator('.docx-quality').innerText(),/Inconsistent heading spacing|Repair cycle detected/)
   console.log('DOCX quality UI: three independent states, global issues, revision invalidation passed')
 } finally {await browser?.close();server?.kill('SIGTERM');await rm(folder,{recursive:true,force:true})}

@@ -53,7 +53,7 @@ def test_cover_date_overflow_is_detected_and_locally_repaired(tmp_path):
     assert result['recheck']['passed'],result['recheck']['repair_targets']
     assert len(result['recheck']['pages'])==1
     assert before=={b['block_id']:b['text'] for b in store.status()['blocks']}
-    assert result['repair_attempts']<=3
+    assert result['repair_attempts']>=1 and result['stop_reason'] is None
 
 
 @pytest.mark.skipif(not shutil.which('libreoffice'),reason='LibreOffice required')
@@ -300,13 +300,39 @@ def test_background_inflight_result_does_not_pollute_new_revision(tmp_path):
     finally:release.set();service.close()
 
 
-def test_repeated_final_check_cannot_restart_exhausted_automatic_repairs(tmp_path,monkeypatch):
+def test_repeated_final_check_cannot_restart_stopped_automatic_repairs(tmp_path,monkeypatch):
     store=a.DocumentStore(tmp_path/'bounded.docx');store.init('bounded',design='cn-thesis-general')
     revision=store.metadata()['revision'];failed=dict(passed=False,revision=revision,repair_targets=[dict(code='cover_overflow',block_id='cover')]);calls=[]
     monkeypatch.setattr(store,'_workflow',lambda *args,**kwargs:dict(failed))
     def repair(*args,**kwargs):
-        calls.append(args);return dict(revision=revision,recheck=failed,repair_attempts=3,remaining=failed['repair_targets'],exhausted=True)
+        calls.append(args);return dict(revision=revision,recheck=failed,repair_attempts=3,remaining=failed['repair_targets'],exhausted=True,stop_reason='repeated_errors')
     monkeypatch.setattr(store,'repair_document',repair)
     assert store.check_document(final=True)['repair_summary']['exhausted']
     assert store.check_document(final=True)['repair_summary']['exhausted']
     assert len(calls)==1
+
+
+def test_progressing_repairs_render_and_recheck_more_than_three_revisions(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    blocks=[b for i in range(5) for b in (f'h{i}',f'p{i}')]
+    store=make_store(tmp_path,[section('body',blocks)])
+    operations=[]
+    for i in range(5):operations.extend([dict(type='append_paragraph',block_id=f'h{i}',style='Heading1',text=f'{i+1} 研究章节'),dict(type='set_paragraph_format',block_id=f'h{i}',keep_next=False),dict(type='append_paragraph',block_id=f'p{i}',text=f'第 {i+1} 节记录独立的研究方法与观测结果。')])
+    store.apply_section(envelope(store,'body',section_id='body',operations=operations))
+    before={b['block_id']:b['text'] for b in store.status()['blocks']}
+    workflow=a._sibling('document_workflow');inspect=workflow.inspect_parts
+    # Model a checker that exposes the next dependent structural defect only
+    # after the preceding one is fixed. The mutations and renders remain real.
+    def next_finding(parts,api):
+        findings=inspect(parts,api)
+        return findings[:1]
+    monkeypatch.setattr(workflow,'inspect_parts',next_finding)
+    api=SimpleNamespace(o=a.o,identifier=a.identifier,BLOCK_ID=a.BLOCK_ID,BLOCK_NS=a.BLOCK_NS,packed=a.packed,mutate=a.mutate,_sibling=a._sibling,repair_policy=a.repair_policy())
+    check=workflow.check_document(store,True,api)
+    result=workflow.repair_document(store,check['revision'],'progressive-repair',api)
+    assert result['repair_attempts']==5 and result['recheck']['passed']
+    assert result['stop_reason'] is None
+    state=store.metadata();assert state['render_revision']==result['revision']
+    for attempt in state['repair_runs']['progressive-repair']['attempts']:
+        assert (store.render_directory(attempt['revision'])/'preview.pdf').is_file()
+    assert before=={b['block_id']:b['text'] for b in store.status()['blocks']}

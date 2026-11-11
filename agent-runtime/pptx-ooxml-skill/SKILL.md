@@ -54,7 +54,7 @@ ChartEx 高级图表、曲面和量价股票图需要 PowerPoint 核对，LibreO
 
 先完成全部页面和原生图表审计，再统一运行 `office_pptx.py check-deck files/deck.pptx --request tmp/deck-check.json`。请求为 `{"content_notes":{"<slide_id>":"该页具体内容核对记录"}}`；slide_id 从 status 读取。生成过程中只更新预览，不逐页启动检查或视觉修复。
 
-`check-deck` 返回 `repair_targets`（遮挡的 slide_id、elements）和 `other_errors`。**Agent 自动修复遮挡：只修改报告中的页面和相关元素，再运行 check-deck，直到 overlap_passed 为 true 且检查通过。** 不受旧的三次修复上限限制。真实的有意叠放才可标记 overlap_group，不能靠忽略错误、删除内容或整体缩字伪造通过。渲染/字体等环境错误先处理原因；无法验证时明确报告，不能宣称通过。
+`check-deck` 返回 `repair_targets`（遮挡的 slide_id、elements）和 `other_errors`。**Agent 自动修复遮挡：只修改报告中的页面和相关元素，再运行 check-deck，直到 overlap_passed 为 true 且检查通过。** 不设置固定修复次数上限。每次确定性局部修复后必须重新渲染并检查；读取 `repair_control`，仅在 `autonomous_repair_allowed` 为 true 时继续。检测到无进展、重复错误或修复循环（`no_progress` / `repeated_errors` / `repair_cycle`）后必须终止自主修复，保留可编辑草稿并报告未解决问题和原因，不得通过增加 Revision 或反复调用检查重新启动循环。真实的有意叠放才可标记 overlap_group，不能靠忽略错误、删除内容或整体缩字伪造通过。渲染/字体等环境错误先处理原因；无法验证时明确报告，不能宣称通过。
 
 **修复读取现有 PPT 并局部改动，禁止重新生成整稿。** 优先 `element.update`；脚本用 `Presentation('files/deck.pptx')`，通过稳定 slide_id/element_id 定位修改，再用 `deck_io.save_deck(prs, 'files/deck.pptx')` 写回原路径。保留其它页及未涉及对象的内容、背景、字体、布局和图表数据。不得重跑从空白 Presentation 重建全部页面的脚本。仅用户要求全局修改时才改全局参数。
 

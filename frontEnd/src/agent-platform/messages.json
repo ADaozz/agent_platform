@@ -1962,5 +1962,29 @@
   "docx.visualAdvisory": {
     "zh": "视觉建议供参考，不会自动修改文档。",
     "en": "Visual suggestions are advisory and do not edit the document."
+  },
+  "docx.quality.repairStopped": {
+    "zh": "自主修复已停止",
+    "en": "Autonomous repair stopped"
+  },
+  "docx.quality.stop.no_progress": {
+    "zh": "检查结果无进展",
+    "en": "No measurable progress"
+  },
+  "docx.quality.stop.repeated_errors": {
+    "zh": "重复出现相同错误",
+    "en": "The same errors persist"
+  },
+  "docx.quality.stop.repair_cycle": {
+    "zh": "检测到修复循环",
+    "en": "Repair cycle detected"
+  },
+  "docx.quality.stop.unrepairable": {
+    "zh": "没有可安全自动执行的局部修复",
+    "en": "No safe deterministic local repair"
+  },
+  "docx.quality.stop.render_failed": {
+    "zh": "渲染失败，无法验证修复",
+    "en": "Rendering failed; repair cannot be verified"
   }
 }

@@ -42,10 +42,18 @@ Prefer a template's sections, paragraphs, named styles, content controls and tab
 4. Run `check-document files/report.docx --final`. **Mandatory:** the current
    immutable revision must undergo actual PDF geometry/collision and layout checks.
    New documents use quality contract 2, including user templates. Final checks
-   automatically run up to three deterministic, Block-ID-local repair transactions,
-   re-rendering and rechecking each time. `--diagnostic-only` reports without repairs
-   and never waives the gate. `repair-document --max-attempts 1..3` can explicitly
-   resume repairs. Unrepairable findings require a local Agent edit or an explicit
+   automatically run deterministic, Block-ID-local repair transactions without a
+   fixed round cap, re-rendering and rechecking each time. `--diagnostic-only`
+   reports without repairs
+   and never waives the gate. `repair-document` can explicitly resume repairs.
+   Each attempt must re-render
+   and recheck. Continue only while deterministic evidence makes progress; stop on
+   unchanged content, repeated errors or recurring document/error states, and report
+   the stop reason with the remaining targets. Revision increments alone are not
+   progress. After a no-progress/repeated-error/cycle stop, report the remaining
+   issues and retain the draft; do not make unrelated edits or add a Revision to
+   restart autonomy without user direction.
+   Unrepairable findings require a local Agent edit or an explicit
    failure report; never silently ignore them, delete necessary content or shrink
    all text. A failed final check cannot be accepted. Keep the downloadable draft.
 5. After the deterministic final pass, the shared platform Office service queues

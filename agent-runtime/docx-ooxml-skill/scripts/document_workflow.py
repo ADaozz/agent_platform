@@ -249,7 +249,7 @@ def check_document(store,final,a,section_id=None):
         store.assert_current(state,revision)
         state['document_check']=result
         state['pages']=result['pages']
-        if result['passed'] and state.get('repair_summary'):state['repair_summary'].update(remaining=[],exhausted=False)
+        if result['passed'] and state.get('repair_summary'):state['repair_summary'].update(remaining=[],exhausted=False,stop_reason=None)
         if not result['passed']:state.update(gate='failed',finalized=False)
         state['delivery_status']='draft_pending_visual' if result['passed'] else 'draft_failed_layout'
         if final and current.get('quality_contract',1)>=2:
@@ -286,7 +286,7 @@ def _repair_once(store,base_revision,operation_id,a):
     if not check or check['revision']!=base_revision or state['revision']!=base_revision:raise ValueError('A current check-document is required')
     operations=[]
     for target in check['repair_targets']:
-        if target['deterministic'] and target.get('block_id') and target.get('operation') not in operations:operations.append(target['operation'])
+        if target['deterministic'] and target.get('block_id') and (target.get('operation') or {}).get('type') in {'set_paragraph_format','repair_table_pagination','keep_component','refresh_toc_pages','repair_section_numbering'} and target.get('operation') not in operations:operations.append(target['operation'])
     operations.sort(key=lambda op:op['type']=='refresh_toc_pages')
     if not operations:return dict(status='unrepairable',revision=base_revision,remaining=check['repair_targets'])
     a.identifier(operation_id)
@@ -330,48 +330,79 @@ def _repair_once(store,base_revision,operation_id,a):
                 parts[a.o.MAIN]=a.o.xml_bytes(root)
             else:parts,_,_=a.mutate(parts,op,store.path.parent)
             changed.append(op['block_id'])
-        result=store.commit(c,state,a.packed(parts),operation_id,dict(repair=base_revision),changed,extra=dict(repaired=len(operations),attempted=len(check['repair_targets'])))
+        data=a.packed(parts)
+        if a.repair_policy.package_fingerprint(data)==a.repair_policy.package_fingerprint(store.path.read_bytes()):
+            return dict(status='unrepairable',stop_reason='no_progress',revision=base_revision,remaining=check['repair_targets'])
+        result=store.commit(c,state,data,operation_id,dict(repair=base_revision),changed,extra=dict(repaired=len(operations),attempted=len(check['repair_targets'])))
     return dict(result,recheck=check_document(store,True,a))
 
 
 
-def repair_document(store,base_revision,operation_id,a,max_attempts=3):
-    if type(max_attempts) is not int or not 1<=max_attempts<=3:raise ValueError('Repair loop limit is 1-3')
-    a.identifier(operation_id)
+def repair_observations(check,policy):
+    issues=[]
+    for target in check.get('repair_targets',[]):
+        detail=target.get('detail');magnitude=None
+        if isinstance(detail,dict):
+            if target['code'] in ('cover_overflow','component_overflow','table_row_split'):
+                magnitude=max(0,len(detail.get('pages',[]))-1)
+            elif target['code']=='toc_page_results':magnitude=len(detail.get('expected',{}))
+            elif target['code'] in ('text_image_collision','text_collision'):
+                first=detail.get('text_bbox',detail.get('first_bbox'));second=detail.get('image_bbox',detail.get('second_bbox'))
+                if first and second:magnitude=max(0,min(first[2],second[2])-max(first[0],second[0]))*max(0,min(first[3],second[3])-max(first[1],second[1]))
+        key=dict(code=target['code'],block=target.get('block_id'),related=sorted(target.get('related_blocks',[])))
+        if not key['block']:key['page']=target.get('page')
+        issues.append(policy.issue(key,detail,magnitude))
+    return issues
+
+
+def repair_document(store,base_revision,operation_id,a):
+    policy=a.repair_policy;a.identifier(operation_id)
     with store.locked() as(c,state):
         old=(state.get('repair_runs') or {}).get(operation_id)
-        if old and (old['base_revision']!=base_revision or old['limit']!=max_attempts):raise ValueError('Repair operation ID reused')
-        if old and old.get('done'):return old['result']
-        run=old or dict(base_revision=base_revision,limit=max_attempts,attempts=[])
+        if old and old['base_revision']!=base_revision:raise ValueError('Repair operation ID reused')
+        if old and old.get('done'):
+            result=dict(old['result'])
+            result.setdefault('stop_reason','unrepairable' if result.get('exhausted') else None)
+            return result
+        run=old or dict(base_revision=base_revision,policy_version=2,attempts=[],steps=[])
         if not old:store.assert_current(state,base_revision)
         state.setdefault('repair_runs',{})[operation_id]=run;store.save_state(c,state);c.commit()
-    result=None
-    for i in range(max_attempts):
-        current=store.status();check=current.get('document_check')
+    result=None;reason=None
+    while True:
+        current=store.status();run=current['repair_runs'][operation_id]
+        i=len(run['attempts']);pending=i<len(run.get('steps',[]))
+        check=current.get('document_check')
         if not check or check['revision']!=current['revision']:check=check_document(store,True,a)
-        if check['passed'] and i>=len(run.get('steps',[])):
-            result=dict(status='checked',revision=current['revision'],recheck=check,repaired=0);break
-        opid=operation_id if i==0 else operation_id[:60]+'-retry-'+str(i)
-        with store.locked() as(c,state):
-            item=state['repair_runs'][operation_id]
-            steps=item.setdefault('steps',[])
-            if i>=len(steps):
+        # Replay an interrupted committed step before evaluating its new check.
+        if not pending:
+            if check['passed']:break
+            if check.get('render_error'):reason='render_failed';break
+            observations=repair_observations(check,policy)
+            if not observations:reason='unrepairable';break
+            content=policy.package_fingerprint(store.snapshot(current['revision']))
+            history,control=policy.observe(run.get('progress'),observations,content,current['revision'])
+            with store.locked() as(c,state):
                 store.assert_current(state,current['revision'])
-                steps.append(dict(base_revision=current['revision'],operation_id=opid))
-            step=steps[i];run=item
-            store.save_state(c,state);c.commit()
+                state['repair_runs'][operation_id]['progress']=history;store.save_state(c,state);c.commit()
+            if not control['autonomous_repair_allowed']:reason=control['stop_reason'];break
+            opid=operation_id if i==0 else operation_id[:60]+'-retry-'+str(i)
+            with store.locked() as(c,state):
+                store.assert_current(state,current['revision'])
+                state['repair_runs'][operation_id].setdefault('steps',[]).append(dict(base_revision=current['revision'],operation_id=opid))
+                store.save_state(c,state);c.commit()
+            step=dict(base_revision=current['revision'],operation_id=opid)
+        else:step=run['steps'][i]
         result=_repair_once(store,step['base_revision'],step['operation_id'],a)
-        if result.get('status')=='unrepairable':break
+        if result.get('status')=='unrepairable':reason=result.get('stop_reason','unrepairable');break
         with store.locked() as(c,state):
-            item=state['repair_runs'][operation_id]
-            if result['revision'] not in [r['revision'] for r in item['attempts']]:item['attempts'].append(dict(revision=result['revision'],operation_id=opid,repaired=result.get('repaired',0)))
+            store.assert_current(state,result['revision'])
+            state['repair_runs'][operation_id]['attempts'].append(dict(revision=result['revision'],operation_id=step['operation_id'],repaired=result.get('repaired',0)))
             store.save_state(c,state);c.commit()
-        if result['recheck']['passed']:break
-    latest=store.status();check=latest.get('document_check') or {}
-    result=dict(result or {},revision=latest['revision'],recheck=check,repair_attempts=len(latest['repair_runs'][operation_id]['attempts']),remaining=check.get('repair_targets',[]),exhausted=not check.get('passed',False))
+    latest=store.status();check=latest.get('document_check') or {};attempts=latest['repair_runs'][operation_id]['attempts']
+    result=dict(result or dict(status='checked' if check.get('passed') else 'unrepairable'),revision=latest['revision'],recheck=check,repaired=sum(r.get('repaired',0) for r in attempts),repair_attempts=len(attempts),remaining=check.get('repair_targets',[]),exhausted=not check.get('passed',False),stop_reason=reason)
     with store.locked() as(c,state):
         store.assert_current(state,latest['revision'])
         state['repair_runs'][operation_id].update(done=True,result=result)
-        state['repair_summary']=dict(attempts=sum(len(r['attempts']) for r in state['repair_runs'].values()),remaining=result['remaining'],exhausted=result['exhausted'])
+        state['repair_summary']=dict(revision=latest['revision'],attempts=sum(len(r['attempts']) for r in state['repair_runs'].values()),remaining=result['remaining'],exhausted=result['exhausted'],stop_reason=reason)
         store.save_state(c,state);c.commit()
     return result

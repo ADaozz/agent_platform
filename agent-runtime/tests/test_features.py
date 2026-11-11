@@ -65,3 +65,11 @@ def test_disabled_feature_skill_is_removed_from_existing_session_snapshot(client
     assert client.delete('/api/features/pptx').status_code==200
     format_plugins.snapshot_skills(skills)
     assert not (skills/'pptx-ooxml-author').exists()
+
+
+def test_office_skill_snapshots_share_the_progress_policy(client,tmp_path):
+    destination=tmp_path/'skills';destination.mkdir()
+    format_plugins.snapshot_skills(destination)
+    source=(Path(format_plugins.__file__).with_name('office_repair.py')).read_bytes()
+    for skill in ('docx-ooxml-author','pptx-ooxml-author'):
+        assert (destination/skill/'scripts/office_repair.py').read_bytes()==source

@@ -106,6 +106,7 @@ def snapshot_skills(destination,skill_bindings=None):
             # Host-only modules (adapter, model access) stay out of the sandbox snapshot.
             host_only=tuple(meta.get('host_only',()))
             shutil.copytree(meta['directory'],folder,ignore=shutil.ignore_patterns('__pycache__','.pytest_cache','tests','platform_adapter.py',*host_only))
+            shutil.copy2(Path(__file__).with_name('office_repair.py'),folder/'scripts'/'office_repair.py')
             # Self-contained skills own their bundled runtime. Supply the shared
             # runtime only for older extensions that do not package it yet.
             if not (folder/'scripts'/'artifact_runtime.py').exists():
