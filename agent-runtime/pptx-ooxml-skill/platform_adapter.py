@@ -35,7 +35,10 @@ def _title(slide):
     return next((element.get('text','')[:80] for element in slide.get('elements',[]) if element.get('type')=='text' and element.get('text')),'')
 
 
-class ReviewCoordinator:
+from platform_app.office_review import BackgroundReviews
+
+
+class ReviewCoordinator(BackgroundReviews):
     """Schedules host-rendered, model-reviewed checks; applies only current results."""
     def __init__(self,service,host):
         self.service=service;self.host=host or {}
@@ -43,26 +46,10 @@ class ReviewCoordinator:
         self.private_root=Path(private) if private else Path(service.temporary_root or tempfile.gettempdir())/'pptx-host-review'
         self.private_root.mkdir(parents=True,exist_ok=True,mode=0o700)
         self.ledger=vision.ReviewLedger(self.private_root/'vision-reviews.sqlite')
-        self.executor=ThreadPoolExecutor(max_workers=2,thread_name_prefix='pptx-vision')
-        self.inflight=set();self.lock=threading.Lock();self.closed=False
-        self.timeout=float(self.host.get('vision_timeout',vision.DEFAULT_TIMEOUT))
+        super().__init__(service, self.host, vision)
     def store(self,path):
         # Host renders go to the private root; the sandbox cannot swap the screenshot.
         return PresentationStore(path,temporary_root=self.private_root/'renders')
-    def close(self):
-        self.closed=True;self.executor.shutdown(wait=False,cancel_futures=True)
-    def schedule(self,key,function,*args):
-        with self.lock:
-            if self.closed or key in self.inflight:return False
-            self.inflight.add(key)
-        def run():
-            try:function(*args)
-            except Exception as exc:LOG.error('PPTX vision job failed: %s %s',key[0],type(exc).__name__)
-            finally:
-                with self.lock:self.inflight.discard(key)
-                try:self.service.sync()
-                except Exception as exc:LOG.error('PPTX sync after vision job failed: %s',type(exc).__name__)
-        self.executor.submit(run);return True
     def observe(self,path,event):
         kind=event.get('type')
         if kind in ('presentation_review','presentation_review_requested'):
@@ -84,13 +71,6 @@ class ReviewCoordinator:
             deck=state.get('deck_review') or {}
         for sid,review in pending:self.schedule(('slide',str(path),sid,review['revision'],review.get('fingerprint')),self.review_slide,path,sid,review['revision'],review.get('fingerprint'))
         if deck.get('status')=='pending':self.schedule(('deck',str(path),deck['request_id']),self.review_deck,path,deck['request_id'],deck['revision'])
-    def model(self):
-        resolver=self.host.get('vision')
-        if resolver is None:return None,'vision review is not configured on this host'
-        try:model_id,chat=resolver()
-        except Exception as exc:return None,'vision model could not be prepared: '+type(exc).__name__
-        if model_id is None:return None,chat
-        return vision.ModelClient(model_id,vision.langchain_invoker(chat) if hasattr(chat,'invoke') else chat,self.timeout),None
     def render(self,store,revision,data):
         with tempfile.TemporaryDirectory(prefix='pptx-host-check-') as folder:
             candidate=Path(folder)/'candidate.pptx';candidate.write_bytes(data);validate_embedded_resources(candidate)

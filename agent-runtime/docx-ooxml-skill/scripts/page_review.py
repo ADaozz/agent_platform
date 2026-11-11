@@ -43,7 +43,13 @@ def analyze_pages(parts, pdf, engine, final=False):
             uncertain_tables += 1
         hits = {i for i, text in enumerate(texts) if any(sample in text for sample in samples)}
         if len(hits) > 1:
-            split_pages.update(hits)
+            rows = list(table.iter(o.q(o.W, 'tr')))
+            header = rows[0].find('./'+o.q(o.W,'trPr')+'/'+o.q(o.W,'tblHeader')) if rows else None
+            protected = all(tr.find('./'+o.q(o.W,'trPr')+'/'+o.q(o.W,'cantSplit')) is not None for tr in rows)
+            # Flowing tables with repeating headers and unsplit rows are expected.
+            keep_chain = bool(table.xpath('.//w:pPr/w:keepNext[not(@w:val="0" or @w:val="false" or @w:val="off")]', namespaces=ns))
+            if header is None or not protected or keep_chain:
+                split_pages.update(hits)
     fonts_missing = []
     full_text = ''.join(texts)
     if re.search(r'[\u3400-\u9fff]', full_text):
@@ -58,6 +64,26 @@ def analyze_pages(parts, pdf, engine, final=False):
             matched = subprocess.run(['fc-match', '-f', '%{family}', font], capture_output=True, text=True, timeout=5).stdout
             if font.casefold() not in [f.strip() for f in matched.casefold().split(',')]:
                 fonts_missing.append(font)
+    block_samples = [(node.get('{urn:deep-agent:docx:blocks:v1}id'), normalized(o.ptext(node)))
+        for node in root.iter() if node.get('{urn:deep-agent:docx:blocks:v1}id')]
+    page_blocks = [[] for _ in texts]
+    for block_id, sample in block_samples:
+        if len(sample) < 3: continue
+        hits = [i for i, text in enumerate(texts) if sample in text]
+        if len(hits) == 1: page_blocks[hits[0]].append(block_id)
+    paragraph_samples = [(p.get('{urn:deep-agent:docx:blocks:v1}id'), normalized(o.ptext(p))) for p in root.iter(o.q(o.W,'p')) if not p.xpath('ancestor::w:tbl',namespaces=ns) and len(normalized(o.ptext(p))) > 20]
+    page_lines = [[normalized(line) for line in page.get_text().splitlines() if normalized(line)] for page in pdf]
+    lonely_lines = set()
+    lonely_blocks = {}
+    for i in range(len(page_lines)-1):
+        left, right = page_lines[i], page_lines[i+1]
+        if not left or not right: continue
+        for block_id, sample in paragraph_samples:
+            if len(left[-1]) >= 8 and len(right[0]) >= 8 and left[-1]+right[0] in sample:
+                for page_index, lines in ((i,left),(i+1,right)):
+                    if sum(line in sample for line in lines)==1:
+                        lonely_lines.add(page_index)
+                        if block_id: lonely_blocks.setdefault(page_index,[]).append(block_id)
     pages = []
     for i, page in enumerate(pdf):
         rect = page.rect
@@ -73,15 +99,20 @@ def analyze_pages(parts, pdf, engine, final=False):
         lines = [normalized(line) for line in page.get_text().splitlines() if normalized(line)]
         complete = final or i < len(pdf) - 1
         orphan = complete and bool(lines and any(normalized(h) and lines[-1].endswith(normalized(h)) for h in headings))
-        checks = dict(ooxml_valid=True, render_success=True, content_overflow=overflow,
+        blank = not lines and not page.get_image_info() and not page.get_drawings()
+        # Require a uniquely recognizable paragraph continuation across pages.
+        # A one-line cover, formula or diagram page is not evidence of a widow.
+        widow_orphan = complete and i in lonely_lines
+        block_ids = page_blocks[i]
+        checks = dict(blank_page=blank, widow_orphan=widow_orphan, ooxml_valid=True, render_success=True, content_overflow=overflow,
             table_split=i in split_pages, heading_orphan=orphan, margins_abnormal=margin_abnormal,
             fonts_missing=fonts_missing, visual_review='pending', warnings=['Table text cannot be uniquely mapped; inspect actual table layout'] if uncertain_tables else [])
-        checks['automatic_passed'] = not (overflow or i in split_pages or orphan or margin_abnormal or fonts_missing)
+        checks['automatic_passed'] = not (overflow or i in split_pages or orphan or margin_abnormal or fonts_missing or blank or widow_orphan)
         # Render fingerprint invalidates previous visual reviews after any reflow,
         # including images, font substitution, headers, and page renumbering.
         fingerprint = hashlib.sha256(page.get_pixmap(alpha=False).samples).hexdigest()
         complete = final or i < len(pdf) - 1
-        pages.append(dict(page=i + 1, complete=complete, fingerprint=fingerprint, checks=checks,
+        pages.append(dict(page=i + 1, block_ids=block_ids, widow_blocks=lonely_blocks.get(i, []), complete=complete, fingerprint=fingerprint, checks=checks,
             image='page-%03d.png' % (i + 1), status='failed' if not checks['automatic_passed'] else 'pending' if complete else 'writing'))
     return pages
 

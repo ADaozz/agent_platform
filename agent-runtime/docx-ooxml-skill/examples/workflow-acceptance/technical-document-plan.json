@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "document_id": "report",
+  "title": "technical acceptance report",
+  "page_target": 30,
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Scope and evidence",
+      "requirements": "Define observable outcomes and establish a reproducible evidence baseline.",
+      "block_ids": [
+        "toc",
+        "s1-h",
+        "s1-h2",
+        "s1-p0",
+        "s1-p1",
+        "s1-p2",
+        "s1-p3",
+        "s1-h3",
+        "s1-table"
+      ],
+      "equations": [],
+      "figures": [],
+      "tables": [
+        "s1-table"
+      ],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Data collection",
+      "requirements": "Measure source quality, coverage, completeness and the limits of each observation.",
+      "block_ids": [
+        "s2-h",
+        "s2-h2",
+        "s2-p0",
+        "s2-p1",
+        "s2-p2",
+        "s2-p3",
+        "s2-h3",
+        "s2-table"
+      ],
+      "equations": [],
+      "figures": [],
+      "tables": [
+        "s2-table"
+      ],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Method and assumptions",
+      "requirements": "Document model assumptions, compare alternatives and justify the selected approach.",
+      "block_ids": [
+        "s3-h",
+        "s3-h2",
+        "s3-p0",
+        "s3-p1",
+        "s3-p2",
+        "s3-p3",
+        "s3-h3",
+        "s3-table"
+      ],
+      "equations": [],
+      "figures": [],
+      "tables": [
+        "s3-table"
+      ],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Evaluation protocol",
+      "requirements": "Separate experimental observations from assumptions and describe the evaluation protocol.",
+      "block_ids": [
+        "s4-h",
+        "s4-h2",
+        "s4-p0",
+        "s4-p1",
+        "s4-p2",
+        "s4-p3",
+        "s4-h3",
+        "s4-table"
+      ],
+      "equations": [],
+      "figures": [],
+      "tables": [
+        "s4-table"
+      ],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "Results and uncertainty",
+      "requirements": "Report uncertainty alongside measured effects and compare baseline performance.",
+      "block_ids": [
+        "s5-h",
+        "s5-h2",
+        "s5-p0",
+        "s5-p1",
+        "s5-p2",
+        "s5-p3",
+        "s5-h3",
+        "s5-table"
+      ],
+      "equations": [],
+      "figures": [],
+      "tables": [
+        "s5-table"
+      ],
+      "citations": [
+        "methodology"
+      ],
+      "styles": [
+        "Normal",
+        "Heading1",
+        "Heading2",
+        "Heading3"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "methodology",
+      "text": "Acceptance benchmark methodology; repository fixture."
+    }
+  ]
+}

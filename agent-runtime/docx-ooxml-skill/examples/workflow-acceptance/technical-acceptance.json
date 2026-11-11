@@ -1,0 +1,98 @@
+{
+  "case": "technical",
+  "page_target": 30,
+  "actual_pages": 30,
+  "passed": true,
+  "new_tool_calls": 11,
+  "revision": 7,
+  "calls": [
+    {
+      "command": "init",
+      "revision": 0,
+      "duration_ms": 28.77
+    },
+    {
+      "command": "validate-plan",
+      "revision": null,
+      "duration_ms": 0.61
+    },
+    {
+      "command": "save-plan",
+      "revision": 1,
+      "duration_ms": 8.65
+    },
+    {
+      "command": "apply-section",
+      "revision": 2,
+      "duration_ms": 1810.88
+    },
+    {
+      "command": "apply-section",
+      "revision": 3,
+      "duration_ms": 1707.29
+    },
+    {
+      "command": "apply-section",
+      "revision": 4,
+      "duration_ms": 2262.72
+    },
+    {
+      "command": "apply-section",
+      "revision": 5,
+      "duration_ms": 3067.05
+    },
+    {
+      "command": "apply-section",
+      "revision": 6,
+      "duration_ms": 3796.32
+    },
+    {
+      "command": "check-document --final",
+      "revision": 6,
+      "duration_ms": 593.13
+    },
+    {
+      "command": "repair-document",
+      "revision": 7,
+      "duration_ms": 3640.01
+    },
+    {
+      "command": "finalize",
+      "revision": 7,
+      "duration_ms": 7.91
+    }
+  ],
+  "repair_successes": 1,
+  "repair_targets": [],
+  "visual_review": "pending; requires configured host vision service",
+  "editable": true,
+  "forced_page_breaks": false,
+  "render_timings_ms": [
+    {
+      "revision": 2,
+      "render_ms": 1505.96
+    },
+    {
+      "revision": 3,
+      "render_ms": 1241.08
+    },
+    {
+      "revision": 4,
+      "render_ms": 1620.44
+    },
+    {
+      "revision": 5,
+      "render_ms": 2272.22
+    },
+    {
+      "revision": 6,
+      "render_ms": 2761.83
+    },
+    {
+      "revision": 7,
+      "render_ms": 2614.18
+    }
+  ],
+  "sha256": "7dea70118ec0cb2f2e24ef018805c33f35f84189928c3ec899a86715e0085ea8",
+  "artifact": "technical.docx"
+}
