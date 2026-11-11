@@ -1,0 +1,19 @@
+# Platform grouped model configuration.
+# Copy to .platform/config.yaml or set PLATFORM_CONFIG before the first start.
+# Once saved in the UI, the encrypted database configuration takes precedence.
+llm:
+  default: deepseek/deepseek-flash
+  timeout: 60
+  # Optional: image-capable model for host-side PPTX visual review when the
+  # session model is text-only. It must declare input: [text, image].
+  # vision_model: deepseek/deepseek-flash
+  models:
+    deepseek:
+      base_url: https://api.deepseek.com/v1
+      api_key: ${DEEPSEEK_API_KEY}
+      api: chat_completions
+      # The first supported reasoning effort is the default.
+      reasoning_efforts: [high, low, max]
+      models:
+        deepseek-flash:
+          input: [text, image]

@@ -1,0 +1,870 @@
+"""HTTP presentation adapter for the upstream AgentRunner, never an agent loop."""
+import asyncio
+import base64
+import json
+import logging
+import mimetypes
+import re
+import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, replace
+from datetime import datetime, timezone
+from uuid import uuid4
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, Field
+
+from . import domain as d, models as m
+from .usage import runner_usage
+from . import format_plugins
+from . import itam_bridge
+from .workspace import resolve, SandboxPolicyBuilder
+
+router = APIRouter(prefix='/api/agent')
+POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix='agent-core')
+RUNTIMES = {}
+LOCK = threading.RLock()
+LOG = logging.getLogger(__name__)
+ACTIVE = ('queued', 'running')
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+
+def public_run_error(error):
+    """Expose actionable classifications without leaking upstream configuration."""
+    message = str(error).casefold()
+    if 'unsupported image' in message or 'uploaded image cannot be decoded' in message:
+        return '模型接口拒绝了图片：请检查图片格式、像素尺寸及模型的图片输入限制。'
+    if 'megapixel decoding limit' in message:
+        return '图片像素过大，请缩小图片后重试。'
+    return '内核执行失败，请检查服务端日志及模型配置。'
+
+
+def upload_records(thread_id, ids):
+    root = resolve(thread_id).files_root
+    result = []
+    for upload_id in ids:
+        try:
+            item = d.get('upload', upload_id)
+        except KeyError:
+            raise HTTPException(404, '上传文件不存在')
+        path = root / item['path']
+        if item.get('thread_id') != thread_id or not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+            raise HTTPException(404, '上传文件不存在')
+        result.append(item)
+    return result
+
+
+@router.post('/sessions/{session_id}/uploads', status_code=201)
+async def upload_file(session_id: str, file: UploadFile = File(...)):
+    find(session_id)
+    name = Path((file.filename or 'file').replace('\\', '/')).name
+    name = ''.join(c for c in name if c.isprintable()).strip().encode('utf-8')[:180].decode('utf-8', errors='ignore') or 'file'
+    if name in ('.', '..'):
+        raise HTTPException(422, '文件名无效')
+    upload_id = uuid4().hex
+    relative = Path('uploads') / upload_id / name
+    root = resolve(session_id).files_root
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.parent.resolve().is_relative_to(root.resolve()):
+        raise HTTPException(422, '上传目录无效')
+    size = 0
+    try:
+        with path.open('xb') as target:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, '每个文件不能超过 20MB')
+                target.write(chunk)
+        if not size:
+            raise HTTPException(422, '不能上传空文件')
+        record = dict(id=upload_id, thread_id=session_id, name=name, size=size,
+            type=mimetypes.guess_type(name)[0] or 'application/octet-stream', path=relative.as_posix(), created_at=now())
+        return d.put('upload', record)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def internal_path(path):
+    return any(part=='.deepagents' or (part.startswith('.') and part.endswith('-state')) for part in Path(path).parts)
+
+
+def public_event(event):
+    if event.get('type')=='output_files':
+        return {**event,'files':[item for item in event.get('files',[]) if not internal_path(item.get('path',''))]}
+    return event
+
+
+def journal(session_id, after):
+    prefix = f'{session_id}:'
+    with d.db() as connection:
+        rows = connection.execute(
+            'SELECT data FROM records WHERE kind=? AND id>? AND id<? ORDER BY id LIMIT 512',
+            ('event', f'{prefix}{after:010d}', prefix + '~')).fetchall()
+    return [public_event(json.loads(row[0])) for row in rows]
+
+
+def file_snapshot(root):
+    snapshot = {}
+    if root.exists():
+        for path in root.rglob('*'):
+            if not path.is_file() or path.is_symlink() or internal_path(path.relative_to(root)):
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            snapshot[path.relative_to(root).as_posix()] = (stat.st_mtime_ns, stat.st_size)
+    return snapshot
+
+
+def changed_files(root, before):
+    after = file_snapshot(root)
+    changed = ({'path': name, 'size': size} for name, (mtime, size) in after.items() if before.get(name) != (mtime, size))
+    return sorted(changed, key=lambda item: item['path'])[:100]
+
+
+def find(session_id):
+    try:
+        return d.get('session', session_id)
+    except KeyError:
+        raise HTTPException(404, '会话不存在')
+
+
+def public(record):
+    value = {k: v for k, v in record.items() if k not in ('model_snapshot', 'config')}
+    snapshot = record.get('model_snapshot')
+    if snapshot:
+        value['context_window'] = m.validate(m.unseal(snapshot['encrypted'])).get_profile(record['model_id']).context_window
+    value['enabled_features'] = [meta['id'] for meta in format_plugins.enabled()]
+    context = resolve(record['id'])
+    value['workspace_id'] = context.workspace_id
+    value['output_files'] = [{'path': path, 'size': size} for path, (_, size) in file_snapshot(context.files_root).items()
+        if Path(path).parts[0] != 'uploads']
+    root = context.artifacts_root
+    value['artifacts'] = [p.name for p in root.iterdir() if p.is_file() and not p.is_symlink()] if root.exists() else []
+    return value
+
+
+def initialize():
+    for record in d.all_records('session'):
+        if record['status'] in ACTIVE:
+            record.update(status='interrupted', usage={}, error='服务重启，本轮已中断；可发送新消息恢复会话。')
+            d.put('session', record)
+
+
+
+def thinking_snapshot(event):
+    # Native reasoning deltas carry the whole text so far; only the newest of a run is needed.
+    return event.get('type') == 'thinking_delta' and event.get('content_mode') != 'append'
+
+
+def manifest_key(event):
+    artifact = event.get('artifact_extension')
+    return (artifact['feature'], artifact['id']) if artifact and 'manifest' in event else None
+
+
+def strip_manifest(connection, row_id):
+    row = connection.execute('SELECT data FROM records WHERE kind=? AND id=?', ('event', row_id)).fetchone()
+    if row:
+        value = json.loads(row[0])
+        if value.pop('manifest', None) is not None:
+            connection.execute('UPDATE records SET data=? WHERE kind=? AND id=?', (json.dumps(value, ensure_ascii=False), 'event', row_id))
+
+
+def compact_journal(session_id):
+    """Drop superseded reasoning snapshots and old artifact manifests; the rendered history is unchanged."""
+    prefix = f'{session_id}:'
+    removed, stripped = [], []
+    previous_snapshot, manifests = None, {}
+    with d.db() as connection:
+        rows = connection.execute('SELECT id, data FROM records WHERE kind=? AND id>? AND id<? ORDER BY id', ('event', prefix, prefix + '~'))
+        for row_id, data in rows:
+            event = json.loads(data)
+            if thinking_snapshot(event):
+                if previous_snapshot:
+                    removed.append(previous_snapshot)
+                previous_snapshot = row_id
+            else:
+                previous_snapshot = None
+            key = manifest_key(event)
+            if key:
+                if key in manifests:
+                    stripped.append(manifests[key])
+                manifests[key] = row_id
+    with d.LOCK, d.db() as connection:
+        connection.executemany('DELETE FROM records WHERE kind=? AND id=?', [('event', row_id) for row_id in removed])
+        for row_id in stripped:
+            strip_manifest(connection, row_id)
+    return dict(removed=len(removed), stripped=len(stripped))
+
+
+class Runtime:
+    def __init__(self, session_id):
+        self.id = session_id
+        self.runner = None
+        self.artifact_services = {}
+        self.lock = threading.RLock()
+        self.previous_snapshot = None
+        self.manifest_rows = {}
+
+    def event(self, event):
+        with self.lock:
+            record = find(self.id)
+            event = json.loads(json.dumps(event, default=str))
+            event['occurred_at'] = now()
+            event['seq'] = record.get('event_seq', 0) + 1
+            record['event_seq'] = event['seq']
+            if event['type'] == 'runtime_config_applied':
+                record['permission_mode'] = event['result']['permission_mode']
+                record['pending_permission_mode'] = None
+                record['sandbox_mode'] = event['result']['sandbox_mode']
+                record['pending_sandbox_mode'] = None
+                if event['result'].get('model_changed') or event['result'].get('reasoning_changed'):
+                    record['usage'] = {}
+            if event['type'] == 'runtime_config_failed':
+                record['pending_sandbox_mode'] = self.runner.pending_sandbox_mode() if self.runner else None
+            # Keep the latest completed request visible while the next one streams.
+            # Empty usage events mark request start, not zero token consumption.
+            if event['type'] == 'usage' and (event.get('result') or {}).get('input_tokens') is not None:
+                record['usage'] = event['result']
+            artifact=event.get('artifact_extension')
+            if artifact:
+                items=record.setdefault(artifact['state_key'],{})
+                previous=items.get(artifact['id'],{})
+                if event.get('revision',-1)>=previous.get('revision',-1):
+                    newer=event.get('revision',-1)>previous.get('revision',-1)
+                    items[artifact['id']]={**previous,**({'pages':[],'finalized':False,'render_error':None} if newer else {}),**event}
+                if event.get('store_seq') and event.get('path'):
+                    record.setdefault('artifact_cursors',{}).setdefault(artifact['feature'],{})[event['path']]=event['store_seq']
+            # Event journal is durable; reconnecting clients resume by sequence.
+            record['updated_at'] = now()
+            row_id = f'{self.id}:{event["seq"]:010d}'
+            with d.LOCK, d.db() as connection:
+                for kind, value in [('event', {'id': row_id, 'session_id': self.id, **event}), ('session', record)]:
+                    connection.execute('INSERT INTO records VALUES (?,?,?) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data', (kind, value['id'], json.dumps(value, ensure_ascii=False)))
+                # Keep the journal proportional to what it renders: one reasoning snapshot per run, one full manifest per artifact.
+                if thinking_snapshot(event):
+                    if self.previous_snapshot:
+                        connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('event', self.previous_snapshot))
+                    self.previous_snapshot = row_id
+                else:
+                    self.previous_snapshot = None
+                key = manifest_key(event)
+                if key:
+                    if key in self.manifest_rows:
+                        strip_manifest(connection, self.manifest_rows[key])
+                    self.manifest_rows[key] = row_id
+
+    def ensure_artifact_services(self):
+        with self.lock:
+            if self.artifact_services:
+                return self.artifact_services
+            record=find(self.id)
+            context=resolve(self.id)
+            root=context.files_root
+            root.mkdir(parents=True,exist_ok=True)
+            # session_root is outside every sandbox mount: review ledgers and host renders live there.
+            host=dict(private_root=context.session_root / 'artifact-review', vision=self.vision_model)
+            self.artifact_services=format_plugins.build_services(root,self.event,temporary_root=context.workspace_root / 'tmp' / 'office-renders',host=host)
+            for feature,service in self.artifact_services.items():
+                service.bind_state(record)
+            return self.artifact_services
+
+    def vision_model(self):
+        """(model_id, chat model) for host-side visual review, or (None, reason).
+
+        The session's current model is used when it declares image input;
+        otherwise an explicitly configured ``llm.vision_model`` (or
+        PLATFORM_VISION_MODEL). Nothing else is guessed.
+        """
+        import os
+        from platform_app.agent_core.config import Settings
+        from platform_app.agent_core.llm import build_chat_model
+        record = find(self.id)
+        snapshot = record.get('model_snapshot')
+        if not snapshot:
+            return None, 'no model is configured for this session'
+        try:
+            config = m.unseal(snapshot['encrypted'])
+            settings = Settings.from_mapping({'llm': config})
+            current = settings.get_profile(record['model_id'])
+        except (KeyError, ValueError):
+            return None, 'session model configuration is unavailable'
+        if current.supports_input('image'):
+            profile = current
+        else:
+            explicit = config.get('vision_model') or os.environ.get('PLATFORM_VISION_MODEL')
+            if not explicit:
+                return None, f'model {current.id} has no image input and no vision model is configured'
+            try:
+                profile = settings.get_profile(explicit)
+            except KeyError:
+                return None, 'configured vision model is not defined'
+            if not profile.supports_input('image'):
+                return None, f'configured vision model {profile.id} does not declare image input'
+        model = build_chat_model(profile, streaming=False, trust_env=True, timeout=max(150.0, settings.request_timeout))
+        return profile.id, model
+
+    def core_event(self,event):
+        data=asdict(event)
+        self.event(data)
+        for service in self.artifact_services.values():
+            if data['type'] in ('tool_completed','tool_failed'):service.detect_external()
+
+    def build(self):
+        if self.runner is not None:
+            return self.runner
+        from platform_app.agent_core import AgentRunner
+        from .agent_factory import prepare_agent
+        from platform_app.agent_core.config import Settings, SubAgentConfig
+        from platform_app.agent_core.llm import build_chat_model
+        from platform_app.agent_core.session import SessionStore
+        from platform_app.agent_core.mcp.manager import MCPManager
+
+        record = find(self.id)
+        config = record['config']
+        context = resolve(self.id)
+        files = context.files_root
+        files.mkdir(parents=True, exist_ok=True)
+        # Immutable skill snapshot outside the writable file library, mounted read-only.
+        root = context.session_root
+        root.mkdir(parents=True, exist_ok=True)
+        skills = context.skills_root
+        skills.mkdir(parents=True, exist_ok=True)
+        for index, skill in enumerate(config['skills']):
+            if skill.get('enabled', True):
+                path = skills / f'skill-{index + 1}'
+                path.mkdir(exist_ok=True)
+                title = skill['name'].replace('\n', ' ').replace('\r', ' ')
+                slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-') or f'skill-{index + 1}'
+                (path / 'SKILL.md').write_text(f'---\nname: {slug}\ndescription: {json.dumps(skill.get("description") or title, ensure_ascii=False)}\n---\n\n# {title}\n\n{skill["content"]}', encoding='utf-8')
+        # Copy complete installed skills, including scripts/references, into
+        # the session's read-only snapshot. Only enabled bindings are discovered.
+        from platform_app.agent_core.config import default_skills_dir
+        installed = skills / 'installed'
+        installed.mkdir(exist_ok=True)
+        for skill in config.get('native_skills', []):
+            if not skill.get('enabled') or skill.get('source') == 'feature':
+                continue
+            identity = skill['id']
+            if Path(identity).name != identity or identity in ('.', '..'):
+                raise ValueError('无效的 Skill 标识')
+            destination = installed / identity
+            if destination.exists():
+                continue
+            source = (default_skills_dir() / identity).resolve()
+            if not source.is_relative_to(default_skills_dir().resolve()) or not (source / 'SKILL.md').is_file():
+                raise ValueError('已启用的 Skill 不存在，请重新配置技能')
+            temporary = installed / f'.{identity}-copy'
+            if temporary.exists():
+                shutil.rmtree(temporary)
+            shutil.copytree(source, temporary, symlinks=True, ignore=shutil.ignore_patterns('__pycache__', '.pytest_cache', '*.pyc'))
+            temporary.rename(destination)
+        format_plugins.snapshot_skills(skills,config.get('skill_bindings'))
+        snapshot = record['model_snapshot']
+        settings = Settings.from_mapping({'llm': m.unseal(snapshot['encrypted'])})
+        hidden = d.hidden_tools(config)
+        settings = replace(settings, trust_env=True, llm_default=record['model_id'],
+            subagents=SubAgentConfig(enabled='task' not in hidden), hidden_tools=hidden,
+            sandbox=SandboxPolicyBuilder().build(context, record.get('sandbox_mode', 'restricted')),
+            config_dir=context.session_root, agent_instructions=config['system_prompt'])
+        model = build_chat_model(settings.active_profile, reasoning_effort=record['reasoning_effort'], trust_env=True, timeout=settings.request_timeout)
+        store = SessionStore.for_workspace(context.workspace_root, override=root / 'checkpoint.sqlite')
+        # MCP runs on the host. Generic servers have no enforceable Thread
+        # contract, so they are not started until a scoped adapter is installed.
+        if config.get('mcp', {}).get('enabled'):
+            self.event(dict(type='resource_policy', component='mcp', status='blocked', reason='Thread-scoped MCP adapter required'))
+        (root / 'mcp.json').write_text(json.dumps({'enabled': False, 'servers': {}}), encoding='utf-8')
+        manager = MCPManager(root / 'mcp.json', trust_env=True)
+        manager.load()
+        adapter = d.ToolAdapter(config, self.id)
+        self.ensure_artifact_services()
+        try:
+            prepared = prepare_agent(settings=settings, model=model, checkpointer=store.checkpointer,
+                instructions=f'当前 Thread 私有目录：{context.workspace_root}。面向用户的文件必须写入 {context.files_root}；校验、渲染、截图等过程文件必须写入临时目录 {context.workspace_root / "tmp"}，不得作为输出文件交付。不得读取其他 Thread 或平台控制数据。\n\n' + '\n\n'.join([config['system_prompt'], '\n'.join(config['rules'])]), skills=['/agent-skills/', '/agent-skills/installed/'],
+                extra_tools=adapter.tools(), interrupt_on={t['name']: True for t in config['tools'] if t['enabled'] and t['name'] in d.TOOL_SCHEMAS} or None, mcp=manager)
+            runner = AgentRunner(prepared=prepared, settings=settings, session_store=store,
+                thread_id=self.id, workspace=context.workspace_root, mcp_manager=manager,
+                on_event=self.core_event)
+            if record['reasoning_effort']:
+                runner.request_model_change(record['model_id'], reasoning_effort=record['reasoning_effort'])
+            runner.request_permission_change(record.get('pending_permission_mode') or record.get('permission_mode', 'ask'))
+            runner.apply_pending_config_if_idle()
+            self.runner = runner
+            with self.lock:
+                current = find(self.id)
+                current.update(permission_mode=runner.permission_mode().value,
+                    pending_permission_mode=runner.pending_permission_mode().value if runner.pending_permission_mode() else None,
+                    sandbox_mode=runner.sandbox_mode())
+                d.put('session', current)
+            self.event({'type': 'capabilities', 'tools': list(runner.prepared.model_tool_names), 'mode': runner.prepared.execution_mode.value, 'sandbox_mode': runner.sandbox_mode()})
+            return runner
+        except BaseException:
+            manager.close()
+            store.close()
+            raise
+
+    def execute(self, operation, payload):
+        try:
+            with self.lock:
+                record = find(self.id)
+                record.update(status='running', error=None)
+                d.put('session', record)
+            self.event({'type': 'status', 'status': 'running'})
+            runner = self.build()
+            files_root = resolve(self.id).files_root
+            before = file_snapshot(files_root)
+            if operation == 'message':
+                from platform_app.agent_core import ImageAttachment
+                images = []
+                for item in payload.get('images', []):
+                    data = base64.b64decode(item['data'], validate=True)
+                    images.append(ImageAttachment(filename=item['name'], mime_type=item['type'], data=data, size=len(data)))
+                uploads = upload_records(self.id, payload.get('upload_ids', []))
+                context = []
+                for item in uploads:
+                    path = resolve(self.id).files_root / item['path']
+                    context.append(f'- {json.dumps(item["name"], ensure_ascii=False)}: {path}')
+                    if runner.supports_next_input('image') and item['type'] in ('image/png', 'image/jpeg', 'image/webp', 'image/gif') and item['size'] <= 10 * 1024 * 1024 and len(images) < 4:
+                        data = path.read_bytes()
+                        images.append(ImageAttachment(filename=item['name'], mime_type=item['type'], data=data, size=len(data)))
+                text = payload['text'] + ('\n\n[Uploaded files; use tools to read these paths]\n' + '\n'.join(context) if context else '')
+                result = runner.invoke(text, images=images)
+            elif operation == 'approve':
+                result = runner.decide_tools(payload['decisions'])
+            elif operation == 'answer':
+                result = runner.submit_human_input(payload['values'])
+            elif operation == 'resume':
+                result = runner.resume_runtime_config() if str(runner.current_interrupt().kind) == 'runtime_config_boundary' else runner.continue_run()
+            elif operation == 'compact':
+                result = runner.compact_context()
+                self.event({'type': 'compacted', **asdict(result)})
+                with self.lock:
+                    record = find(self.id)
+                    record.update(status='completed', usage={})
+                    d.put('session', record)
+                return
+            else:
+                raise ValueError('未知操作')
+            with self.lock:
+                record = find(self.id)
+                usage = runner_usage(runner)
+                if result.error and usage.get('input_tokens') is None:
+                    usage = record.get('usage', {})
+                record.update(status=result.status, output=result.output or '',
+                    error=public_run_error(result.error) if result.error else None,
+                    pending_tool_calls=result.pending_tool_calls, human_input=result.human_input,
+                    usage=usage, model_id=runner.current_model().id,
+                    permission_mode=runner.permission_mode().value,
+                    pending_permission_mode=runner.pending_permission_mode().value if runner.pending_permission_mode() else None,
+                    sandbox_mode=runner.sandbox_mode(),
+                    reasoning_effort=None if runner.reasoning_effort() == 'default' else runner.reasoning_effort())
+                d.put('session', record)
+            for service in self.artifact_services.values():service.detect_external()
+            changed = changed_files(files_root, before)
+            if changed:
+                self.event({'type': 'output_files', 'files': changed})
+            self.event({'type': 'result', **{**asdict(result), 'error': record['error'] or ''}})
+        except Exception as exc:
+            # Provider errors may contain credentials; only publish known safe diagnoses.
+            from platform_app.agent_core.sandbox import SandboxUnavailableError
+            message = 'Bubblewrap 沙箱不可用，请检查主机 user namespace 与 bwrap 配置。' if isinstance(exc, SandboxUnavailableError) else 'Agent 执行失败，请检查模型配置与服务端日志。'
+            LOG.error('Agent operation failed: session=%s exception=%s', self.id, type(exc).__name__)
+            with self.lock:
+                record = find(self.id)
+                record.update(status='failed', error=message)
+                d.put('session', record)
+            self.event({'type': 'error', 'content': message})
+
+
+def runtime(session_id):
+    find(session_id)
+    with LOCK:
+        return RUNTIMES.setdefault(session_id, Runtime(session_id))
+
+
+def schedule(session_id, operation, payload):
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        if record['status'] in ACTIVE:
+            raise HTTPException(409, '当前会话正在执行')
+        if sum(r['status'] in ACTIVE for r in d.all_records('session')) >= 8:
+            raise HTTPException(429, '任务队列已满')
+        previous = record['status']
+        if operation == 'compact' and previous in ('waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'):
+            raise HTTPException(409, '请先处理当前中断再压缩上下文')
+        if operation == 'message' and previous in ('waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'):
+            raise HTTPException(409, '请先处理当前审批、提问或暂停')
+        if operation == 'approve' and previous != 'waiting_confirmation':
+            raise HTTPException(409, '当前没有待审批工具')
+        if operation == 'answer' and previous != 'waiting_human':
+            raise HTTPException(409, '当前没有待回答问题')
+        if operation == 'resume' and previous not in ('paused', 'runtime_config_boundary'):
+            raise HTTPException(409, '当前会话未暂停')
+        if operation == 'approve':
+            decisions = payload.get('decisions', [])
+            expected = {p['toolCallId'] for p in record.get('pending_tool_calls', [])}
+            if len(decisions) != len(expected) or {v.get('tool_call_id') for v in decisions} != expected or any(v.get('decision') not in ('approve', 'reject') for v in decisions):
+                raise HTTPException(422, '请对每一个待审批工具作出决定')
+        if operation == 'answer':
+            from platform_app.agent_core.tools.human_interaction import validate_human_input_values
+            try:
+                validate_human_input_values(payload.get('values'), record['human_input'])
+            except ValueError as exc:
+                raise HTTPException(422, str(exc))
+        record.update(status='queued', updated_at=now(), error=None)
+        if operation == 'message':
+            record['messages'].append({'role': 'user', 'content': payload['text'], 'created_at': now(), 'images': [i['name'] for i in payload.get('images', [])], 'attachments': payload.get('attachments', [])})
+        d.put('session', record)
+        rt.event({'type': 'operation', 'operation': operation, 'text': payload.get('text', ''), 'attachments': payload.get('attachments', [])})
+    POOL.submit(rt.execute, operation, payload)
+    return public(find(session_id))
+
+
+class NewSession(BaseModel):
+    model_config = {'extra': 'forbid'}
+    model_id: str | None = None
+    reasoning_effort: str | None = None
+    sandbox_mode: str = Field(default='restricted', pattern='^(restricted|full-access)$')
+    sandbox_confirmation: str | None = None
+    permission_mode: str = Field(default='ask', pattern='^(ask|allow)$')
+    permission_confirmation: str | None = None
+
+
+@router.get('/capabilities')
+def capabilities():
+    return {'core': 'platform_app.agent_core', 'source': 'in-tree',
+        'tools': list(d.CORE_TOOLS), 'streaming': True, 'sessions': True, 'approvals': True,
+        'workspace_isolation': 'thread', 'sandbox_default': 'restricted',
+        'subagents': True, 'images': True, 'mcp': False, 'mcp_requires_scoped_adapter': True}
+
+
+@router.get('/sessions')
+def sessions():
+    records = reversed(d.all_records('session'))
+    if itam_bridge.is_enabled():
+        records = (r for r in records if r.get('owner_user_id') == itam_bridge.owner())
+    return [public(r) for r in records]
+
+
+@router.post('/sessions', status_code=201)
+def create_session(value: NewSession):
+    if itam_bridge.is_enabled() and value.sandbox_mode != 'restricted':
+        raise HTTPException(403, '多用户模式只允许 restricted 沙箱')
+    if value.permission_mode == 'allow' and value.permission_confirmation != 'ALLOW':
+        raise HTTPException(422, '请输入 ALLOW 确认自动批准模式')
+    if value.sandbox_mode == 'full-access' and value.sandbox_confirmation != 'FULL_ACCESS':
+        raise HTTPException(422, '请输入 FULL_ACCESS 确认宿主文件访问模式')
+    config = d.effective_config()
+    try:
+        snapshot = m.selection(value.model_id, value.reasoning_effort if 'reasoning_effort' in value.model_fields_set else m.UNSET, owner=itam_bridge.owner())
+    except LookupError as exc:
+        raise HTTPException(503, str(exc))
+    except ValueError:
+        raise HTTPException(422, '模型、思考强度或密钥配置无效')
+    record = dict(id=uuid4().hex, owner_user_id=itam_bridge.owner() if itam_bridge.is_enabled() else None, config=config, model_snapshot=snapshot,
+        model_id=snapshot['id'], reasoning_effort=snapshot['reasoning_effort'], status='idle', messages=[],
+        output='', error=None, created_at=now(), updated_at=now(), event_seq=0,
+        pending_tool_calls=[], human_input={}, permission_mode=value.permission_mode,
+        pending_permission_mode=None, sandbox_mode=value.sandbox_mode, pending_sandbox_mode=None)
+    return public(d.put('session', record))
+
+
+@router.get('/sessions/{session_id}')
+def session(session_id: str):
+    return public(find(session_id))
+
+
+@router.delete('/sessions/{session_id}', status_code=204)
+def delete_session(session_id: str):
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        # A queued or running worker would keep writing into the tree being removed.
+        if record['status'] in ACTIVE:
+            raise HTTPException(409, '会话正在执行，请先停止后再删除')
+        context = resolve(session_id)
+        prefix = f'{session_id}:'
+        with d.LOCK, d.db() as connection:
+            connection.execute('DELETE FROM records WHERE kind=? AND id>? AND id<?', ('event', prefix, prefix + '~'))
+            uploads = [json.loads(row[0]) for row in connection.execute('SELECT data FROM records WHERE kind=?', ('upload',))]
+            connection.executemany('DELETE FROM records WHERE kind=? AND id=?',
+                [('upload', item['id']) for item in uploads if item.get('thread_id') == session_id])
+            connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('thread_workspace', session_id))
+            connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('session', session_id))
+        rt.runner = None
+        for path in (context.workspace_root, context.session_root, context.sandbox_state_root, context.skills_root):
+            shutil.rmtree(path, ignore_errors=True)
+    with LOCK:
+        RUNTIMES.pop(session_id, None)
+
+
+@router.get('/sessions/{session_id}/artifacts/{filename}')
+def artifact(session_id: str, filename: str):
+    record = find(session_id)
+    root = d.artifact_root(session_id)
+    path = root / filename
+    if path.parent != root or not path.is_file() or path.is_symlink():
+        raise HTTPException(404, '文件不存在')
+    return FileResponse(path, filename=filename)
+
+
+class Message(BaseModel):
+    text: str = Field(min_length=1, max_length=100000)
+    images: list[dict[str, str]] = Field(default_factory=list, max_length=4)
+    upload_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+@router.post('/sessions/{session_id}/messages', status_code=202)
+def message(session_id: str, value: Message):
+    record = find(session_id)
+    if len(set(value.upload_ids)) != len(value.upload_ids):
+        raise HTTPException(422, '上传文件不能重复')
+    uploads = upload_records(session_id, value.upload_ids)
+    for image in value.images:
+        try:
+            if image['type'] not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif') or len(base64.b64decode(image['data'], validate=True)) > 10 * 1024 * 1024:
+                raise ValueError()
+        except (KeyError, ValueError):
+            raise HTTPException(422, '图片格式无效或超过 10MB')
+    return schedule(session_id, 'message', {**value.model_dump(), 'attachments': [{k: item[k] for k in ('id', 'name', 'size', 'type', 'path')} for item in uploads]})
+
+
+@router.post('/sessions/{session_id}/actions/{action}', status_code=202)
+def action(session_id: str, action: str, value: dict):
+    if action in ('approve', 'answer', 'resume', 'compact'):
+        return schedule(session_id, action, value)
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        if rt.runner is None or record['status'] != 'running':
+            raise HTTPException(409, 'Agent 尚未运行')
+        if action in ('cancel', 'pause'):
+            getattr(rt.runner, 'request_' + action)()
+        elif action in ('steer', 'follow_up'):
+            text = value.get('text', '').strip()
+            if not text:
+                raise HTTPException(422, '指令不能为空')
+            context=value.get('artifact')
+            instruction=text
+            if context is not None:
+                if not isinstance(context,dict):raise HTTPException(422,'Artifact feedback context invalid')
+                feature=context.get('feature')
+                service=rt.ensure_artifact_services().get(feature)
+                if service is None:raise HTTPException(404,'Artifact feature is unavailable')
+                try:instruction=service.feedback(text,context)
+                except ValueError as exc:raise HTTPException(409,str(exc))
+            getattr(rt.runner, action)(instruction)
+            rt.event({'type': action, 'content': text, 'document': context, 'artifact_context': context, 'status': 'accepted_pending_boundary'})
+        else:
+            raise HTTPException(404, '操作不存在')
+    return {'accepted': True}
+
+
+@router.put('/sessions/{session_id}/model')
+def change_model(session_id: str, value: NewSession):
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        try:
+            selected = m.selection(value.model_id, value.reasoning_effort, owner=itam_bridge.owner())
+        except (LookupError, ValueError):
+            raise HTTPException(422, '模型或思考强度配置无效')
+        if rt.runner is not None:
+            available = {p.id for p in rt.runner.list_models()}
+            if selected['id'] not in available:
+                raise HTTPException(409, '此模型在会话创建后新增，请新建会话使用')
+            rt.runner.request_model_change(selected['id'], reasoning_effort=value.reasoning_effort or 'default')
+            if record['status'] not in ACTIVE:
+                rt.runner.apply_pending_config_if_idle()
+        record.update(model_id=selected['id'], reasoning_effort=value.reasoning_effort)
+        if rt.runner is None:
+            record['model_snapshot'] = selected
+        d.put('session', record)
+        rt.event({'type': 'model_selected', 'model_id': selected['id'], 'reasoning_effort': value.reasoning_effort})
+    return public(record)
+
+
+class Permission(BaseModel):
+    mode: str = Field(pattern='^(ask|allow)$')
+    confirmation: str | None = None
+
+
+@router.put('/sessions/{session_id}/permission')
+def permission(session_id: str, value: Permission):
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        if record['status'] in ('waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'):
+            raise HTTPException(409, '请先处理当前交互再切换权限模式')
+        previous = record.get('pending_permission_mode') or record.get('permission_mode', 'ask')
+        if value.mode == 'allow' and previous != 'allow' and value.confirmation != 'ALLOW':
+            raise HTTPException(422, '请输入 ALLOW 确认自动批准模式')
+        if rt.runner is None:
+            if record['status'] in ACTIVE:
+                raise HTTPException(409, '请在 Agent 初始化完成后切换权限模式')
+            record.update(permission_mode=value.mode, pending_permission_mode=None)
+            d.put('session', record)
+            rt.event({'type': 'permission_selected', 'mode': value.mode})
+            return public(record)
+        try:
+            rt.runner.request_permission_change(value.mode)
+            if find(session_id)['status'] not in ACTIVE:
+                rt.runner.apply_pending_config_if_idle()
+        except ValueError:
+            raise HTTPException(422, '当前运行环境不支持此权限模式')
+        record = find(session_id)
+        record['permission_mode'] = rt.runner.permission_mode().value
+        pending = rt.runner.pending_permission_mode()
+        record['pending_permission_mode'] = pending.value if pending else None
+        d.put('session', record)
+        rt.event({'type': 'permission_selected', 'mode': value.mode})
+        return public(record)
+
+
+@router.get('/sessions/{session_id}/journal')
+def session_journal(session_id: str):
+    record = find(session_id)
+    prefix = f'{session_id}:'
+    with d.db() as connection:
+        rows = connection.execute(
+            'SELECT data FROM records WHERE kind=? AND id>? AND id<? ORDER BY id',
+            ('event', f'{prefix}{0:010d}', prefix + '~')).fetchall()
+    events = [public_event(json.loads(row[0])) for row in rows]
+    # Keep every reasoning/tool-output chunk available for full history replay.
+    return {'events': events}
+
+
+@router.get('/sessions/{session_id}/events')
+async def events(session_id: str, request: Request, after: int = 0):
+    find(session_id)
+    async def stream():
+        try:
+            cursor = max(0, after, int(request.headers.get('last-event-id', '0') or 0))
+        except ValueError:
+            cursor = max(0, after)
+        while not await request.is_disconnected():
+            batch = await asyncio.to_thread(journal, session_id, cursor)
+            for event in batch:
+                cursor = event['seq']
+                yield f'id: {cursor}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n'
+            yield ': heartbeat\n\n'
+            await asyncio.sleep(0.1)
+    return StreamingResponse(stream(), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@router.get('/sessions/{session_id}/files')
+def files(session_id: str):
+    find(session_id)
+    root = resolve(session_id).files_root
+    if not root.exists():
+        return []
+    paths = [p for p in root.rglob('*') if p.is_file() and not p.is_symlink() and not internal_path(p.relative_to(root)) and p.resolve().is_relative_to(root.resolve())][:1000]
+    return [{'path': str(p.relative_to(root)), 'size': (stat := p.stat()).st_size, 'modified_at': stat.st_mtime} for p in paths]
+
+
+@router.get('/files')
+def all_files():
+    """Files from every session the caller owns, newest first, tagged with their session."""
+    result = []
+    for record in d.all_records('session'):
+        if itam_bridge.is_enabled() and record.get('owner_user_id') != itam_bridge.owner():
+            continue
+        title = next((m.get('content') or '' for m in record.get('messages', []) if m.get('role') == 'user'), '').split('\n')[0][:80]
+        for item in files(record['id']):
+            result.append({**item, 'session_id': record['id'], 'session_title': title, 'session_status': record['status']})
+    result.sort(key=lambda item: item['modified_at'], reverse=True)
+    return result[:500]
+
+
+@router.get('/sessions/{session_id}/files/{filename:path}')
+def download(session_id: str, filename: str):
+    root, path = library_file(session_id, filename)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get('/sessions/{session_id}/file-preview/{filename:path}')
+def file_preview(session_id: str, filename: str):
+    _, path = library_file(session_id, filename)
+    ext = path.suffix.lower()
+    text_types = {'.md', '.markdown', '.txt', '.yaml', '.yml', '.json', '.csv', '.log', '.toml', '.ini', '.xml'}
+    media_types = {'.pdf': 'application/pdf', '.png': 'image/png', '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif',
+        '.bmp': 'image/bmp', '.svg': 'image/svg+xml'}
+    if ext in text_types:
+        with path.open('rb') as stream:
+            data = stream.read(2 * 1024 * 1024 + 1)
+        if len(data) > 2 * 1024 * 1024:
+            raise HTTPException(413, '文本超过 2 MB，请下载后查看')
+        if data.startswith((b'\xff\xfe', b'\xfe\xff')):
+            content = data.decode('utf-16', errors='replace')
+        else:
+            try:
+                content = data.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                content = data.decode('gb18030', errors='replace')
+        return {'content': content}
+    if ext not in media_types:
+        raise HTTPException(415, '暂不支持此文件的预览，请下载后查看')
+    headers = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}
+    if ext == '.svg':
+        headers['Content-Security-Policy'] = "sandbox; default-src 'none'; style-src 'unsafe-inline'"
+    return FileResponse(path, media_type=media_types[ext], filename=path.name,
+        content_disposition_type='inline', headers=headers)
+
+
+def library_file(session_id, filename):
+    find(session_id)
+    root = resolve(session_id).files_root
+    path = root / filename
+    if internal_path(filename) or not path.resolve().is_relative_to(root.resolve()) or not path.is_file() or path.is_symlink():
+        raise HTTPException(404, '文件不存在')
+    return root, path
+
+
+class SandboxMode(BaseModel):
+    model_config = {'extra':'forbid'}
+    mode: str = Field(pattern='^(restricted|full-access)$')
+    confirmation: str | None = None
+
+
+@router.put('/sessions/{session_id}/sandbox')
+def sandbox_mode(session_id: str, value: SandboxMode):
+    rt = runtime(session_id)
+    with rt.lock:
+        record = find(session_id)
+        previous = record.get('pending_sandbox_mode') or record.get('sandbox_mode', 'restricted')
+        if value.mode == 'full-access' and previous != value.mode and value.confirmation != 'FULL_ACCESS':
+            raise HTTPException(422, '请输入 FULL_ACCESS 确认宿主文件访问模式')
+        if record['status'] in ('waiting_confirmation','waiting_human','paused','runtime_config_boundary'):
+            raise HTTPException(409, '请先处理当前交互再切换文件系统模式')
+        try:
+            SandboxPolicyBuilder().build(resolve(session_id), value.mode)
+            if rt.runner is None:
+                if record['status'] in ACTIVE:raise HTTPException(409, '请等待 Agent 初始化完成')
+                record.update(sandbox_mode=value.mode, pending_sandbox_mode=None)
+                d.put('session', record)
+            else:
+                rt.runner.request_sandbox_mode(value.mode)
+                if record['status'] not in ACTIVE:rt.runner.apply_pending_config_if_idle()
+                if record['status'] not in ACTIVE and rt.runner.sandbox_mode() != value.mode and rt.runner.pending_sandbox_mode() is None:
+                    raise HTTPException(503, '沙箱模式切换失败；当前隔离策略保持不变')
+                record = find(session_id)
+                record.update(sandbox_mode=rt.runner.sandbox_mode(), pending_sandbox_mode=rt.runner.pending_sandbox_mode())
+                d.put('session', record)
+            rt.event(dict(type='sandbox_selected',mode=value.mode,status='pending' if record.get('pending_sandbox_mode') else 'applied'))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+    return public(record)
