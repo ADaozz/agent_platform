@@ -17,6 +17,8 @@ examples/workflow-acceptance/academic-document-plan.json
 examples/workflow-acceptance/academic-page.png
 examples/workflow-acceptance/academic.docx
 examples/workflow-acceptance/browser-acceptance.json
+examples/workflow-acceptance/deepseek-live-acceptance.json
+examples/workflow-acceptance/deepseek-live.docx
 examples/workflow-acceptance/legacy-academic-trace.json
 examples/workflow-acceptance/technical-acceptance.json
 examples/workflow-acceptance/technical-document-plan.json

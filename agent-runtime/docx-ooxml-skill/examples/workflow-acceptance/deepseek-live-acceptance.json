@@ -1,0 +1,76 @@
+{
+  "endpoint": "https://api.deepseek.com/v1",
+  "live": true,
+  "authentication": {
+    "status": 200
+  },
+  "models": [
+    "deepseek-flash",
+    "deepseek-v4-pro"
+  ],
+  "selected_model": "deepseek-flash",
+  "text_completion": {
+    "status": 200,
+    "reply": "OK",
+    "usage": {
+      "prompt_tokens": 35,
+      "completion_tokens": 11,
+      "total_tokens": 46,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 9
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 35
+    },
+    "duration_s": 1.19
+  },
+  "plan_generation": {
+    "validated": true,
+    "operation_count": 2,
+    "usage": {
+      "prompt_tokens": 242,
+      "completion_tokens": 702,
+      "total_tokens": 944,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 479
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 242
+    },
+    "duration_s": 4.35
+  },
+  "editable_document": {
+    "path": "deepseek-live.docx",
+    "revision": 2,
+    "pages": 1,
+    "structure_passed": true,
+    "layout_passed": true
+  },
+  "background_visual_review": {
+    "status": "passed",
+    "model_id": "deepseek/deepseek-flash",
+    "summary": "Page 1 renders cleanly: the Heading 1 'Workflow reliability' uses the specified blue (245A81) and stays with its following paragraph; the body text uses Liberation Sans at readable size with consistent line spacing and stays well within margins. The paragraph reads as a complete sentence set through its end ('...authoritative.'), with no orphaned single lines, mid-word breaks, overlapping text, or images/tables on this page. Note that the supplied block text for intro-p is truncated mid-sentence ('...without '), but the screenshot shows the full sentence, indicating a metadata truncation rather than a rendering defect.",
+    "issues": [],
+    "error": null,
+    "queue_return_ms": 3.32,
+    "duration_s": 5.676,
+    "revision": 2,
+    "page": 1,
+    "fingerprint_bound": true,
+    "host_ledger_applied": true,
+    "host_image_sha256": "a8cd4f402779e5854ac329e5dddb838ff9489728493afa18e92e6678a0613c27",
+    "advisory_only": true
+  },
+  "delivery": {
+    "status": "finalized",
+    "editable": true,
+    "visual_status": "completed"
+  },
+  "test_scope": "One-page live authoring and production asynchronous visual-review smoke test; prior 20/30-page fixtures retain their recorded standalone visual status."
+}

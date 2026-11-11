@@ -27,7 +27,8 @@ Both final structure/layout checks passed. Visual status remains pending for the
 standalone CLI artifacts. Background review is separately tested with host-rendered
 images and a scripted image-model response, including delayed/stale responses,
 identity/revision/fingerprint checks and private ledger application flags. No live
-external model was configured for this task. PNGs are representative page samples,
+external model was configured for the original scripted run; see the subsequent
+live DeepSeek verification below. PNGs are representative page samples,
 not a claim that every page received a human visual verdict.
 
 The browser evidence uses the actual main Agent runner, native Bubblewrap sandbox,
@@ -57,3 +58,20 @@ source after restore-chain coverage **64 passed**; Office UI state tests **4 pas
 frontend production build passed. Restore-chain coverage verifies that restoring a
 revision created after an earlier restore retains that snapshot’s plan and legacy
 review contract. These are actual executed checks, not inferred pass counts.
+
+
+## Live DeepSeek verification
+
+A subsequent live API test used `deepseek-flash` for both plan/content generation
+and the production asynchronous DOCX page-review path. Authentication and text
+completion returned HTTP 200. The generated plan validated, the editable one-page
+DOCX passed structure/layout checks at Revision 2, and visual review returned
+`passed` with no issues. The host-private ledger marked the review applied; the
+Revision and page fingerprint matched. Scheduling returned in 3.32 ms and the live
+review finished in 5.676 s. Finalization returned editable=true and visual_status=completed.
+
+See `deepseek-live.docx` and `deepseek-live-acceptance.json`. The API key was supplied
+only to the test process and is absent from the repository and evidence. This is a
+one-page real-provider smoke test; it does not replace the recorded visual status
+of the earlier 20/30-page standalone fixtures. The earlier statement about no live
+external model applies to the original scripted acceptance run.
