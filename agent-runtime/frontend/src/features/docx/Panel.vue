@@ -28,7 +28,7 @@ function receiveDocuments(updates) {
     }
   }
 }
-watch(documents,values=>emit('catalog',Object.values(values).filter(file=>file.path)),{deep:true})
+watch(documents,values=>emit('catalog',Object.values(values).filter(file=>file.path)))
 watch(()=>props.openRequest,async request=>{
  if(!request||!props.session)return
  const id=props.session.id

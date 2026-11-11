@@ -1,0 +1,39 @@
+{
+  "embedded": false,
+  "menu_open_ms": [
+    14.9,
+    13.9,
+    12,
+    15.1,
+    13.3,
+    17.8,
+    11.2,
+    13.4,
+    12.7,
+    14.4,
+    13.2,
+    14.1,
+    13.7,
+    12.9,
+    14.1
+  ],
+  "menu_open_median_ms": 13.7,
+  "workload": {
+    "turns": 80,
+    "answer_characters": 3771,
+    "input_characters": 22,
+    "stream_interval_ms": 40
+  },
+  "typing_ms": [
+    237.37,
+    118.78,
+    127.17
+  ],
+  "typing_median_ms": 127.17,
+  "long_tasks": [
+    121,
+    350
+  ],
+  "page_errors": [],
+  "requests": 7
+}

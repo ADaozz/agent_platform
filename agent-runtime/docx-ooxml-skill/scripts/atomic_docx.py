@@ -157,6 +157,19 @@ class DocumentStore(_shared.ArtifactStore):
         if not self.path.exists() or o.sha(self.path) != state['sha256']:
             raise ValueError('External modification detected; track before editing')
 
+    def metadata(self, external=False):
+        """Current state without unpacking a DOCX or loading its revision history."""
+        with self.locked() as (c, state):
+            if state is None:
+                raise ValueError('Document not initialized')
+            result = dict(state)
+            if external:
+                try:
+                    result['external_conflict'] = o.sha(self.path) != state['sha256']
+                except OSError:
+                    result['external_conflict'] = True
+            return result
+
     def status(self, committed=False):
         with self.locked() as (c, state):
             if committed:

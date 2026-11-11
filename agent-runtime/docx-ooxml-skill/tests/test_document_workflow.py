@@ -315,3 +315,12 @@ def test_restore_chains_preserve_the_plan_and_original_review_contract(store):
     store.restore(2,6,'restore-section-workflow')
     assert store.status()['document_plan']==plan()
     assert store.status()['workflow_version']==1
+
+
+def test_metadata_polling_avoids_unpacking_and_preserves_external_conflicts(store,monkeypatch):
+    def unexpected(*args,**kwargs):raise AssertionError('Metadata unpacked the document')
+    monkeypatch.setattr(a.o,'read_parts',unexpected)
+    assert store.metadata()['revision']==1
+    assert store.metadata(external=True)['external_conflict'] is False
+    store.path.write_bytes(store.path.read_bytes()+b'external edit')
+    assert store.metadata(external=True)['external_conflict'] is True
