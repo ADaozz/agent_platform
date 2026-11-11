@@ -274,3 +274,34 @@ class BackgroundReviews:
             return None, chat
         api = self.api
         return api.ModelClient(model_id, api.langchain_invoker(chat) if hasattr(chat, 'invoke') else chat, self.timeout), None
+
+
+def contact_sheet(images, columns=4, width=480):
+    """Numbered thumbnail overview for deck review, built on the host."""
+    from PIL import Image, ImageDraw, ImageFont
+    thumbs = []
+    for data in images:
+        with Image.open(io.BytesIO(data)) as image:
+            rgb = image.convert('RGB')
+            height = round(rgb.height * width / rgb.width)
+            thumbs.append(rgb.resize((width, height), Image.LANCZOS))
+    if not thumbs:
+        raise VisionUnavailable('image_missing', 'no rendered slides')
+    gap, label = 16, 30
+    cell_h = max(thumb.height for thumb in thumbs)
+    rows = (len(thumbs) + columns - 1) // columns
+    sheet = Image.new('RGB', (columns * width + (columns + 1) * gap, rows * (cell_h + label) + (rows + 1) * gap), '#DDE2E8')
+    draw = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype('DejaVuSans-Bold.ttf', 20)
+    except OSError:
+        font = ImageFont.load_default()
+    for index, thumb in enumerate(thumbs):
+        row, column = divmod(index, columns)
+        x = gap + column * (width + gap)
+        y = gap + row * (cell_h + label + gap)
+        draw.text((x, y), f'{index + 1:02d}', fill='#17324D', font=font)
+        sheet.paste(thumb, (x, y + label))
+    buffer = io.BytesIO()
+    sheet.save(buffer, format='PNG', optimize=True)
+    return buffer.getvalue()

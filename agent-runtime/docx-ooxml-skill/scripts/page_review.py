@@ -54,9 +54,25 @@ def analyze_pages(parts, pdf, engine, final=False):
     full_text = ''.join(texts)
     if re.search(r'[\u3400-\u9fff]', full_text):
         declared = set()
-        for name in (o.MAIN, 'word/styles.xml'):
-            if name in parts:
-                declared.update(o.parse_xml(parts[name]).xpath('//w:rFonts/@w:eastAsia', namespaces=ns))
+        styles=o.parse_xml(parts['word/styles.xml'])
+        index={s.get(o.q(o.W,'styleId')):s for s in styles}
+        default=styles.xpath('string(./w:docDefaults/w:rPrDefault/w:rPr/w:rFonts/@w:eastAsia)',namespaces=ns)
+        def inherited_font(style):
+            seen=set()
+            while style in index and style not in seen:
+                seen.add(style);node=index[style]
+                value=node.xpath('string(./w:rPr/w:rFonts/@w:eastAsia)',namespaces=ns)
+                if value:return value
+                style=node.xpath('string(./w:basedOn/@w:val)',namespaces=ns)
+            return default
+        for name,data in parts.items():
+            if name!=o.MAIN and not (name.startswith(('word/header','word/footer')) and name.endswith('.xml')):continue
+            for paragraph in o.parse_xml(data).iter(o.q(o.W,'p')):
+                style=paragraph.xpath('string(./w:pPr/w:pStyle/@w:val)',namespaces=ns) or 'Normal'
+                for run in paragraph.iter(o.q(o.W,'r')):
+                    if not re.search(r'[\u3400-\u9fff]',o.ptext(run)):continue
+                    font=run.xpath('string(./w:rPr/w:rFonts/@w:eastAsia)',namespaces=ns) or inherited_font(style)
+                    if font:declared.add(font)
         for font in sorted(declared):
             if not shutil.which('fc-match'):
                 fonts_missing.append('fontconfig unavailable: ' + font)

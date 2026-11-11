@@ -1,0 +1,1816 @@
+{
+  "document_id": "research",
+  "revision": 14,
+  "structure_passed": true,
+  "layout_passed": true,
+  "repair_targets": [],
+  "render_error": null,
+  "pages": [
+    {
+      "page": 1,
+      "block_ids": [
+        "cover-date",
+        "cover-title"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "fc790837b836971e556f72fc29ad7dd9621f5a4a714ff4c732ca35f89c9f062a",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-001.png",
+      "status": "pending"
+    },
+    {
+      "page": 2,
+      "block_ids": [
+        "abstract-keys",
+        "abstract-p",
+        "matrix-h",
+        "refs-h",
+        "s1-h",
+        "s1-h2",
+        "s2-h",
+        "s2-h2",
+        "s3-h",
+        "s3-h2",
+        "s4-h",
+        "s4-h2",
+        "s5-h",
+        "s5-h2",
+        "s6-h",
+        "s6-h2"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "8f0817501583ed6741dd1aa292634df673ee1233d2435fdcfd01a2870f29c384",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-002.png",
+      "status": "pending"
+    },
+    {
+      "page": 3,
+      "block_ids": [
+        "s1-h",
+        "s1-h2",
+        "s1-p0",
+        "s1-p1",
+        "s1-p2",
+        "s1-p3"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "99ce05cc2b417eea80103eba36b3163655fcf822b19ca53e0840c345b488ba97",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-003.png",
+      "status": "pending"
+    },
+    {
+      "page": 4,
+      "block_ids": [
+        "s1-p4",
+        "s1-p5",
+        "s1-p6",
+        "s1-p7"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "188dc657a381eee9ce5765cb8abfeea8b6068e3448665b26064d36b3c12eb06c",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-004.png",
+      "status": "pending"
+    },
+    {
+      "page": 5,
+      "block_ids": [
+        "s1-cap",
+        "s1-eq",
+        "s1-h",
+        "s1-refs",
+        "s2-h",
+        "s2-h2",
+        "s2-p0",
+        "s2-p1"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "47d4145b8d5c16fd299aa5b082a8c20447eae05f00dbab2f4053d8ffa483392d",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-005.png",
+      "status": "pending"
+    },
+    {
+      "page": 6,
+      "block_ids": [
+        "s2-p2",
+        "s2-p3",
+        "s2-p4",
+        "s2-p5"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "8ca70a4084aa96efa2fc7956f35a978ec3d8c96fdf8eafa6baf58a26dfb109c1",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-006.png",
+      "status": "pending"
+    },
+    {
+      "page": 7,
+      "block_ids": [
+        "s2-eq",
+        "s2-p6",
+        "s2-p7"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "fd6185864b00c11f1f520a71ff3333c5a70a95d6676618cc8447c10815e4e05f",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-007.png",
+      "status": "pending"
+    },
+    {
+      "page": 8,
+      "block_ids": [
+        "s2-cap",
+        "s2-eq",
+        "s2-h",
+        "s2-refs",
+        "s3-h",
+        "s3-h2",
+        "s3-p0",
+        "s3-p1"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "06d9fa89f7fc01ad5565489f9db88232fdb382707ee704ad273c84baaf8df83c",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-008.png",
+      "status": "pending"
+    },
+    {
+      "page": 9,
+      "block_ids": [
+        "s3-p2",
+        "s3-p3",
+        "s3-p4",
+        "s3-p5"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "601a3df142631d061b7ad1787483197bb33869851a98c70b24df7b7bfa71997c",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-009.png",
+      "status": "pending"
+    },
+    {
+      "page": 10,
+      "block_ids": [
+        "s3-cap",
+        "s3-eq",
+        "s3-h",
+        "s3-p6",
+        "s3-p7",
+        "s3-refs"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "70e29f14bb18c9c0f2e0111dd5da0ac12d1dec77aed5b31364881976bbb239bc",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-010.png",
+      "status": "pending"
+    },
+    {
+      "page": 11,
+      "block_ids": [
+        "s4-h",
+        "s4-h2",
+        "s4-p0",
+        "s4-p1",
+        "s4-p2",
+        "s4-p3"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "84dc6a6ae3df317784a7e5b5ab04bfdc23b60112a85b3c3cef2f8f0d47368d8a",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-011.png",
+      "status": "pending"
+    },
+    {
+      "page": 12,
+      "block_ids": [
+        "s4-p4",
+        "s4-p5",
+        "s4-p6",
+        "s4-p7"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "49e0b74ab4f1026e9cbb1a416ed63378ac9c13c7a69d2ee1b2d938ef9ba15a7e",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-012.png",
+      "status": "pending"
+    },
+    {
+      "page": 13,
+      "block_ids": [
+        "s4-cap",
+        "s4-eq",
+        "s4-h",
+        "s4-refs",
+        "s5-h",
+        "s5-h2",
+        "s5-p0",
+        "s5-p1"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "61d159688e4141552ca981e239184892197ea71a8cfa701f3a8d2fd596f83de9",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-013.png",
+      "status": "pending"
+    },
+    {
+      "page": 14,
+      "block_ids": [
+        "s5-p2",
+        "s5-p3",
+        "s5-p4",
+        "s5-p5"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "a16ea62b552ba0f15068ba44fea57e92be524891146ec39d3343baa9811f4f54",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-014.png",
+      "status": "pending"
+    },
+    {
+      "page": 15,
+      "block_ids": [
+        "s5-eq",
+        "s5-p6",
+        "s5-p7"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "fa3644b7ca9b7ec55e3412a7cd9dcfc431f869752ea27397ff6d5c2d1b714341",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-015.png",
+      "status": "pending"
+    },
+    {
+      "page": 16,
+      "block_ids": [
+        "s5-cap",
+        "s5-eq",
+        "s5-h",
+        "s5-refs",
+        "s6-h",
+        "s6-h2",
+        "s6-p0",
+        "s6-p1"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "bd4f1015120071c3e7d9c27fd46e59f780ca2665fb434dc858b196376d5c0968",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-016.png",
+      "status": "pending"
+    },
+    {
+      "page": 17,
+      "block_ids": [
+        "s6-p2",
+        "s6-p3",
+        "s6-p4",
+        "s6-p5"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "b69749203bd5e7a5bc8ff449d706aa5479b58ac1d3d07d40cfd6fa85a84e58b7",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-017.png",
+      "status": "pending"
+    },
+    {
+      "page": 18,
+      "block_ids": [
+        "s6-cap",
+        "s6-eq",
+        "s6-h",
+        "s6-p6",
+        "s6-p7",
+        "s6-refs"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "f27baf1ce9f2b7a0b908223143e9080ef37127f2211459d4d9063170b22c3e03",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-018.png",
+      "status": "pending"
+    },
+    {
+      "page": 19,
+      "block_ids": [
+        "matrix-h",
+        "matrix-table",
+        "template-1411",
+        "template-1420",
+        "template-1429",
+        "template-1440",
+        "template-1446",
+        "template-1452",
+        "template-1461",
+        "template-1467",
+        "template-1473",
+        "template-1482",
+        "template-1488",
+        "template-1494",
+        "template-1503",
+        "template-1509",
+        "template-1515",
+        "template-1524",
+        "template-1530",
+        "template-1536",
+        "template-1545",
+        "template-1551",
+        "template-1557",
+        "template-1566",
+        "template-1572",
+        "template-1578",
+        "template-1587",
+        "template-1593",
+        "template-1599",
+        "template-1608",
+        "template-1614",
+        "template-1620",
+        "template-1629",
+        "template-1635",
+        "template-1641",
+        "template-1650",
+        "template-1656",
+        "template-1662",
+        "template-1671",
+        "template-1677",
+        "template-1683",
+        "template-1692",
+        "template-1698",
+        "template-1704",
+        "template-1713",
+        "template-1719",
+        "template-1725"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "07e11cb2e0aeb75dbf8ac60bd0e7dbc20abcd5068d3c3733a754fa325df9acff",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-019.png",
+      "status": "pending"
+    },
+    {
+      "page": 20,
+      "block_ids": [
+        "matrix-table",
+        "template-1411",
+        "template-1420",
+        "template-1429",
+        "template-1734",
+        "template-1740",
+        "template-1746",
+        "template-1755",
+        "template-1761",
+        "template-1767",
+        "template-1776",
+        "template-1782",
+        "template-1788",
+        "template-1797",
+        "template-1803",
+        "template-1809",
+        "template-1818",
+        "template-1824",
+        "template-1830",
+        "template-1839",
+        "template-1845",
+        "template-1851",
+        "template-1860",
+        "template-1866",
+        "template-1872",
+        "template-1881",
+        "template-1887",
+        "template-1893",
+        "template-1902",
+        "template-1908",
+        "template-1914",
+        "template-1923",
+        "template-1929",
+        "template-1935",
+        "template-1944",
+        "template-1950",
+        "template-1956",
+        "template-1965",
+        "template-1971",
+        "template-1977",
+        "template-1986",
+        "template-1992",
+        "template-1998",
+        "template-2007",
+        "template-2013",
+        "template-2019",
+        "template-2028",
+        "template-2034",
+        "template-2040"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "33c1f19cb1b7f15168d796a55809e6c9ceba8211a60127e4b35936e36d55fb49",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-020.png",
+      "status": "pending"
+    },
+    {
+      "page": 21,
+      "block_ids": [
+        "matrix-table",
+        "template-1411",
+        "template-1420",
+        "template-1429",
+        "template-2049",
+        "template-2055",
+        "template-2061",
+        "template-2070",
+        "template-2076",
+        "template-2082",
+        "template-2091",
+        "template-2097",
+        "template-2103",
+        "template-2112",
+        "template-2118",
+        "template-2124",
+        "template-2133",
+        "template-2139",
+        "template-2145",
+        "template-2154",
+        "template-2160",
+        "template-2166",
+        "template-2175",
+        "template-2181",
+        "template-2187",
+        "template-2196",
+        "template-2202",
+        "template-2208",
+        "template-2217",
+        "template-2223",
+        "template-2229",
+        "template-2238",
+        "template-2244",
+        "template-2250",
+        "template-2259",
+        "template-2265",
+        "template-2271",
+        "template-2280",
+        "template-2286",
+        "template-2292",
+        "template-2301",
+        "template-2307",
+        "template-2313",
+        "template-2322",
+        "template-2328",
+        "template-2334",
+        "template-2343",
+        "template-2349",
+        "template-2355"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "bef6a3b4ad25c95f376fe5e4ffb6dcabb050353ab83074bf04f6f24a6a4772cd",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-021.png",
+      "status": "pending"
+    },
+    {
+      "page": 22,
+      "block_ids": [
+        "matrix-table",
+        "template-1411",
+        "template-1420",
+        "template-1429",
+        "template-2364",
+        "template-2370",
+        "template-2376",
+        "template-2385",
+        "template-2391",
+        "template-2397",
+        "template-2406",
+        "template-2412",
+        "template-2418",
+        "template-2427",
+        "template-2433",
+        "template-2439",
+        "template-2448",
+        "template-2454",
+        "template-2460",
+        "template-2469",
+        "template-2475",
+        "template-2481",
+        "template-2490",
+        "template-2496",
+        "template-2502",
+        "template-2511",
+        "template-2517",
+        "template-2523",
+        "template-2532",
+        "template-2538",
+        "template-2544",
+        "template-2553",
+        "template-2559",
+        "template-2565",
+        "template-2574",
+        "template-2580",
+        "template-2586",
+        "template-2595",
+        "template-2601",
+        "template-2607",
+        "template-2616",
+        "template-2622",
+        "template-2628",
+        "template-2637",
+        "template-2643",
+        "template-2649",
+        "template-2658",
+        "template-2664",
+        "template-2670"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "b2f65c3762121bc65164b359ae14bca2b540369c7cc7307815fc73b14edaf5f9",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-022.png",
+      "status": "pending"
+    },
+    {
+      "page": 23,
+      "block_ids": [
+        "refs-h",
+        "refs-p"
+      ],
+      "widow_blocks": [],
+      "complete": true,
+      "fingerprint": "6e57c0d2dc0b2512113abb357e0f4e915b15d5061c64ec26e16cbc1aa26aad77",
+      "checks": {
+        "blank_page": false,
+        "widow_orphan": false,
+        "ooxml_valid": true,
+        "render_success": true,
+        "content_overflow": false,
+        "table_split": false,
+        "heading_orphan": false,
+        "margins_abnormal": false,
+        "fonts_missing": [],
+        "visual_review": "pending",
+        "warnings": [],
+        "automatic_passed": true
+      },
+      "image": "page-023.png",
+      "status": "pending"
+    }
+  ],
+  "scope": "document",
+  "duration_ms": 9652.64,
+  "geometry": {
+    "findings": [],
+    "block_pages": {
+      "cover-title": [
+        1
+      ],
+      "cover-date": [
+        1
+      ],
+      "abstract-p": [
+        2
+      ],
+      "abstract-keys": [
+        2
+      ],
+      "s1-h": [
+        2,
+        3,
+        5
+      ],
+      "s1-h2": [
+        2,
+        3
+      ],
+      "s2-h": [
+        2,
+        5,
+        8
+      ],
+      "s2-h2": [
+        2,
+        5
+      ],
+      "s3-h": [
+        2,
+        8,
+        10
+      ],
+      "s3-h2": [
+        2,
+        8
+      ],
+      "s4-h": [
+        2,
+        11,
+        13
+      ],
+      "s4-h2": [
+        2,
+        11
+      ],
+      "s5-h": [
+        2,
+        13,
+        16
+      ],
+      "s5-h2": [
+        2,
+        13
+      ],
+      "s6-h": [
+        2,
+        16,
+        18
+      ],
+      "s6-h2": [
+        2,
+        16
+      ],
+      "matrix-h": [
+        2,
+        19
+      ],
+      "refs-h": [
+        2,
+        23
+      ],
+      "s1-p0": [
+        3
+      ],
+      "s1-p1": [
+        3
+      ],
+      "s1-p2": [
+        3
+      ],
+      "s1-p3": [
+        3
+      ],
+      "s1-p4": [
+        4
+      ],
+      "s1-p5": [
+        4
+      ],
+      "s1-p6": [
+        4
+      ],
+      "s1-p7": [
+        4
+      ],
+      "s1-eq": [
+        5
+      ],
+      "s1-cap": [
+        5
+      ],
+      "s1-refs": [
+        5
+      ],
+      "s2-p0": [
+        5
+      ],
+      "s2-p1": [
+        5
+      ],
+      "s2-p2": [
+        6
+      ],
+      "s2-p3": [
+        6
+      ],
+      "s2-p4": [
+        6
+      ],
+      "s2-p5": [
+        6
+      ],
+      "s2-p6": [
+        7
+      ],
+      "s2-p7": [
+        7
+      ],
+      "s2-eq": [
+        7,
+        8
+      ],
+      "s2-cap": [
+        8
+      ],
+      "s2-refs": [
+        8
+      ],
+      "s3-p0": [
+        8
+      ],
+      "s3-p1": [
+        8
+      ],
+      "s3-p2": [
+        9
+      ],
+      "s3-p3": [
+        9
+      ],
+      "s3-p4": [
+        9
+      ],
+      "s3-p5": [
+        9
+      ],
+      "s3-p6": [
+        10
+      ],
+      "s3-p7": [
+        10
+      ],
+      "s3-eq": [
+        10
+      ],
+      "s3-cap": [
+        10
+      ],
+      "s3-refs": [
+        10
+      ],
+      "s4-p0": [
+        11
+      ],
+      "s4-p1": [
+        11
+      ],
+      "s4-p2": [
+        11
+      ],
+      "s4-p3": [
+        11
+      ],
+      "s4-p4": [
+        12
+      ],
+      "s4-p5": [
+        12
+      ],
+      "s4-p6": [
+        12
+      ],
+      "s4-p7": [
+        12
+      ],
+      "s4-eq": [
+        13
+      ],
+      "s4-cap": [
+        13
+      ],
+      "s4-refs": [
+        13
+      ],
+      "s5-p0": [
+        13
+      ],
+      "s5-p1": [
+        13
+      ],
+      "s5-p2": [
+        14
+      ],
+      "s5-p3": [
+        14
+      ],
+      "s5-p4": [
+        14
+      ],
+      "s5-p5": [
+        14
+      ],
+      "s5-p6": [
+        15
+      ],
+      "s5-p7": [
+        15
+      ],
+      "s5-eq": [
+        15,
+        16
+      ],
+      "s5-cap": [
+        16
+      ],
+      "s5-refs": [
+        16
+      ],
+      "s6-p0": [
+        16
+      ],
+      "s6-p1": [
+        16
+      ],
+      "s6-p2": [
+        17
+      ],
+      "s6-p3": [
+        17
+      ],
+      "s6-p4": [
+        17
+      ],
+      "s6-p5": [
+        17
+      ],
+      "s6-p6": [
+        18
+      ],
+      "s6-p7": [
+        18
+      ],
+      "s6-eq": [
+        18
+      ],
+      "s6-cap": [
+        18
+      ],
+      "s6-refs": [
+        18
+      ],
+      "template-1411": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "template-1420": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "template-1429": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "template-1440": [
+        19
+      ],
+      "template-1446": [
+        19
+      ],
+      "template-1452": [
+        19
+      ],
+      "template-1461": [
+        19
+      ],
+      "template-1467": [
+        19
+      ],
+      "template-1473": [
+        19
+      ],
+      "template-1482": [
+        19
+      ],
+      "template-1488": [
+        19
+      ],
+      "template-1494": [
+        19
+      ],
+      "template-1503": [
+        19
+      ],
+      "template-1509": [
+        19
+      ],
+      "template-1515": [
+        19
+      ],
+      "template-1524": [
+        19
+      ],
+      "template-1530": [
+        19
+      ],
+      "template-1536": [
+        19
+      ],
+      "template-1545": [
+        19
+      ],
+      "template-1551": [
+        19
+      ],
+      "template-1557": [
+        19
+      ],
+      "template-1566": [
+        19
+      ],
+      "template-1572": [
+        19
+      ],
+      "template-1578": [
+        19
+      ],
+      "template-1587": [
+        19
+      ],
+      "template-1593": [
+        19
+      ],
+      "template-1599": [
+        19
+      ],
+      "template-1608": [
+        19
+      ],
+      "template-1614": [
+        19
+      ],
+      "template-1620": [
+        19
+      ],
+      "template-1629": [
+        19
+      ],
+      "template-1635": [
+        19
+      ],
+      "template-1641": [
+        19
+      ],
+      "template-1650": [
+        19
+      ],
+      "template-1656": [
+        19
+      ],
+      "template-1662": [
+        19
+      ],
+      "template-1671": [
+        19
+      ],
+      "template-1677": [
+        19
+      ],
+      "template-1683": [
+        19
+      ],
+      "template-1692": [
+        19
+      ],
+      "template-1698": [
+        19
+      ],
+      "template-1704": [
+        19
+      ],
+      "template-1713": [
+        19
+      ],
+      "template-1719": [
+        19
+      ],
+      "template-1725": [
+        19
+      ],
+      "template-1734": [
+        20
+      ],
+      "template-1740": [
+        20
+      ],
+      "template-1746": [
+        20
+      ],
+      "template-1755": [
+        20
+      ],
+      "template-1761": [
+        20
+      ],
+      "template-1767": [
+        20
+      ],
+      "template-1776": [
+        20
+      ],
+      "template-1782": [
+        20
+      ],
+      "template-1788": [
+        20
+      ],
+      "template-1797": [
+        20
+      ],
+      "template-1803": [
+        20
+      ],
+      "template-1809": [
+        20
+      ],
+      "template-1818": [
+        20
+      ],
+      "template-1824": [
+        20
+      ],
+      "template-1830": [
+        20
+      ],
+      "template-1839": [
+        20
+      ],
+      "template-1845": [
+        20
+      ],
+      "template-1851": [
+        20
+      ],
+      "template-1860": [
+        20
+      ],
+      "template-1866": [
+        20
+      ],
+      "template-1872": [
+        20
+      ],
+      "template-1881": [
+        20
+      ],
+      "template-1887": [
+        20
+      ],
+      "template-1893": [
+        20
+      ],
+      "template-1902": [
+        20
+      ],
+      "template-1908": [
+        20
+      ],
+      "template-1914": [
+        20
+      ],
+      "template-1923": [
+        20
+      ],
+      "template-1929": [
+        20
+      ],
+      "template-1935": [
+        20
+      ],
+      "template-1944": [
+        20
+      ],
+      "template-1950": [
+        20
+      ],
+      "template-1956": [
+        20
+      ],
+      "template-1965": [
+        20
+      ],
+      "template-1971": [
+        20
+      ],
+      "template-1977": [
+        20
+      ],
+      "template-1986": [
+        20
+      ],
+      "template-1992": [
+        20
+      ],
+      "template-1998": [
+        20
+      ],
+      "template-2007": [
+        20
+      ],
+      "template-2013": [
+        20
+      ],
+      "template-2019": [
+        20
+      ],
+      "template-2028": [
+        20
+      ],
+      "template-2034": [
+        20
+      ],
+      "template-2040": [
+        20
+      ],
+      "template-2049": [
+        21
+      ],
+      "template-2055": [
+        21
+      ],
+      "template-2061": [
+        21
+      ],
+      "template-2070": [
+        21
+      ],
+      "template-2076": [
+        21
+      ],
+      "template-2082": [
+        21
+      ],
+      "template-2091": [
+        21
+      ],
+      "template-2097": [
+        21
+      ],
+      "template-2103": [
+        21
+      ],
+      "template-2112": [
+        21
+      ],
+      "template-2118": [
+        21
+      ],
+      "template-2124": [
+        21
+      ],
+      "template-2133": [
+        21
+      ],
+      "template-2139": [
+        21
+      ],
+      "template-2145": [
+        21
+      ],
+      "template-2154": [
+        21
+      ],
+      "template-2160": [
+        21
+      ],
+      "template-2166": [
+        21
+      ],
+      "template-2175": [
+        21
+      ],
+      "template-2181": [
+        21
+      ],
+      "template-2187": [
+        21
+      ],
+      "template-2196": [
+        21
+      ],
+      "template-2202": [
+        21
+      ],
+      "template-2208": [
+        21
+      ],
+      "template-2217": [
+        21
+      ],
+      "template-2223": [
+        21
+      ],
+      "template-2229": [
+        21
+      ],
+      "template-2238": [
+        21
+      ],
+      "template-2244": [
+        21
+      ],
+      "template-2250": [
+        21
+      ],
+      "template-2259": [
+        21
+      ],
+      "template-2265": [
+        21
+      ],
+      "template-2271": [
+        21
+      ],
+      "template-2280": [
+        21
+      ],
+      "template-2286": [
+        21
+      ],
+      "template-2292": [
+        21
+      ],
+      "template-2301": [
+        21
+      ],
+      "template-2307": [
+        21
+      ],
+      "template-2313": [
+        21
+      ],
+      "template-2322": [
+        21
+      ],
+      "template-2328": [
+        21
+      ],
+      "template-2334": [
+        21
+      ],
+      "template-2343": [
+        21
+      ],
+      "template-2349": [
+        21
+      ],
+      "template-2355": [
+        21
+      ],
+      "template-2364": [
+        22
+      ],
+      "template-2370": [
+        22
+      ],
+      "template-2376": [
+        22
+      ],
+      "template-2385": [
+        22
+      ],
+      "template-2391": [
+        22
+      ],
+      "template-2397": [
+        22
+      ],
+      "template-2406": [
+        22
+      ],
+      "template-2412": [
+        22
+      ],
+      "template-2418": [
+        22
+      ],
+      "template-2427": [
+        22
+      ],
+      "template-2433": [
+        22
+      ],
+      "template-2439": [
+        22
+      ],
+      "template-2448": [
+        22
+      ],
+      "template-2454": [
+        22
+      ],
+      "template-2460": [
+        22
+      ],
+      "template-2469": [
+        22
+      ],
+      "template-2475": [
+        22
+      ],
+      "template-2481": [
+        22
+      ],
+      "template-2490": [
+        22
+      ],
+      "template-2496": [
+        22
+      ],
+      "template-2502": [
+        22
+      ],
+      "template-2511": [
+        22
+      ],
+      "template-2517": [
+        22
+      ],
+      "template-2523": [
+        22
+      ],
+      "template-2532": [
+        22
+      ],
+      "template-2538": [
+        22
+      ],
+      "template-2544": [
+        22
+      ],
+      "template-2553": [
+        22
+      ],
+      "template-2559": [
+        22
+      ],
+      "template-2565": [
+        22
+      ],
+      "template-2574": [
+        22
+      ],
+      "template-2580": [
+        22
+      ],
+      "template-2586": [
+        22
+      ],
+      "template-2595": [
+        22
+      ],
+      "template-2601": [
+        22
+      ],
+      "template-2607": [
+        22
+      ],
+      "template-2616": [
+        22
+      ],
+      "template-2622": [
+        22
+      ],
+      "template-2628": [
+        22
+      ],
+      "template-2637": [
+        22
+      ],
+      "template-2643": [
+        22
+      ],
+      "template-2649": [
+        22
+      ],
+      "template-2658": [
+        22
+      ],
+      "template-2664": [
+        22
+      ],
+      "template-2670": [
+        22
+      ],
+      "refs-p": [
+        23
+      ],
+      "matrix-table": [
+        19,
+        20,
+        21,
+        22
+      ]
+    },
+    "section_pages": [
+      {
+        "id": "cover",
+        "kind": "cover",
+        "pages": [
+          1
+        ]
+      },
+      {
+        "id": "abstract",
+        "kind": "abstract",
+        "pages": [
+          2
+        ]
+      },
+      {
+        "id": "toc-section",
+        "kind": "toc",
+        "pages": []
+      },
+      {
+        "id": "s1",
+        "kind": "body",
+        "pages": [
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "id": "s2",
+        "kind": "body",
+        "pages": [
+          2,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "id": "s3",
+        "kind": "body",
+        "pages": [
+          2,
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "id": "s4",
+        "kind": "body",
+        "pages": [
+          2,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "id": "s5",
+        "kind": "body",
+        "pages": [
+          2,
+          13,
+          14,
+          15,
+          16
+        ]
+      },
+      {
+        "id": "s6",
+        "kind": "body",
+        "pages": [
+          2,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "id": "matrix",
+        "kind": "body",
+        "pages": [
+          2,
+          19,
+          20,
+          21,
+          22
+        ]
+      },
+      {
+        "id": "references",
+        "kind": "references",
+        "pages": [
+          2,
+          23
+        ]
+      }
+    ],
+    "detectors": [
+      "text_image_collision",
+      "text_collision",
+      "content_regions",
+      "cover_pagination",
+      "toc_results",
+      "section_numbering",
+      "image_geometry",
+      "table_continuations"
+    ]
+  },
+  "collision_check_executed": true,
+  "final": true,
+  "passed": true
+}

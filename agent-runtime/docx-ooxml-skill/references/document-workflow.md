@@ -59,7 +59,9 @@ overflow, blank pages, font substitution and orphan headings/lines. Ambiguous or
 unsupported template structures are reported or rejected, never flattened.
 
 `repair-document ... --base-revision N --operation-id repair-id` only applies the
-checker-owned allowlist: heading keep-with-next, recognized widow/orphan control and long-table row/header/keep rules.
+checker-owned allowlist: heading keep-with-next, recognized widow/orphan control,
+long-table row/header/keep rules, declared single-page component spacing, cached
+TOC destination pages and explicitly planned section numbering properties.
 It rechecks and reports unresolved issues. It never accepts arbitrary repair payloads
 or modifies text. Fonts, ambiguous whitespace, complex template layout and semantic
 suggestions require user/Agent investigation. Identical rendered page fingerprints
@@ -84,3 +86,34 @@ legacy protocol call count, revisions, elapsed render/check time and local repai
 Page targets are soft and depend on LibreOffice/fonts. No page breaks are inserted.
 Use `pytest --import-mode=importlib` when running DOCX and PPTX suites together
 because their existing test module basenames overlap.
+
+## Quality contract 2 (new CLI documents)
+
+The authoritative final check uses the immutable revision PDF and OOXML semantic
+objects. `repair_targets` include revision, page (null when not uniquely mapped),
+stable block ID, error code, severity, repairability and exact safe operation.
+Normal wrapping, same-paragraph superscripts, table-cell text and header/footer
+furniture are excluded from naive box-overlap claims. Ambiguous geometry is
+reported without fabricated IDs. Complex edits continue to reject lossily.
+
+`check-document --final` automatically repairs safe targets in at most three
+commits. Each commit re-renders; all prior revision review results become invalid.
+A remaining finding blocks formal acceptance and leaves the draft downloadable.
+Exhaustion is persisted for the current revision: repeating the final check does
+not reset the automatic repair budget. A content edit creates a new revision.
+`--diagnostic-only` and `repair-document --max-attempts` support investigation,
+not bypasses. New CLI init defaults to contract 2; persisted legacy contract 1
+state remains backward compatible.
+
+Host page reviews cover every page; separate `document_review` uses every page
+in a numbered thumbnail sheet and completed page summaries. Both are async and
+version/pixel/request bound, never mutating content. Three UI states are separate:
+deterministic passed/failed/pending, page visual passed/issues/pending/unavailable,
+and document visual passed/issues/pending/unavailable. Final output records
+revision/design, repair attempts/unresolved targets, reviewed/issue pages and
+visual completion. Pending or unavailable reviews are drafts, never fake passes.
+
+A plan section may set `kind`, `single_page`, `numbering:{format,start}` and
+`continued_label`. These express component requirements; sections are authoring
+units and physical pages are review units. `numbering` audits real Word section
+properties; it does not silently insert new section boundaries into templates.

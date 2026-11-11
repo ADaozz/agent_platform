@@ -31,6 +31,7 @@ class Documents:
         self.preview_active = set()
         self.closed = False
         self.engine_store = DocumentStore
+        self.quality_delivery = engine._sibling('quality_status').delivery
         self.reviews = review_module.DocumentReviews(self, host)
 
     def store(self, path):
