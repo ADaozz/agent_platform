@@ -19,15 +19,22 @@ export function dispatch(type, payload = {}) {
 }
 
 export function sessionTitle(s) {
-  return s.messages?.[0]?.content?.split('\n')[0] || t('New chat')
+  return s.title || s.messages?.[0]?.content?.split('\n')[0] || t('New chat')
 }
 
 export function deletable(s) {
   return !['running', 'queued'].includes(s.status)
 }
 
-export async function loadSessions() {
-  const response = await runtimeFetch('/agent/sessions')
+let sessionLoad = null
+export function loadSessions() {
+  if (sessionLoad) return sessionLoad
+  sessionLoad = fetchSessions().finally(() => { sessionLoad = null })
+  return sessionLoad
+}
+
+async function fetchSessions() {
+  const response = await runtimeFetch('/agent/sessions?summary=true')
   if (!response.ok) throw new Error(t('请求失败，请检查输入配置'))
   sessions.value = await response.json()
   return sessions.value

@@ -552,7 +552,19 @@ def capabilities():
 
 
 @router.get('/sessions')
-def sessions():
+def sessions(summary: bool = False):
+    if summary:
+        # Project in SQLite: do not load complete conversations, decrypt model
+        # configs or walk every workspace for a sidebar refresh.
+        fields=('id','model_id','reasoning_effort','status','created_at','updated_at','event_seq','permission_mode','sandbox_mode')
+        pairs=','.join("'%s',json_extract(data,'$.%s')" % (key,key) for key in fields)
+        title="coalesce(json_extract(data,'$.messages[0].content'),'')"
+        pairs+=",'title',substr("+title+",1,min(200,instr("+title+"||char(10),char(10))-1))"
+        owner=itam_bridge.owner() if itam_bridge.is_enabled() else None
+        clause=" AND json_extract(data,'$.owner_user_id') IS ?" if itam_bridge.is_enabled() else ''
+        with d.db() as connection:
+            rows=connection.execute("SELECT json_object("+pairs+") FROM records WHERE kind=?"+clause+" ORDER BY id DESC",('session',owner) if clause else ('session',)).fetchall()
+        return [json.loads(row[0]) for row in rows]
     records = reversed(d.all_records('session'))
     if itam_bridge.is_enabled():
         records = (r for r in records if r.get('owner_user_id') == itam_bridge.owner())

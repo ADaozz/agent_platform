@@ -1,0 +1,21 @@
+{
+  "tests": [
+    "global_settings",
+    "workspace_ui_removed",
+    "thread_scoped_files",
+    "cross_thread_download_denied",
+    "local_environment_menu",
+    "new_chat_keeps_upload",
+    "five_visual_lines",
+    "short_content_height",
+    "independent_parallel_scroll",
+    "stream_identity",
+    "per_step_collapse",
+    "no_early_task_collapse",
+    "whole_task_collapse",
+    "history_reopen",
+    "cancelled_and_failed",
+    "persisted_replay"
+  ],
+  "errors": []
+}

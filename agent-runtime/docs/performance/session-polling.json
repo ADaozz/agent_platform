@@ -1,0 +1,26 @@
+{
+  "full": {
+    "median_ms": 315.93,
+    "samples_ms": [
+      442.95,
+      298.7,
+      287.221,
+      315.93,
+      384.881
+    ],
+    "response_bytes": 4784041,
+    "sessions": 50
+  },
+  "summary": {
+    "median_ms": 11.181,
+    "samples_ms": [
+      10.615,
+      11.181,
+      13.684,
+      22.41,
+      9.991
+    ],
+    "response_bytes": 12141,
+    "sessions": 50
+  }
+}

@@ -8,7 +8,7 @@ const props=defineProps({step:Object,actionLabel:Function,now:Number,collapseEpo
 const complete=computed(()=>settledStatuses.has(props.step.status))
 const expanded=ref(!complete.value),viewport=ref(null),follow=ref(true)
 let programmatic=false
-const content=computed(()=>stepBody(props.step,t))
+const content=computed(()=>expanded.value ? stepBody(props.step,t) : '')
 const label=computed(()=>props.step.kind==='reasoning'?t('process.thinking'):props.step.kind==='summary'?t('process.summary'):props.step.kind==='progress'?t('process.progress'):props.actionLabel(props.step.name))
 const icon=computed(()=>props.step.status==='failed'?'CircleAlert':props.step.status==='cancelled'||props.step.status==='interrupted'?'X':props.step.kind==='reasoning'?'Brain':props.step.kind==='tool'?(props.step.name==='execute'?'Terminal':'Wrench'):'FileText')
 const duration=computed(()=>formatDuration(elapsed(props.step.startedAt,props.step.endedAt,props.step.durationMs,props.now,!complete.value),t))
@@ -27,7 +27,7 @@ onMounted(tail)
    <button class="process-step-heading" type="button" :aria-expanded="expanded" @click="expanded=!expanded">
     <span class="process-step-name" :title="label">{{ label }}</span><span class="process-step-status" :class="step.status">{{ t('process.status.'+step.status) }}</span><time class="process-step-duration">{{ duration }}</time><span class="process-step-result" :title="step.resultSummary">{{ step.resultSummary }}</span><Icon name="ChevronDown" :size="12" class="process-chevron" :class="{expanded}"/>
    </button>
-   <div class="process-step-fold" :class="{expanded}" :inert="!expanded" :aria-hidden="!expanded"><div class="process-step-fold-inner"><pre ref="viewport" class="process-step-content" :class="{'is-live':!complete}" :data-following="follow" tabindex="0" role="region" :aria-label="t('process.details',{name:label})" @scroll.passive="onScroll">{{ content }}</pre></div></div>
+   <div class="process-step-fold" :class="{expanded}" :inert="!expanded" :aria-hidden="!expanded"><div class="process-step-fold-inner"><pre v-if="expanded" ref="viewport" class="process-step-content" :class="{'is-live':!complete}" :data-following="follow" tabindex="0" role="region" :aria-label="t('process.details',{name:label})" @scroll.passive="onScroll">{{ content }}</pre></div></div>
   </div>
  </li>
 </template>
