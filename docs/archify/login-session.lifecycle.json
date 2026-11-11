@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "登录会话生命周期",
+    "output": "login-session-lifecycle.html",
+    "quality_profile": "showcase",
+    "locale": "zh-CN",
+    "viewBox": [980, 660],
+    "views": [
+      {
+        "id": "main-path",
+        "label": "主流程",
+        "focus": ["login-ok", "online", "logout-ok"],
+        "note": "登录建立会话，在线期间持 Bearer JWT 访问 API，用户主动登出结束。"
+      },
+      {
+        "id": "interrupts",
+        "label": "中断与恢复",
+        "focus": ["online", "auth-failed", "login-ok"],
+        "note": "鉴权失败返回 401；用户重新登录会创建新会话。"
+      },
+      {
+        "id": "all-exits",
+        "label": "全部结束方式",
+        "focus": ["logout-ok", "kicked", "superseded", "jwt-expired", "auth-failed"],
+        "note": "正常登出、踢出、单点顶替、JWT 超时与鉴权失败，五种出口均保留。"
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "主进度" },
+    { "id": "recovery", "label": "鉴权中断" },
+    { "id": "terminal", "label": "终态" }
+  ],
+  "states": [
+    {
+      "id": "login-ok",
+      "type": "start",
+      "label": "登录成功",
+      "sublabel": "createSession",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "jti 签发"
+    },
+    {
+      "id": "online",
+      "type": "active",
+      "label": "在线",
+      "sublabel": "status=0",
+      "lane": "main",
+      "col": 2,
+      "step": "02",
+      "tag": "Bearer JWT"
+    },
+    {
+      "id": "logout-ok",
+      "type": "success",
+      "label": "正常登出",
+      "sublabel": "status=1",
+      "lane": "main",
+      "col": 4,
+      "step": "03",
+      "tag": "成功结束"
+    },
+    {
+      "id": "auth-failed",
+      "type": "failure",
+      "label": "鉴权失败",
+      "sublabel": "HTTP 401",
+      "lane": "recovery",
+      "col": 0,
+      "yOffset": 78,
+      "tag": "可重试"
+    },
+    {
+      "id": "kicked",
+      "type": "failure",
+      "label": "被踢下线",
+      "sublabel": "status=1",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "取消"
+    },
+    {
+      "id": "superseded",
+      "type": "failure",
+      "label": "单点顶替",
+      "sublabel": "status=1",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "取消"
+    },
+    {
+      "id": "jwt-expired",
+      "type": "failure",
+      "label": "JWT 过期",
+      "sublabel": "jwt.expire",
+      "lane": "terminal",
+      "col": 2,
+      "tag": "超时"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "user-logout",
+      "from": "online",
+      "to": "logout-ok",
+      "label": "POST /logout",
+      "variant": "emphasis"
+    },
+    {
+      "id": "admin-kick",
+      "from": "online",
+      "to": "kicked",
+      "label": "踢出设备",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [[402, 250], [480, 250], [480, 432], [402, 432]],
+      "labelAt": [440, 424]
+    },
+    {
+      "id": "single-login",
+      "from": "online",
+      "to": "superseded",
+      "label": "单点吊销",
+      "variant": "security",
+      "route": "drop",
+      "channelX": 556,
+      "labelAt": [556, 430]
+    },
+    {
+      "id": "token-timeout",
+      "from": "online",
+      "to": "jwt-expired",
+      "label": "JWT 超时",
+      "variant": "security",
+      "route": "drop",
+      "channelX": 680,
+      "labelAt": [680, 360]
+    },
+    {
+      "id": "session-invalid",
+      "from": "online",
+      "to": "auth-failed",
+      "label": "会话无效",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [[320, 157], [320, 385]],
+      "labelAt": [320, 250]
+    },
+    {
+      "id": "re-login",
+      "from": "auth-failed",
+      "to": "login-ok",
+      "label": "重新登录",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "top",
+      "via": [[20, 385], [20, 80], [94, 80]]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "主进度",
+      "items": [
+        "账密或证书登录调用 createSingleLoginSession",
+        "JWT jti 绑定 sys_login_session.session_id",
+        "在线期间 JwtFilter → UserRealm 校验会话 status=0"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "鉴权中断",
+      "items": [
+        "Token 无效或会话已吊销时 assertSessionActive 抛 401",
+        "中断态非终态：POST /login 重新登录建立新会话",
+        "不启用 Shiro HttpSession，会话事实以 DB 为准"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "五种结束方式",
+      "items": [
+        "成功：POST /logout 主动登出",
+        "取消：DELETE /system/session/{id} 踢出；新登录 revokeAll 单点顶替",
+        "超时：JWT 超过 jwt.expire（默认 7200s）",
+        "失败：已吊销会话再次携带 Token 请求"
+      ]
+    }
+  ]
+}

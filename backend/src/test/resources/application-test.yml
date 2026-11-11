@@ -1,0 +1,5 @@
+# 单元测试 / mvn test：不依赖部署机上的中间 CA 文件
+cert:
+  storage-base-path: ${java.io.tmpdir}/personalDemo-test/certs
+  intermediate-cert:
+  intermediate-key:

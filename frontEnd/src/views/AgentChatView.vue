@@ -1,0 +1,38 @@
+<script setup lang="ts">
+// @ts-ignore: the workspace UI is reused as-is from agent-runtime (JavaScript SFCs)
+import AgentPlatform from '@/agent-platform/AgentPlatform.vue'
+// @ts-ignore
+import { theme } from '@/agent-platform/preferences'
+import '@/agent-platform/style.css'
+</script>
+
+<template>
+  <div class="dap-root agent-host" :data-theme="theme">
+    <AgentPlatform />
+  </div>
+</template>
+
+<style scoped>
+/* Fixed-position parts of the workspace (sidebar, modals, panels) anchor to this box instead of the viewport. */
+.agent-host {
+  --dap-vh: calc(100dvh - 3.5rem);
+  position: relative;
+  height: var(--dap-vh);
+  overflow: hidden;
+  contain: layout paint;
+  color-scheme: light;
+}
+.agent-host[data-theme='dark'] {
+  color-scheme: dark;
+}
+/* Conversation navigation lives in the platform sidebar, so the workspace reserves no sidebar column. */
+.agent-host :deep(.shell),
+.agent-host :deep(.shell.expanded) {
+  --sidebar-width: 0px;
+}
+/* The standalone app scrolled the document; embedded, its main column scrolls instead. */
+.agent-host :deep(main) {
+  height: var(--dap-vh);
+  overflow-y: auto;
+}
+</style>

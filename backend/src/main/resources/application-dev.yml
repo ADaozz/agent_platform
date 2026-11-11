@@ -1,0 +1,8 @@
+# 本地 / IDE 开发：避免与 systemd 部署实例（8080）冲突
+server:
+  port: 8082
+
+# 证书登录（经 nginx 8443）完成后允许跳回 Vite 开发前端
+cert:
+  login:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173

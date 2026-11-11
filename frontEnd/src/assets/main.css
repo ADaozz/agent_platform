@@ -1,0 +1,149 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-primary-light: #eff6ff;
+
+  --color-page: #f7f8fa;
+  --color-card: #ffffff;
+  --color-line: #e5e7eb;
+  --color-hover: #f9fafb;
+
+  --color-ink: #111827;
+  --color-ink-secondary: #4b5563;
+  --color-ink-muted: #6b7280;
+  --color-ink-faint: #9ca3af;
+
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+}
+
+/* 黑夜模式（默认）：由 <html data-theme> 切换，覆盖平台色板以及页面里直接使用的 Tailwind 灰阶和状态色 */
+:root[data-theme='dark'] {
+  --color-primary: #3b82f6;
+  --color-primary-dark: #2563eb;
+  --color-primary-light: #1d2a44;
+  --color-page: #171819;
+  --color-card: #222426;
+  --color-line: #3b3f42;
+  --color-hover: #2a2d30;
+  --color-ink: #e5e7e9;
+  --color-ink-secondary: #b3b9bf;
+  --color-ink-muted: #a1a9b0;
+  --color-ink-faint: #8a949c;
+
+  --color-gray-50: #26292c;
+  --color-gray-100: #2f3235;
+  --color-gray-300: #4b5055;
+  --color-gray-600: #b3b9bf;
+  --color-red-50: #3a2422;
+  --color-red-200: #6b3b36;
+  --color-red-700: #f0a39b;
+  --color-red-800: #f5b8b1;
+  --color-emerald-50: #1f3329;
+  --color-emerald-200: #2f5a45;
+  --color-emerald-600: #5fd0a0;
+  --color-emerald-700: #7fdcb2;
+  --color-emerald-800: #9be5c3;
+  --color-amber-50: #3a3020;
+  --color-amber-200: #6b5530;
+  --color-amber-700: #f0c06b;
+  --color-amber-800: #f5cf88;
+  --color-blue-50: #1f2b40;
+  --color-blue-200: #34507a;
+  --color-blue-700: #8fb6f0;
+  --color-blue-800: #a9c8f5;
+  --color-orange-50: #3a2a1f;
+  --color-orange-700: #f2b07a;
+}
+
+/* text-white 需保持白色（主色按钮），因此不改 --color-white，只把白色底改成卡片色 */
+:root[data-theme='dark'] .bg-white {
+  background-color: var(--color-card);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+.app-icon {
+  width: 1em;
+  height: 1em;
+  font-size: 20px;
+  vertical-align: -0.125em;
+}
+
+/* JetBrains Mono 默认开启编程连字，会把「星号+斜杠」等组合合并成单个符号（如 Cron 表达式），全部禁用 */
+.font-mono,
+code {
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'calt' 0;
+}
+
+/* 通用组件样式 */
+.btn-primary {
+  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-ghost {
+  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-line bg-card px-4 text-sm font-medium text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-danger {
+  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-danger px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.input {
+  @apply h-9 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/15;
+}
+
+.select {
+  @apply h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15;
+}
+
+.form-label {
+  @apply mb-1.5 block text-xs font-medium text-ink-secondary;
+}
+
+.card {
+  @apply rounded-lg border border-line bg-card;
+}
+
+.session-history-row {
+  background-color: #eef0f3;
+}
+
+.session-history-row:hover {
+  background-color: #e5e7eb;
+}
+
+:root[data-theme='dark'] .session-history-row {
+  background-color: #1e2022;
+}
+
+:root[data-theme='dark'] .session-history-row:hover {
+  background-color: var(--color-hover);
+}
+
+.session-history-row td {
+  background-color: inherit;
+}

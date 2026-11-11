@@ -1,0 +1,10 @@
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = personal-demo.local
+IP.1 = 127.0.0.1
+IP.2 = 10.8.40.225

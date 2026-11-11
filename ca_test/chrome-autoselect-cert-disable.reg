@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+; 删除 Chrome 自动选证策略（排查 8443 握手 400 时先导入本文件）
+; 导入后重启 Chrome，再访问 https://IP:8443/debug-cert 应弹出证书选择框
+
+[-HKEY_CURRENT_USER\SOFTWARE\Policies\Google\Chrome\AutoSelectCertificateForUrls]

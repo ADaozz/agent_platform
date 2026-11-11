@@ -1,0 +1,53 @@
+# 数据源配置
+spring:
+  # 未指定 profile 时默认 8080（Spring Boot 默认端口，等同 prod）
+  # 本地 IDE 请在运行配置中激活 dev → application-dev.yml 使用 8081
+  # 生产部署：java -jar app.jar --spring.profiles.active=prod 或环境变量 SPRING_PROFILES_ACTIVE=prod
+  # 数据库密码、JWT 密钥等敏感配置：环境变量，或 application-local.yml（不入库，模板见 application-local.example.yml）
+  config:
+    import: optional:classpath:application-local.yml
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    type: com.kingbase8.ds.KBPoolingDataSource
+    driver-class-name: com.kingbase8.Driver
+    url: ${DB_URL:jdbc:kingbase8://127.0.0.1:54321/lwt_personal_demo?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DATABASE:0}
+
+# MyBatis-Plus：Kingbase 下避免 sys_user 等同名系统视图冲突
+mybatis-plus:
+  global-config:
+    db-config:
+      schema: public
+
+# JWT 配置
+jwt:
+  # 签名密钥（HS256 建议不少于 32 位）
+  secret: ${JWT_SECRET}
+  # 过期时间（秒），默认 2 小时
+  expire: 7200
+  api:
+    secret: ${JWT_API_SECRET}
+    expire: 604800
+
+# 客户端证书签发与存储
+cert:
+  storage-base-path: /home/neo/application/personalDemo/ca/client/users
+  intermediate-cert: /home/neo/application/personalDemo/ca/intermediate/intermediate-ca.crt
+  intermediate-key: /home/neo/application/personalDemo/ca/intermediate/intermediate-ca.key
+  root-cert: /home/neo/application/personalDemo/ca/root/root-ca.crt
+  default-valid-days: 365
+  p12-password-length: 16
+# Agent Runtime 由 Python 进程提供，仅通过本应用的 JWT/Shiro 网关访问。
+# AGENT_RUNTIME_SHARED_SECRET 与 Python 的 ITAM_RUNTIME_SHARED_SECRET 必须相同，
+# 至少 32 字节。禁止将该密钥提交到仓库。
+agent:
+  runtime:
+    url: ${AGENT_RUNTIME_URL:http://127.0.0.1:8090}
+    shared-secret: ${AGENT_RUNTIME_SHARED_SECRET:}

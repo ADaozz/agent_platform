@@ -1,0 +1,4 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\SOFTWARE\Policies\Microsoft\Edge\AutoSelectCertificateForUrls]
+"1"="{\"pattern\":\"https://10.8.40.225:8443\",\"filter\":{\"SUBJECT\":{\"CN\":\"user\"},\"ISSUER\":{\"CN\":\"personalDemo Intermediate CA\",\"O\":\"personalDemo\",\"C\":\"CN\"}}}"

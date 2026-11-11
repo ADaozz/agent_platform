@@ -1,0 +1,1862 @@
+{
+  "展开或收起侧栏": {
+    "zh": "展开或收起侧栏",
+    "en": "Toggle sidebar"
+  },
+  "Toggle sidebar · Ctrl+Alt+B": {
+    "zh": "切换侧栏 · Ctrl+Alt+B",
+    "en": "Toggle sidebar · Ctrl+Alt+B"
+  },
+  "搜索会话": {
+    "zh": "搜索会话",
+    "en": "Search chats"
+  },
+  "New Chat": {
+    "zh": "新建对话",
+    "en": "New Chat"
+  },
+  "会话历史": {
+    "zh": "会话历史",
+    "en": "Chat history"
+  },
+  "History": {
+    "zh": "历史记录",
+    "en": "History"
+  },
+  "RECENT CHATS": {
+    "zh": "最近对话",
+    "en": "RECENT CHATS"
+  },
+  "Your ideas start here.": {
+    "zh": "从这里开始实现你的想法。",
+    "en": "Your ideas start here."
+  },
+  "模型配置": {
+    "zh": "模型配置",
+    "en": "Model settings"
+  },
+  "Settings": {
+    "zh": "设置",
+    "en": "Settings"
+  },
+  "LOCAL": {
+    "zh": "本地",
+    "en": "LOCAL"
+  },
+  "Agents": {
+    "zh": "智能体",
+    "en": "Agents"
+  },
+  "Chats": {
+    "zh": "对话",
+    "en": "Chats"
+  },
+  "Search chats…": {
+    "zh": "搜索对话…",
+    "en": "Search chats…"
+  },
+  "No chats yet": {
+    "zh": "暂无对话",
+    "en": "No chats yet"
+  },
+  "Start a new chat to bring your ideas to life.": {
+    "zh": "新建对话，让你的想法成为现实。",
+    "en": "Start a new chat to bring your ideas to life."
+  },
+  "New chat": {
+    "zh": "新建对话",
+    "en": "New chat"
+  },
+  "All chats": {
+    "zh": "所有对话",
+    "en": "All chats"
+  },
+  "Connect a model to get started": {
+    "zh": "连接模型，开始使用",
+    "en": "Connect a model to get started"
+  },
+  "Set up model": {
+    "zh": "配置模型",
+    "en": "Set up model"
+  },
+  "关闭提示": {
+    "zh": "关闭提示",
+    "en": "Dismiss notice"
+  },
+  "You": {
+    "zh": "你",
+    "en": "You"
+  },
+  "Agent": {
+    "zh": "智能体",
+    "en": "Agent"
+  },
+  "Thinking": {
+    "zh": "思考过程",
+    "en": "Thinking"
+  },
+  "Pause": {
+    "zh": "暂停",
+    "en": "Pause"
+  },
+  "Stop": {
+    "zh": "停止",
+    "en": "Stop"
+  },
+  "Review tool calls": {
+    "zh": "审批工具调用",
+    "en": "Review tool calls"
+  },
+  "Agent 请求执行以下操作，请逐项确认。": {
+    "zh": "Agent 请求执行以下操作，请逐项确认。",
+    "en": "Agent is requesting these actions. Review each one before continuing."
+  },
+  "Approve": {
+    "zh": "批准",
+    "en": "Approve"
+  },
+  "Reject": {
+    "zh": "拒绝",
+    "en": "Reject"
+  },
+  "Submit decisions": {
+    "zh": "提交审批",
+    "en": "Submit decisions"
+  },
+  "Continue": {
+    "zh": "继续",
+    "en": "Continue"
+  },
+  "Agent paused": {
+    "zh": "Agent 已暂停",
+    "en": "Agent paused"
+  },
+  "运行环境": {
+    "zh": "运行环境",
+    "en": "Runtime"
+  },
+  "Tool permission ·": {
+    "zh": "工具权限 ·",
+    "en": "Tool permission ·"
+  },
+  "Ask before changes": {
+    "zh": "更改前询问",
+    "en": "Ask before changes"
+  },
+  "Auto-approve in sandbox": {
+    "zh": "沙箱内自动批准",
+    "en": "Auto-approve in sandbox"
+  },
+  "Auto-approve 会自动执行工具并开放沙箱网络；MCP 仍在宿主执行。": {
+    "zh": "自动批准工具调用，包括写入和删除。restricted 下命令仍隔离宿主网络；full-access 下可开放命令网络。未适配 Thread 作用域的 MCP 不会启动。切回 ask 不会停止已运行的操作。",
+    "en": "Auto-approve tool calls, including writes and deletes. Restricted commands remain isolated from host networking; full-access commands may use networking. MCP servers without Thread scoping stay disabled. Switching to ask does not stop running work."
+  },
+  "Compact context": {
+    "zh": "压缩上下文",
+    "en": "Compact context"
+  },
+  "任务输入": {
+    "zh": "任务输入",
+    "en": "Task input"
+  },
+  "添加上下文和工具": {
+    "zh": "添加上下文和工具",
+    "en": "Add context and tools"
+  },
+  "Add context & tools": {
+    "zh": "添加上下文和工具",
+    "en": "Add context & tools"
+  },
+  "Attach images": {
+    "zh": "添加图片",
+    "en": "Attach images"
+  },
+  "Up to 4": {
+    "zh": "最多 4 张",
+    "en": "Up to 4"
+  },
+  "Skills": {
+    "zh": "设置技能",
+    "en": "Agent skills"
+  },
+  "Select model": {
+    "zh": "选择模型",
+    "en": "Select model"
+  },
+  "Add a model provider to start.": {
+    "zh": "添加模型来源以开始使用。",
+    "en": "Add a model provider to start."
+  },
+  "未就绪": {
+    "zh": "未就绪",
+    "en": "Not ready"
+  },
+  "Manage models": {
+    "zh": "管理模型",
+    "en": "Manage models"
+  },
+  "思考强度": {
+    "zh": "思考强度",
+    "en": "Reasoning effort"
+  },
+  "Reasoning effort": {
+    "zh": "思考强度",
+    "en": "Reasoning effort"
+  },
+  "Default": {
+    "zh": "默认",
+    "en": "Default"
+  },
+  "Queue": {
+    "zh": "加入队列",
+    "en": "Queue"
+  },
+  "tokens": {
+    "zh": "Token",
+    "en": "tokens"
+  },
+  "关闭错误": {
+    "zh": "关闭错误",
+    "en": "Dismiss error"
+  },
+  "A little idea. A new beginning.": {
+    "zh": "一个小想法，一次新开始。",
+    "en": "A little idea. A new beginning."
+  },
+  "Build something, explore a question, or create your next document.": {
+    "zh": "构建新作品、探索问题，或创建下一份文档。",
+    "en": "Build something, explore a question, or create your next document."
+  },
+  "Your chats will appear here.": {
+    "zh": "你的对话将显示在这里。",
+    "en": "Your chats will appear here."
+  },
+  "关闭设置": {
+    "zh": "关闭设置",
+    "en": "Close settings"
+  },
+  "描述": {
+    "zh": "描述",
+    "en": "Description"
+  },
+  "System prompt": {
+    "zh": "系统提示词",
+    "en": "System prompt"
+  },
+  "Rules": {
+    "zh": "规则",
+    "en": "Rules"
+  },
+  "每行一条规则": {
+    "zh": "每行一条规则",
+    "en": "One rule per line"
+  },
+  "配置保存后用于新会话；现有会话保留创建时的配置快照。": {
+    "zh": "配置保存后用于新会话；现有会话保留创建时的配置快照。",
+    "en": "Saved settings apply to new chats. Existing chats keep their original configuration."
+  },
+  "Core tools": {
+    "zh": "内核工具",
+    "en": "Core tools"
+  },
+  "使用平台内置工具，具有副作用的操作交由内核请求审批。": {
+    "zh": "使用平台内置工具，具有副作用的操作交由内核请求审批。",
+    "en": "Use built-in platform tools. The core requests approval for actions that make changes."
+  },
+  "编辑已注册工具的描述与 JSON Schema。参数名称和必填项需保留。": {
+    "zh": "编辑已注册工具的描述与 JSON Schema。参数名称和必填项需保留。",
+    "en": "Edit registered tool descriptions and JSON Schema. Keep parameter names and required fields."
+  },
+  "启用此工具": {
+    "zh": "启用此工具",
+    "en": "Enable this tool"
+  },
+  "Description": {
+    "zh": "描述",
+    "en": "Description"
+  },
+  "MCP servers": {
+    "zh": "MCP 服务",
+    "en": "MCP servers"
+  },
+  "沿用内核的 MCP 配置。支持 stdio 和 streamable_http；stdio 在服务宿主运行，凭据通过环境变量引用。": {
+    "zh": "沿用内核的 MCP 配置。支持 stdio 和 streamable_http；stdio 在服务宿主运行，凭据通过环境变量引用。",
+    "en": "Uses the core MCP configuration. Supports stdio and streamable_http. Stdio runs on the host; credentials use environment variable references."
+  },
+  "MCP JSON 配置": {
+    "zh": "MCP JSON 配置",
+    "en": "MCP JSON configuration"
+  },
+  "Skill 将生成标准 SKILL.md，并作为只读目录提供给内核按需加载。": {
+    "zh": "Skill 将生成标准 SKILL.md，并作为只读目录提供给内核按需加载。",
+    "en": "Skills generate standard SKILL.md files in a read-only directory for the core to load on demand."
+  },
+  "Add skill": {
+    "zh": "添加技能",
+    "en": "Add skill"
+  },
+  "No skills yet. Add a reusable workflow.": {
+    "zh": "暂无技能，添加可复用的工作流程。",
+    "en": "No skills yet. Add a reusable workflow."
+  },
+  "Skill": {
+    "zh": "技能",
+    "en": "Skill"
+  },
+  "Enabled": {
+    "zh": "已启用",
+    "en": "Enabled"
+  },
+  "Disabled": {
+    "zh": "已禁用",
+    "en": "Disabled"
+  },
+  "Name": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "e.g. Code review": {
+    "zh": "例如：代码审查",
+    "en": "e.g. Code review"
+  },
+  "When should Agent use this skill?": {
+    "zh": "Agent 应在什么情况下使用这个技能？",
+    "en": "When should Agent use this skill?"
+  },
+  "Instructions": {
+    "zh": "操作指引",
+    "en": "Instructions"
+  },
+  "Describe the workflow, rules and expected output…": {
+    "zh": "描述工作流程、规则和预期输出…",
+    "en": "Describe the workflow, rules and expected output…"
+  },
+  "Applies to new chats": {
+    "zh": "适用于新对话",
+    "en": "Applies to new chats"
+  },
+  "Cancel": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "Save changes": {
+    "zh": "保存更改",
+    "en": "Save changes"
+  },
+  "Providers & models": {
+    "zh": "来源与模型",
+    "en": "Providers & models"
+  },
+  "Advanced JSON": {
+    "zh": "高级 JSON",
+    "en": "Advanced JSON"
+  },
+  "Add a model": {
+    "zh": "添加模型",
+    "en": "Add a model"
+  },
+  "支持 Chat Completions 和 Responses 模型配置。": {
+    "zh": "支持 Chat Completions 和 Responses 模型配置。",
+    "en": "Supports Chat Completions and Responses model configuration."
+  },
+  "来源名称": {
+    "zh": "来源名称",
+    "en": "Provider name"
+  },
+  "模型 ID": {
+    "zh": "模型 ID",
+    "en": "Model ID"
+  },
+  "Provider model ID": {
+    "zh": "服务商模型 ID",
+    "en": "Provider model ID"
+  },
+  "API Key 或 ${ENV_VAR}": {
+    "zh": "API Key 或 ${ENV_VAR}",
+    "en": "API Key or ${ENV_VAR}"
+  },
+  "密钥在服务端加密保存，读取时脱敏。": {
+    "zh": "密钥在服务端加密保存，读取时脱敏。",
+    "en": "Keys are encrypted on the server and masked when read."
+  },
+  "API 协议": {
+    "zh": "API 协议",
+    "en": "API protocol"
+  },
+  "逗号分隔": {
+    "zh": "逗号分隔",
+    "en": "Comma-separated"
+  },
+  "模型支持图片输入": {
+    "zh": "模型支持图片输入",
+    "en": "Model supports image input"
+  },
+  "编辑完整 llm 配置，可删除模型、修改默认模型和模型参数。保留 __UNCHANGED_SECRET__ 可沿用已保存的密钥。": {
+    "zh": "编辑完整 llm 配置，可删除模型、修改默认模型和模型参数。保留 __UNCHANGED_SECRET__ 可沿用已保存的密钥。",
+    "en": "Edit the full llm configuration to remove models or change defaults and parameters. Keep __UNCHANGED_SECRET__ to reuse saved keys."
+  },
+  "模型高级 JSON 配置": {
+    "zh": "模型高级 JSON 配置",
+    "en": "Advanced model JSON configuration"
+  },
+  "models configured": {
+    "zh": "个模型已配置",
+    "en": "models configured"
+  },
+  "A dedicated space for your tools, skills and ideas.": {
+    "zh": "为你的工具、技能和想法创建专属空间。",
+    "en": "A dedicated space for your tools, skills and ideas."
+  },
+  "e.g. Development": {
+    "zh": "例如：开发设置",
+    "en": "e.g. Development"
+  },
+  "No files yet.": {
+    "zh": "暂无文件。",
+    "en": "No files yet."
+  },
+  "No chats yet.": {
+    "zh": "暂无对话。",
+    "en": "No chats yet."
+  },
+  "Queued…": {
+    "zh": "排队中…",
+    "en": "Queued…"
+  },
+  "Agent is working…": {
+    "zh": "Agent 正在执行…",
+    "en": "Agent is working…"
+  },
+  "Agent needs your input": {
+    "zh": "Agent 需要你的回复",
+    "en": "Agent needs your input"
+  },
+  "Start from scratch": {
+    "zh": "从零开始",
+    "en": "Start from scratch"
+  },
+  "Add instructions while Agent works…": {
+    "zh": "在 Agent 执行时追加指令…",
+    "en": "Add instructions while Agent works…"
+  },
+  "Ask a follow-up…": {
+    "zh": "继续提问…",
+    "en": "Ask a follow-up…"
+  },
+  "Ask Agent to build, fix bugs, explore": {
+    "zh": "让 Agent 构建、修复问题或探索想法",
+    "en": "Ask Agent to build, fix bugs, explore"
+  },
+  "追加指令": {
+    "zh": "追加指令",
+    "en": "Add instructions"
+  },
+  "后续任务": {
+    "zh": "后续任务",
+    "en": "Follow-up task"
+  },
+  "发送任务": {
+    "zh": "发送任务",
+    "en": "Send task"
+  },
+  "Enter to steer · Queue for a follow-up": {
+    "zh": "Enter 追加指令 · 可将后续任务加入队列",
+    "en": "Enter to steer · Queue for a follow-up"
+  },
+  "Enter to send · Shift+Enter for a new line": {
+    "zh": "Enter 发送 · Shift+Enter 换行",
+    "en": "Enter to send · Shift+Enter for a new line"
+  },
+  "Model settings": {
+    "zh": "模型设置",
+    "en": "Model settings"
+  },
+  "Search chats": {
+    "zh": "搜索对话",
+    "en": "Search chats"
+  },
+  "General": {
+    "zh": "通用",
+    "en": "General"
+  },
+  "Tools": {
+    "zh": "工具",
+    "en": "Tools"
+  },
+  "Ready": {
+    "zh": "已就绪",
+    "en": "Ready"
+  },
+  "Key missing": {
+    "zh": "缺少密钥",
+    "en": "Key missing"
+  },
+  "Saving…": {
+    "zh": "正在保存…",
+    "en": "Saving…"
+  },
+  "Save configuration": {
+    "zh": "保存配置",
+    "en": "Save configuration"
+  },
+  "Add model": {
+    "zh": "添加模型",
+    "en": "Add model"
+  },
+  "列出文件": {
+    "zh": "列出文件",
+    "en": "List files"
+  },
+  "读取文件": {
+    "zh": "读取文件",
+    "en": "Read files"
+  },
+  "写入文件": {
+    "zh": "写入文件",
+    "en": "Write files"
+  },
+  "编辑文件": {
+    "zh": "编辑文件",
+    "en": "Edit files"
+  },
+  "删除文件": {
+    "zh": "删除文件",
+    "en": "Delete files"
+  },
+  "文件匹配": {
+    "zh": "文件匹配",
+    "en": "Find files"
+  },
+  "搜索内容": {
+    "zh": "搜索内容",
+    "en": "Search contents"
+  },
+  "执行命令": {
+    "zh": "执行命令",
+    "en": "Run commands"
+  },
+  "子 Agent 委派": {
+    "zh": "子 Agent 委派",
+    "en": "Delegate to subagent"
+  },
+  "子任务日志": {
+    "zh": "子任务日志",
+    "en": "Subagent logs"
+  },
+  "向用户提问": {
+    "zh": "向用户提问",
+    "en": "Ask the user"
+  },
+  "联网搜索": {
+    "zh": "联网搜索",
+    "en": "Web search"
+  },
+  "新会话": {
+    "zh": "新会话",
+    "en": "New chat"
+  },
+  "排队中": {
+    "zh": "排队中",
+    "en": "Queued"
+  },
+  "执行中": {
+    "zh": "执行中",
+    "en": "Running"
+  },
+  "已完成": {
+    "zh": "已完成",
+    "en": "Completed"
+  },
+  "执行失败": {
+    "zh": "执行失败",
+    "en": "Failed"
+  },
+  "等待审批": {
+    "zh": "等待审批",
+    "en": "Awaiting approval"
+  },
+  "等待回复": {
+    "zh": "等待回复",
+    "en": "Awaiting input"
+  },
+  "已暂停": {
+    "zh": "已暂停",
+    "en": "Paused"
+  },
+  "等待继续": {
+    "zh": "等待继续",
+    "en": "Ready to continue"
+  },
+  "已取消": {
+    "zh": "已取消",
+    "en": "Cancelled"
+  },
+  "已中断": {
+    "zh": "已中断",
+    "en": "Interrupted"
+  },
+  "请求失败，请检查输入配置": {
+    "zh": "请求失败，请检查输入配置",
+    "en": "Request failed. Check your configuration."
+  },
+  "请先处理审批、提问或暂停，再发送下一条消息": {
+    "zh": "请先处理审批、提问或暂停，再发送下一条消息",
+    "en": "Resolve the pending approval, question or pause before sending another message."
+  },
+  "模型配置已排队，将在内核安全边界生效": {
+    "zh": "模型配置已排队，将在内核安全边界生效",
+    "en": "Model settings are queued and will apply at the next safe boundary."
+  },
+  "最多添加 4 张图片，每张不超过 10MB": {
+    "zh": "最多添加 4 张图片，每张不超过 10MB",
+    "en": "Attach up to 4 images, each no larger than 10MB."
+  },
+  "请填写来源、模型 ID、端点和 API Key": {
+    "zh": "请填写来源、模型 ID、端点和 API Key",
+    "en": "Enter the provider, model ID, base URL and API key."
+  },
+  "来源名称请使用字母、数字、下划线或短横线": {
+    "zh": "来源名称请使用字母、数字、下划线或短横线",
+    "en": "Use letters, numbers, underscores or hyphens in the provider name."
+  },
+  "模型配置已保存": {
+    "zh": "模型配置已保存",
+    "en": "Model settings saved."
+  },
+  "权限配置已交给内核，将在安全边界生效": {
+    "zh": "权限配置已交给内核，将在安全边界生效",
+    "en": "Permission settings will apply at the next safe boundary."
+  },
+  "appearance": {
+    "zh": "外观",
+    "en": "Appearance"
+  },
+  "theme.dark": {
+    "zh": "切换到夜间模式",
+    "en": "Switch to dark mode"
+  },
+  "theme.light": {
+    "zh": "切换到浅色模式",
+    "en": "Switch to light mode"
+  },
+  "language.switch": {
+    "zh": "Switch to English",
+    "en": "切换为中文"
+  },
+  "reviewTool": {
+    "zh": "审批 {name}",
+    "en": "Review {name}"
+  },
+  "removeImage": {
+    "zh": "移除 {name}",
+    "en": "Remove {name}"
+  },
+  "deleteSkill": {
+    "zh": "删除技能 {name}",
+    "en": "Delete skill {name}"
+  },
+  "document.title": {
+    "zh": "Deep Agent · 设置",
+    "en": "Deep Agent · Agent"
+  },
+  "请在网页的模型配置中新增模型来源和模型": {
+    "zh": "请在网页的模型配置中新增模型来源和模型",
+    "en": "Add a provider and model in Model settings first."
+  },
+  "模型、思考强度或密钥配置无效": {
+    "zh": "模型、思考强度或密钥配置无效",
+    "en": "Invalid model, reasoning effort or API key configuration."
+  },
+  "会话不存在": {
+    "zh": "会话不存在",
+    "en": "Chat not found."
+  },
+  "配置已更新，请刷新后重试": {
+    "zh": "配置已更新，请刷新后重试",
+    "en": "Settings have changed. Refresh and try again."
+  },
+  "模型配置已更新，请重新打开后编辑": {
+    "zh": "模型配置已更新，请重新打开后编辑",
+    "en": "Model settings have changed. Reopen the editor and try again."
+  },
+  "当前会话正在执行": {
+    "zh": "当前会话正在执行",
+    "en": "This chat is already running."
+  },
+  "请先处理当前审批、提问或暂停": {
+    "zh": "请先处理当前审批、提问或暂停",
+    "en": "Resolve the pending approval, question or pause first."
+  },
+  "请先处理当前中断再压缩上下文": {
+    "zh": "请先处理当前中断再压缩上下文",
+    "en": "Resolve the pending interaction before compacting context."
+  },
+  "任务队列已满": {
+    "zh": "任务队列已满",
+    "en": "The task queue is full."
+  },
+  "当前没有待审批工具": {
+    "zh": "当前没有待审批工具",
+    "en": "No tool calls are awaiting approval."
+  },
+  "当前没有待回答问题": {
+    "zh": "当前没有待回答问题",
+    "en": "No questions are awaiting an answer."
+  },
+  "当前会话未暂停": {
+    "zh": "当前会话未暂停",
+    "en": "This chat is not paused."
+  },
+  "请对每一个待审批工具作出决定": {
+    "zh": "请对每一个待审批工具作出决定",
+    "en": "Review every pending tool call."
+  },
+  "Agent 尚未运行": {
+    "zh": "Agent 尚未运行",
+    "en": "Agent has not started yet."
+  },
+  "指令不能为空": {
+    "zh": "指令不能为空",
+    "en": "Instructions cannot be empty."
+  },
+  "图片格式无效或超过 10MB": {
+    "zh": "图片格式无效或超过 10MB",
+    "en": "Invalid image format or image larger than 10MB."
+  },
+  "此模型在会话创建后新增，请新建会话使用": {
+    "zh": "此模型在会话创建后新增，请新建会话使用",
+    "en": "This model was added after the chat was created. Start a new chat to use it."
+  },
+  "模型或思考强度配置无效": {
+    "zh": "模型或思考强度配置无效",
+    "en": "Invalid model or reasoning effort configuration."
+  },
+  "请在 Agent 初始化完成后切换权限模式": {
+    "zh": "请在 Agent 初始化完成后切换权限模式",
+    "en": "Wait for Agent to initialize before changing permissions."
+  },
+  "当前运行环境不支持此权限模式": {
+    "zh": "当前运行环境不支持此权限模式",
+    "en": "This runtime does not support that permission mode."
+  },
+  "文件不存在": {
+    "zh": "文件不存在",
+    "en": "File not found."
+  },
+  "内核执行失败，请检查服务端日志及模型配置。": {
+    "zh": "内核执行失败，请检查服务端日志及模型配置。",
+    "en": "The core failed. Check the server logs and model settings."
+  },
+  "Bubblewrap 沙箱不可用，请检查主机 user namespace 与 bwrap 配置。": {
+    "zh": "Bubblewrap 沙箱不可用，请检查主机 user namespace 与 bwrap 配置。",
+    "en": "Bubblewrap is unavailable. Check user namespaces and the bwrap configuration on the host."
+  },
+  "Agent 执行失败，请检查模型配置与服务端日志。": {
+    "zh": "Agent 执行失败，请检查模型配置与服务端日志。",
+    "en": "Agent failed. Check model settings and server logs."
+  },
+  "服务重启，本轮已中断；可发送新消息恢复会话。": {
+    "zh": "服务重启，本轮已中断；可发送新消息恢复会话。",
+    "en": "The server restarted and interrupted this turn. Send a new message to resume the chat."
+  },
+  "Filebase": {
+    "zh": "会话文件",
+    "en": "Thread files"
+  },
+  "e.g. openai": {
+    "zh": "例如：openai",
+    "en": "e.g. openai"
+  },
+  "mcp.example": {
+    "zh": "格式：{ \"enabled\": true, \"servers\": { \"name\": { \"transport\": \"streamable_http\", \"url\": \"https://example.com/mcp\" } } }",
+    "en": "Example: { \"enabled\": true, \"servers\": { \"name\": { \"transport\": \"streamable_http\", \"url\": \"https://example.com/mcp\" } } }"
+  },
+  "密钥占位符没有对应的已保存密钥": {
+    "zh": "密钥占位符没有对应的已保存密钥",
+    "en": "The key placeholder has no previously saved key."
+  },
+  "该模型不支持所选思考强度": {
+    "zh": "该模型不支持所选思考强度",
+    "en": "The model does not support this reasoning effort."
+  },
+  "system_prompt 必须是文本": {
+    "zh": "system_prompt 必须是文本",
+    "en": "System prompt must be text."
+  },
+  "rules 必须是文本列表": {
+    "zh": "rules 必须是文本列表",
+    "en": "Rules must be a list of text entries."
+  },
+  "skills 必须包含 name 和 content": {
+    "zh": "skills 必须包含 name 和 content",
+    "en": "Each skill must include a name and content."
+  },
+  "内核工具配置无效": {
+    "zh": "内核工具配置无效",
+    "en": "Invalid core tool configuration."
+  },
+  "MCP 配置需要 enabled 和 servers": {
+    "zh": "MCP 配置需要 enabled 和 servers",
+    "en": "MCP configuration requires enabled and servers fields."
+  },
+  "Skill 需要非空名称、文本描述和有效的启用状态": {
+    "zh": "Skill 需要非空名称、文本描述和有效的启用状态",
+    "en": "A skill requires a name, text description and valid enabled state."
+  },
+  "工具必须绑定唯一的已注册处理器": {
+    "zh": "工具必须绑定唯一的已注册处理器",
+    "en": "Each tool must use a unique registered handler."
+  },
+  "工具需要 description 和 enabled": {
+    "zh": "工具需要 description 和 enabled",
+    "en": "Tools require description and enabled fields."
+  },
+  "schema 必须保留处理器参数与 required；可修改描述和约束": {
+    "zh": "schema 必须保留处理器参数与 required；可修改描述和约束",
+    "en": "Keep handler parameters and required fields in the schema. Descriptions and constraints may be edited."
+  },
+  "服务已重启，请创建新任务重试。": {
+    "zh": "服务已重启，请创建新任务重试。",
+    "en": "The server restarted. Create a new task to try again."
+  },
+  "当前任务已满，请稍后再试": {
+    "zh": "当前任务已满，请稍后再试",
+    "en": "The task queue is full. Try again later."
+  },
+  "内核未完成此任务；请检查服务端日志与模型配置。": {
+    "zh": "内核未完成此任务；请检查服务端日志与模型配置。",
+    "en": "The core did not complete this task. Check server logs and model settings."
+  },
+  "记录不存在": {
+    "zh": "记录不存在",
+    "en": "Record not found."
+  },
+  "模型配置无效：请检查来源、默认模型、API 协议和 llm 参数。": {
+    "zh": "模型配置无效：请检查来源、默认模型、API 协议和 llm 参数。",
+    "en": "Invalid model configuration. Check the provider, default model, API protocol and llm parameters."
+  },
+  "模型、思考强度或密钥环境变量无效，请检查模型配置。": {
+    "zh": "模型、思考强度或密钥环境变量无效，请检查模型配置。",
+    "en": "Invalid model, reasoning effort or key environment variable. Check model settings."
+  },
+  "Agent 执行失败，请检查模型连接及服务端运行环境。": {
+    "zh": "Agent 执行失败，请检查模型连接及服务端运行环境。",
+    "en": "Agent failed. Check the model connection and server environment."
+  },
+  "操作不存在": {
+    "zh": "操作不存在",
+    "en": "Action not found."
+  },
+  "未知操作": {
+    "zh": "未知操作",
+    "en": "Unknown action."
+  },
+  "Permission": {
+    "zh": "权限",
+    "en": "Permission"
+  },
+  "permission.askDescription": {
+    "zh": "修改文件、执行命令、联网检索及 MCP 操作前询问。",
+    "en": "Ask before file changes, commands, web search and MCP operations."
+  },
+  "permission.allowDescription": {
+    "zh": "自动批准工具调用，包括写入和删除。restricted 下命令仍隔离宿主网络；full-access 下可开放命令网络。未适配 Thread 作用域的 MCP 不会启动。切回 ask 不会停止已运行的操作。",
+    "en": "Auto-approve tool calls, including writes and deletes. Restricted commands remain isolated from host networking; full-access commands may use networking. MCP servers without Thread scoping stay disabled. Switching to ask does not stop running work."
+  },
+  "permission.pending": {
+    "zh": "已排队，将在内核安全边界生效。",
+    "en": "Queued; applies at the next safe boundary in the core."
+  },
+  "permission.saved": {
+    "zh": "权限模式已更新",
+    "en": "Permission mode updated."
+  },
+  "permission.confirmTitle": {
+    "zh": "启用 ALLOW？",
+    "en": "Enable ALLOW?"
+  },
+  "permission.allowWarning": {
+    "zh": "自动批准工具调用，包括写入和删除。restricted 下命令仍隔离宿主网络；full-access 下可开放命令网络。未适配 Thread 作用域的 MCP 不会启动。切回 ask 不会停止已运行的操作。",
+    "en": "Auto-approve tool calls, including writes and deletes. Restricted commands remain isolated from host networking; full-access commands may use networking. MCP servers without Thread scoping stay disabled. Switching to ask does not stop running work."
+  },
+  "permission.typeAllow": {
+    "zh": "输入 ALLOW 确认",
+    "en": "Type ALLOW to confirm"
+  },
+  "permission.enableAllow": {
+    "zh": "启用 ALLOW",
+    "en": "Enable ALLOW"
+  },
+  "请输入 ALLOW 确认自动批准模式": {
+    "zh": "请输入 ALLOW 确认自动批准模式",
+    "en": "Type ALLOW to confirm auto-approve mode."
+  },
+  "请先处理当前交互再切换权限模式": {
+    "zh": "请先处理当前交互再切换权限模式",
+    "en": "Finish the current interaction before changing permission mode."
+  },
+  "upload.drop": {
+    "zh": "松开即可上传文件",
+    "en": "Drop files to upload"
+  },
+  "upload.files": {
+    "zh": "上传文件",
+    "en": "Upload files"
+  },
+  "upload.remove": {
+    "zh": "移除文件 {name}",
+    "en": "Remove file {name}"
+  },
+  "upload.limit": {
+    "zh": "每次最多添加 10 个文件，每个不超过 20MB",
+    "en": "Attach up to 10 files, each no larger than 20MB."
+  },
+  "upload.defaultPrompt": {
+    "zh": "请读取并分析我上传的文件。",
+    "en": "Read and analyze the uploaded files."
+  },
+  "每个文件不能超过 20MB": {
+    "zh": "每个文件不能超过 20MB",
+    "en": "Each file must be no larger than 20MB."
+  },
+  "不能上传空文件": {
+    "zh": "不能上传空文件",
+    "en": "Empty files cannot be uploaded."
+  },
+  "上传文件不存在": {
+    "zh": "上传文件不存在",
+    "en": "Uploaded file not found in this settings."
+  },
+  "上传文件不能重复": {
+    "zh": "上传文件不能重复",
+    "en": "The same file cannot be attached twice."
+  },
+  "文件名无效": {
+    "zh": "文件名无效",
+    "en": "Invalid file name."
+  },
+  "上传目录无效": {
+    "zh": "上传目录无效",
+    "en": "Invalid upload directory."
+  },
+  "model.back": {
+    "zh": "返回模型列表",
+    "en": "Back to models"
+  },
+  "model.editEffort": {
+    "zh": "编辑 {name} 的思考强度",
+    "en": "Edit reasoning effort for {name}"
+  },
+  "usage.cacheHit": {
+    "zh": "缓存命中率",
+    "en": "Cache hit"
+  },
+  "usage.cacheUnavailable": {
+    "zh": "最近一次模型请求未返回可用的缓存统计",
+    "en": "No cache usage was reported for the latest model request."
+  },
+  "usage.cacheDetails": {
+    "zh": "最近一次模型请求：缓存命中 {cached} / 输入 {total} Token",
+    "en": "Latest model request: {cached} cached / {total} input tokens"
+  },
+  "activity.operations": {
+    "zh": "{count} 项操作",
+    "en": "{count} actions"
+  },
+  "activity.action": {
+    "zh": "执行操作",
+    "en": "Perform action"
+  },
+  "activity.external": {
+    "zh": "调用外部服务",
+    "en": "Use external service"
+  },
+  "activity.document": {
+    "zh": "创建文档",
+    "en": "Create document"
+  },
+  "activity.presentation": {
+    "zh": "创建演示文稿",
+    "en": "Create presentation"
+  },
+  "activity.spreadsheet": {
+    "zh": "创建表格",
+    "en": "Create spreadsheet"
+  },
+  "activity.ended": {
+    "zh": "已结束",
+    "en": "Finished"
+  },
+  "activity.command": {
+    "zh": "执行命令",
+    "en": "Command"
+  },
+  "activity.file": {
+    "zh": "文件",
+    "en": "File"
+  },
+  "activity.address": {
+    "zh": "地址",
+    "en": "Address"
+  },
+  "activity.query": {
+    "zh": "搜索内容",
+    "en": "Search query"
+  },
+  "activity.content": {
+    "zh": "操作内容",
+    "en": "Content"
+  },
+  "activity.original": {
+    "zh": "原内容",
+    "en": "Original content"
+  },
+  "activity.replacement": {
+    "zh": "替换内容",
+    "en": "Replacement content"
+  },
+  "activity.operation": {
+    "zh": "1 项操作",
+    "en": "1 action"
+  },
+  "抓取网页": {
+    "zh": "抓取网页",
+    "en": "Fetch web page"
+  },
+  "process.title": {
+    "zh": "工作过程",
+    "en": "Work process"
+  },
+  "process.processing": {
+    "zh": "正在处理",
+    "en": "Processing"
+  },
+  "process.running": {
+    "zh": "运行中",
+    "en": "Running"
+  },
+  "process.thinking": {
+    "zh": "思考",
+    "en": "Thinking"
+  },
+  "process.rememberThoughts": {
+    "zh": "展开或收起思考，将记住你的偏好",
+    "en": "Expand or collapse thinking; your preference is remembered"
+  },
+  "process.progress": {
+    "zh": "执行进度",
+    "en": "Progress"
+  },
+  "process.details": {
+    "zh": "{name}的完整记录",
+    "en": "Full history for {name}"
+  },
+  "process.truncated": {
+    "zh": "结果较长，仅显示前部分内容。",
+    "en": "Long result; showing the first part."
+  },
+  "skills.configureHint": {
+    "zh": "选择启用的内置或已安装技能。技能包含操作指引、脚本和参考资料，保存后用于新会话。",
+    "en": "Enable built-in or installed skills. Instructions, scripts and references load with each skill; saved settings apply to new chats."
+  },
+  "skills.empty": {
+    "zh": "尚未发现已安装的 Skill。",
+    "en": "No installed skills found."
+  },
+  "skills.enable": {
+    "zh": "启用技能 {name}",
+    "en": "Enable skill {name}"
+  },
+  "skills.installed": {
+    "zh": "已安装 · 平台",
+    "en": "Installed · Platform"
+  },
+  "artifacts.title": {
+    "zh": "输出文件",
+    "en": "Output files"
+  },
+  "artifacts.download": {
+    "zh": "点击下载",
+    "en": "Click to download"
+  },
+  "Download": {
+    "zh": "下载",
+    "en": "Download"
+  },
+  "Save": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "docx.preview": {
+    "zh": "文档只读预览",
+    "en": "Read-only document preview"
+  },
+  "docx.close": {
+    "zh": "关闭文档预览",
+    "en": "Close document preview"
+  },
+  "docx.revision": {
+    "zh": "版本 {revision}",
+    "en": "Revision {revision}"
+  },
+  "docx.updating": {
+    "zh": "正在更新…",
+    "en": "Updating…"
+  },
+  "docx.follow": {
+    "zh": "跟随最新修改",
+    "en": "Follow latest changes"
+  },
+  "docx.loadError": {
+    "zh": "文档预览加载失败，可重试或下载查看。",
+    "en": "Preview failed. Retry or download the document."
+  },
+  "docx.retry": {
+    "zh": "重试",
+    "en": "Retry"
+  },
+  "docx.page": {
+    "zh": "第 {page} 页",
+    "en": "Page {page}"
+  },
+  "docx.writing": {
+    "zh": "正在编写",
+    "en": "Writing"
+  },
+  "docx.pending": {
+    "zh": "待视觉检查",
+    "en": "Visual review pending"
+  },
+  "docx.passed": {
+    "zh": "检查通过",
+    "en": "Passed"
+  },
+  "docx.failed": {
+    "zh": "检查失败",
+    "en": "Failed"
+  },
+  "docx.checkFailed": {
+    "zh": "排版检查未完成：",
+    "en": "Layout check incomplete:"
+  },
+  "docx.gate.checkpoint": {
+    "zh": "等待排版检查，完成后继续生成。",
+    "en": "Waiting for a layout checkpoint."
+  },
+  "docx.gate.failed": {
+    "zh": "页面检查失败，正在等待修复与复检。",
+    "en": "Page check failed. Waiting for repairs and recheck."
+  },
+  "docx.gate.visual_pending": {
+    "zh": "严格模式：等待已完成页面的视觉检查。",
+    "en": "Strict mode: awaiting visual review of completed pages."
+  },
+  "docx.layoutNote": {
+    "zh": "预览与页面验收共用 LibreOffice 分页；Microsoft Word 可能存在排版差异。",
+    "en": "Preview and review use LibreOffice pagination; Microsoft Word layout may differ."
+  },
+  "docx.inspectPage": {
+    "zh": "检查第 {page} 页",
+    "en": "Inspect page {page}"
+  },
+  "docx.actualReview": {
+    "zh": "请查看实际渲染页面后填写检查依据。提交仅记录本页视觉审查，不会自动生成新内容。",
+    "en": "Inspect the rendered page and record evidence. This records visual review; it does not resume generation."
+  },
+  "docx.fullPage": {
+    "zh": "打开完整页面截图",
+    "en": "Open full page screenshot"
+  },
+  "docx.reviewNotes": {
+    "zh": "记录排版检查依据或需要修复的问题",
+    "en": "Record layout evidence or issues to fix"
+  },
+  "docx.approve": {
+    "zh": "本页视觉检查通过",
+    "en": "Page visually passed"
+  },
+  "docx.reject": {
+    "zh": "本页需要修复",
+    "en": "Page needs repairs"
+  },
+  "docx.steerAccepted": {
+    "zh": "已接收纠偏，等待当前操作完成后处理。",
+    "en": "Correction received; waiting for the current operation to finish."
+  },
+  "docx.draft": {
+    "zh": "草稿 · 尚未完成全部页面验收",
+    "en": "Draft · page review incomplete"
+  },
+  "docx.finalized": {
+    "zh": "文档已完成验收",
+    "en": "Document finalized"
+  },
+  "docx.paginating": {
+    "zh": "正在排版新版本…",
+    "en": "Paginating the new revision…"
+  },
+  "docx.previewUnavailable": {
+    "zh": "分页预览暂不可用，请检查 LibreOffice 与字体；仍可下载 DOCX。",
+    "en": "Paginated preview unavailable. Check LibreOffice and fonts, or download the DOCX."
+  },
+  "docx.zoom": {
+    "zh": "缩放",
+    "en": "Zoom"
+  },
+  "docx.fitPage": {
+    "zh": "适合整页",
+    "en": "Fit page"
+  },
+  "docx.fitWidth": {
+    "zh": "适合页宽",
+    "en": "Fit width"
+  },
+  "docx.externalConflict": {
+    "zh": "文件被外部操作修改，当前显示最后有效提交；请恢复或检查新文件后继续。",
+    "en": "External file changes detected. Showing the last valid commit; restore or check the new file before continuing."
+  },
+  "滚动到底部": {
+    "zh": "滚动到底部",
+    "en": "Scroll to bottom"
+  },
+  "pptx.preview": {
+    "zh": "PPTX 只读预览",
+    "en": "PPTX read-only preview"
+  },
+  "pptx.close": {
+    "zh": "关闭演示文稿预览",
+    "en": "Close presentation preview"
+  },
+  "pptx.finalized": {
+    "zh": "已定稿",
+    "en": "Finalized"
+  },
+  "pptx.draft": {
+    "zh": "草稿",
+    "en": "Draft"
+  },
+  "pptx.follow": {
+    "zh": "跟随当前幻灯片",
+    "en": "Follow current slide"
+  },
+  "pptx.slides": {
+    "zh": "幻灯片缩略图",
+    "en": "Slide thumbnails"
+  },
+  "pptx.formal": {
+    "zh": "正式渲染",
+    "en": "Formal render"
+  },
+  "pptx.instant": {
+    "zh": "即时预览",
+    "en": "Instant preview"
+  },
+  "pptx.creating": {
+    "zh": "正在初始化幻灯片…",
+    "en": "Initializing slides…"
+  },
+  "pptx.writing": {
+    "zh": "正在制作",
+    "en": "Building"
+  },
+  "pptx.pending": {
+    "zh": "检查通过 · 视觉审查中",
+    "en": "Checks passed · visual review running"
+  },
+  "pptx.blocked": {
+    "zh": "检查失败 · 等待修复",
+    "en": "Check failed · repair required"
+  },
+  "pptx.passed": {
+    "zh": "检查通过",
+    "en": "Passed"
+  },
+  "pptx.visual": {
+    "zh": "视觉审查",
+    "en": "Visual review"
+  },
+  "pptx.inspect": {
+    "zh": "检查正式渲染截图",
+    "en": "Inspect formal screenshot"
+  },
+  "pptx.layout": {
+    "zh": "版式",
+    "en": "Layout"
+  },
+  "pptx.styleUnspecified": {
+    "zh": "未指定",
+    "en": "Not specified"
+  },
+  "pptx.profile": {
+    "zh": "设计风格",
+    "en": "Profile"
+  },
+  "pptx.errors": {
+    "zh": "错误",
+    "en": "Errors"
+  },
+  "pptx.warnings": {
+    "zh": "警告",
+    "en": "Warnings"
+  },
+  "pptx.aesthetic.suggestions": {
+    "zh": "{count} 条建议，由你决定",
+    "en": "{count} suggestions, your call"
+  },
+  "pptx.noCritical": {
+    "zh": "没有严重问题",
+    "en": "No critical issues"
+  },
+  "pptx.delegate": {
+    "zh": "交给 Agent 修复",
+    "en": "Ask the Agent to fix"
+  },
+  "pptx.delegated": {
+    "zh": "已交给 Agent",
+    "en": "Sent to the Agent"
+  },
+  "pptx.fixRequest": {
+    "zh": "请修复第 {pages} 页的视觉问题 {id}：{observation}。建议：{suggestion}",
+    "en": "Please fix visual issue {id} on slide {pages}: {observation}. Suggestion: {suggestion}"
+  },
+  "pptx.error.no_vision_model": {
+    "zh": "没有可读取图片的模型",
+    "en": "No image-capable model"
+  },
+  "pptx.error.timeout": {
+    "zh": "模型响应超时",
+    "en": "Model timed out"
+  },
+  "pptx.error.invalid_json": {
+    "zh": "模型回复不是可解析的 JSON",
+    "en": "Model reply was not parseable JSON"
+  },
+  "pptx.previewError": {
+    "zh": "本版本预览生成失败：",
+    "en": "Preview generation failed for this revision:"
+  },
+  "pptx.error.schema_invalid": {
+    "zh": "模型回复格式不完整或不符合审查结构",
+    "en": "Model reply was incomplete or did not match the review schema"
+  },
+  "pptx.error.provider_error": {
+    "zh": "模型服务调用出错",
+    "en": "Model provider error"
+  },
+  "pptx.error.image_missing": {
+    "zh": "截图缺失",
+    "en": "Screenshot missing"
+  },
+  "pptx.error.unsupported_chart_renderer": {
+    "zh": "当前预览器无法准确显示此原生图表，请在 PowerPoint 中核对",
+    "en": "Verify this native chart in PowerPoint; the current preview renderer is not authoritative"
+  },
+  "pptx.error.render_failed": {
+    "zh": "截图渲染失败",
+    "en": "Screenshot rendering failed"
+  },
+  "pptx.error.snapshot_mismatch": {
+    "zh": "修订文件校验不一致",
+    "en": "Revision hash mismatch"
+  },
+  "pptx.advisories": {
+    "zh": "建议",
+    "en": "Advisories"
+  },
+  "pptx.needs_attention": {
+    "zh": "存在严重视觉问题 · 不阻塞交付",
+    "en": "Critical visual issue · does not block delivery"
+  },
+  "pptx.technical": {
+    "zh": "确定性检查",
+    "en": "Deterministic checks"
+  },
+  "pptx.integrity": {
+    "zh": "渲染完整性",
+    "en": "Render integrity"
+  },
+  "pptx.aesthetic": {
+    "zh": "模型视觉审查",
+    "en": "Model visual review"
+  },
+  "pptx.aesthetic.pending": {
+    "zh": "审查中",
+    "en": "Reviewing"
+  },
+  "pptx.aesthetic.passed": {
+    "zh": "通过",
+    "en": "Passed"
+  },
+  "pptx.aesthetic.failed": {
+    "zh": "未通过",
+    "en": "Failed"
+  },
+  "pptx.aesthetic.uncertain": {
+    "zh": "无法确认 · 仅供参考",
+    "en": "Uncertain · for reference only"
+  },
+  "pptx.aesthetic.unavailable": {
+    "zh": "未获得有效审查结果",
+    "en": "No usable review result"
+  },
+  "pptx.check.passed": {
+    "zh": "通过",
+    "en": "Passed"
+  },
+  "pptx.check.failed": {
+    "zh": "未通过",
+    "en": "Failed"
+  },
+  "pptx.check.unavailable": {
+    "zh": "未渲染",
+    "en": "Not rendered"
+  },
+  "pptx.severity.critical": {
+    "zh": "严重",
+    "en": "Critical"
+  },
+  "pptx.severity.major": {
+    "zh": "重大",
+    "en": "Major"
+  },
+  "pptx.severity.minor": {
+    "zh": "优化建议",
+    "en": "Minor"
+  },
+  "pptx.reason": {
+    "zh": "依据",
+    "en": "Reason"
+  },
+  "pptx.suggestion": {
+    "zh": "建议修改",
+    "en": "Suggestion"
+  },
+  "pptx.confidence": {
+    "zh": "置信度 {value}",
+    "en": "Confidence {value}"
+  },
+  "pptx.elementsRef": {
+    "zh": "元素 {ids}",
+    "en": "Elements {ids}"
+  },
+  "pptx.unmapped": {
+    "zh": "模型给出的元素 ID 不存在：{ids}",
+    "en": "Model referenced unknown element IDs: {ids}"
+  },
+  "pptx.needsVerification": {
+    "zh": "待验证",
+    "en": "Needs verification"
+  },
+  "pptx.dismissed": {
+    "zh": "已人工驳回",
+    "en": "Dismissed by reviewer"
+  },
+  "pptx.dismiss": {
+    "zh": "驳回此问题",
+    "en": "Dismiss issue"
+  },
+  "pptx.model": {
+    "zh": "模型 {model} · 提示词 {prompt}",
+    "en": "Model {model} · prompt {prompt}"
+  },
+  "pptx.reviewError": {
+    "zh": "原因：{code}",
+    "en": "Reason: {code}"
+  },
+  "pptx.autoRepairStopped": {
+    "zh": "严重问题经两轮修复仍存在，已停止自动修复，等待你的判断。",
+    "en": "A critical issue survived two repair rounds; auto-repair stopped and awaits your decision."
+  },
+  "pptx.noIssues": {
+    "zh": "模型未发现问题",
+    "en": "No issues reported by the model"
+  },
+  "pptx.constraints": {
+    "zh": "用户版式约束：{items}",
+    "en": "User layout constraints: {items}"
+  },
+  "pptx.deckReview": {
+    "zh": "整套视觉一致性审查",
+    "en": "Deck visual consistency review"
+  },
+  "pptx.requestDeck": {
+    "zh": "审查整套一致性",
+    "en": "Review deck consistency"
+  },
+  "pptx.deckNotRequested": {
+    "zh": "尚未进行整套审查",
+    "en": "Deck review not requested yet"
+  },
+  "pptx.pages": {
+    "zh": "第 {pages} 页",
+    "en": "Slides {pages}"
+  },
+  "pptx.rejectedIssues": {
+    "zh": "{count} 条笼统或越界的意见已被拒收",
+    "en": "{count} vague or out-of-range findings were rejected"
+  },
+  "pptx.verified": {
+    "zh": "定稿已核验",
+    "en": "Finalization verified"
+  },
+  "pptx.unverified": {
+    "zh": "定稿未通过宿主核验",
+    "en": "Finalization failed host verification"
+  },
+  "pptx.agentNote": {
+    "zh": "Agent 自查（不作为验收依据）：{notes}",
+    "en": "Agent self-check (not acceptance): {notes}"
+  },
+  "Features": {
+    "zh": "扩展功能",
+    "en": "Features"
+  },
+  "features.explain": {
+    "zh": "DOCX 和 PPTX 独立安装、停用或卸载。卸载不会删除已生成的文件和版本。",
+    "en": "DOCX and PPTX can be installed, disabled or removed independently. Existing files and versions are preserved."
+  },
+  "features.uninstalled": {
+    "zh": "已卸载",
+    "en": "Uninstalled"
+  },
+  "features.install": {
+    "zh": "安装",
+    "en": "Install"
+  },
+  "features.enable": {
+    "zh": "启用",
+    "en": "Enable"
+  },
+  "features.disable": {
+    "zh": "停用",
+    "en": "Disable"
+  },
+  "features.uninstall": {
+    "zh": "卸载",
+    "en": "Uninstall"
+  },
+  "process.summary": {
+    "zh": "执行摘要",
+    "en": "Execution summary"
+  },
+  "process.input": {
+    "zh": "输入",
+    "en": "Input"
+  },
+  "process.output": {
+    "zh": "流式输出",
+    "en": "Streamed output"
+  },
+  "process.result": {
+    "zh": "执行结果",
+    "en": "Result"
+  },
+  "process.waitingOutput": {
+    "zh": "正在执行，等待输出…",
+    "en": "Running, waiting for output…"
+  },
+  "process.waitingSummary": {
+    "zh": "正在整理摘要…",
+    "en": "Preparing summary…"
+  },
+  "process.waitingStep": {
+    "zh": "正在等待下一步进展…",
+    "en": "Waiting for the next step…"
+  },
+  "process.durationUnknown": {
+    "zh": "耗时未知",
+    "en": "Duration unavailable"
+  },
+  "process.seconds": {
+    "zh": "{seconds} 秒",
+    "en": "{seconds}s"
+  },
+  "process.minutesSeconds": {
+    "zh": "{minutes} 分 {seconds} 秒",
+    "en": "{minutes}m {seconds}s"
+  },
+  "process.steps": {
+    "zh": "{count} 个步骤",
+    "en": "{count} steps"
+  },
+  "process.status.paused": {
+    "zh": "已暂停",
+    "en": "Paused"
+  },
+  "process.status.runtime_config_boundary": {
+    "zh": "等待继续",
+    "en": "Waiting to continue"
+  },
+  "process.status.pending": {
+    "zh": "等待中",
+    "en": "Pending"
+  },
+  "process.status.running": {
+    "zh": "执行中",
+    "en": "Running"
+  },
+  "process.status.completed": {
+    "zh": "成功",
+    "en": "Success"
+  },
+  "process.status.failed": {
+    "zh": "失败",
+    "en": "Failed"
+  },
+  "process.status.cancelled": {
+    "zh": "已取消",
+    "en": "Cancelled"
+  },
+  "process.status.interrupted": {
+    "zh": "已中断",
+    "en": "Interrupted"
+  },
+  "process.task.queued": {
+    "zh": "排队中",
+    "en": "Queued"
+  },
+  "process.task.running": {
+    "zh": "执行中",
+    "en": "Running"
+  },
+  "process.task.completed": {
+    "zh": "任务完成",
+    "en": "Task completed"
+  },
+  "process.task.failed": {
+    "zh": "任务失败",
+    "en": "Task failed"
+  },
+  "process.task.cancelled": {
+    "zh": "任务取消",
+    "en": "Task cancelled"
+  },
+  "process.task.interrupted": {
+    "zh": "任务中断",
+    "en": "Task interrupted"
+  },
+  "process.task.waiting_confirmation": {
+    "zh": "等待审批",
+    "en": "Awaiting approval"
+  },
+  "process.task.waiting_human": {
+    "zh": "等待回复",
+    "en": "Awaiting input"
+  },
+  "process.task.paused": {
+    "zh": "任务暂停",
+    "en": "Task paused"
+  },
+  "process.task.runtime_config_boundary": {
+    "zh": "等待继续",
+    "en": "Awaiting resume"
+  },
+  "Loading…": {
+    "zh": "加载中…",
+    "en": "Loading…"
+  },
+  "YOUR CHATS": {
+    "zh": "全部会话",
+    "en": "YOUR CHATS"
+  },
+  "配置模型，即可使用 Deep Agent 的完整能力": {
+    "zh": "配置模型，即可在设置使用 Deep Agent 的完整能力",
+    "en": "Set up a model to use Deep Agent in your settings"
+  },
+  "Ready to start": {
+    "zh": "已就绪，可以开始了",
+    "en": "Ready to start"
+  },
+  "Agent settings": {
+    "zh": "Agent 设置",
+    "en": "Agent settings"
+  },
+  "Files": {
+    "zh": "会话文件",
+    "en": "Thread files"
+  },
+  "Local environment": {
+    "zh": "本地环境",
+    "en": "Local environment"
+  },
+  "Additional tools": {
+    "zh": "设置工具",
+    "en": "Agent tools"
+  },
+  "没有额外的 Office 工具，仍可使用上方内核工具。": {
+    "zh": "此设置没有额外的 Office 工具，仍可使用上方内核工具。",
+    "en": "No extra Office tools in this settings. Core tools remain available above."
+  },
+  "skills.configured": {
+    "zh": "已配置的技能",
+    "en": "Configured skill"
+  },
+  "设置已保存；新会话使用新配置": {
+    "zh": "设置已保存；新会话使用新配置",
+    "en": "Settings saved; new chats use the updated configuration"
+  },
+  "sandbox.independentPermission": {
+    "zh": "工具审批与文件系统隔离独立；allow 不会自动开启 full-access。",
+    "en": "Tool approval is independent of filesystem isolation. Allow does not enable full-access."
+  },
+  "当前会话的文件库": {
+    "zh": "当前会话独享的文件库",
+    "en": "Private file library for the current Thread"
+  },
+  "sandbox.mcpScope": {
+    "zh": "MCP 配置可保留。通用宿主 MCP 服务尚无 Thread 作用域适配，因此当前不会启动；不会把宿主访问能力当作沙箱内工具。",
+    "en": "MCP configuration is retained. Generic host MCP servers are not started until a Thread-scoped adapter is available; host access is not treated as sandboxed."
+  },
+  "human.other": {
+    "zh": "其他",
+    "en": "Other"
+  },
+  "human.otherAnswer": {
+    "zh": "{field}：其他回复",
+    "en": "{field}: custom answer"
+  },
+  "human.otherPlaceholder": {
+    "zh": "请填写你的回复…",
+    "en": "Enter your answer…"
+  },
+  "usage.context": {
+    "zh": "上下文 {used} / {limit} Token",
+    "en": "Context {used} / {limit} tokens"
+  },
+  "usage.output": {
+    "zh": "输出 {count} Token",
+    "en": "Output {count} tokens"
+  },
+  "usage.latestRequest": {
+    "zh": "最近一次模型请求的输入用量 / 模型上下文窗口",
+    "en": "Latest model request input usage / model context window"
+  },
+  "skills.bundled": {
+    "zh": "内置技能",
+    "en": "Built-in skill"
+  },
+  "artifacts.preview": {
+    "zh": "点击预览",
+    "en": "Preview"
+  },
+  "artifacts.select": {
+    "zh": "选择预览文件",
+    "en": "Select preview file"
+  },
+  "artifacts.previewUnavailable": {
+    "zh": "此文件的预览暂不可用，可下载查看。",
+    "en": "Preview is unavailable for this file. You can download it."
+  },
+  "pptx.automatic": {
+    "zh": "自动检查",
+    "en": "Automatic checks"
+  },
+  "pptx.issueCount": {
+    "zh": "{count} 个问题",
+    "en": "{count} issues"
+  },
+  "pptx.severity.ungraded": {
+    "zh": "未分级",
+    "en": "Unrated"
+  },
+  "pptx.reviewState.not_requested": {
+    "zh": "未检查",
+    "en": "Not checked"
+  },
+  "pptx.reviewState.waiting": {
+    "zh": "等待自动检查",
+    "en": "Waiting for automatic checks"
+  },
+  "pptx.reviewState.pending": {
+    "zh": "检查中",
+    "en": "Checking"
+  },
+  "pptx.reviewState.passed": {
+    "zh": "通过",
+    "en": "Passed"
+  },
+  "pptx.reviewState.failed": {
+    "zh": "未通过",
+    "en": "Failed"
+  },
+  "pptx.reviewState.unavailable": {
+    "zh": "检查不可用",
+    "en": "Check unavailable"
+  },
+  "pptx.reviewState.uncertain": {
+    "zh": "待核实",
+    "en": "Needs verification"
+  },
+  "pptx.aesthetic.stale": {
+    "zh": "审查已过期",
+    "en": "Review outdated"
+  },
+  "pptx.reviewState.stale": {
+    "zh": "审查已过期",
+    "en": "Review outdated"
+  },
+  "pptx.reviewVersions": {
+    "zh": "审查版本 {reviewed} · 当前版本 {current}",
+    "en": "Reviewed revision {reviewed} · Current revision {current}"
+  },
+  "pptx.reviewExpired": {
+    "zh": "PPT 已在该次审查后修改，此结果仅供历史参考，需要针对当前版本重新审查。",
+    "en": "The PPT changed after this review. This result is historical; review the current revision again."
+  },
+  "pptx.error.snapshot_expired": {
+    "zh": "审查所需快照已超出当前版和前一版的保留范围，需针对当前版本重新检查",
+    "en": "The reviewed snapshot expired under two-revision retention; check the current revision again"
+  },
+  "filePreview.title": {
+    "zh": "文件预览",
+    "en": "File preview"
+  },
+  "filePreview.close": {
+    "zh": "关闭文件预览",
+    "en": "Close file preview"
+  },
+  "filePreview.image": {
+    "zh": "图片",
+    "en": "Image"
+  },
+  "filePreview.text": {
+    "zh": "文本",
+    "en": "Text"
+  },
+  "filePreview.failed": {
+    "zh": "预览失败，请下载文件查看或重试。",
+    "en": "Preview failed. Download the file or try again."
+  },
+  "filePreview.source": {
+    "zh": "查看源码",
+    "en": "View source"
+  },
+  "filePreview.rendered": {
+    "zh": "查看排版",
+    "en": "View rendered"
+  },
+  "filePreview.zoomOut": {
+    "zh": "缩小图片",
+    "en": "Zoom out"
+  },
+  "filePreview.zoomIn": {
+    "zh": "放大图片",
+    "en": "Zoom in"
+  },
+  "filePreview.refresh": {
+    "zh": "刷新",
+    "en": "Refresh"
+  },
+  "filePreview.loading": {
+    "zh": "正在加载预览…",
+    "en": "Loading preview…"
+  },
+  "docx.pages": {
+    "zh": "文档页面",
+    "en": "Document pages"
+  },
+  "docx.changedPages": {
+    "zh": "已更新第 {pages} 页",
+    "en": "Updated page {pages}"
+  }
+}

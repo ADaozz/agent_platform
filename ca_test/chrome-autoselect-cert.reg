@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; 仅自动选择 CN=user 的签名证，避免误选 encrypt 证
+; 双击导入后重启 Chrome
+
+[HKEY_CURRENT_USER\SOFTWARE\Policies\Google\Chrome\AutoSelectCertificateForUrls]
+"1"="{\"pattern\":\"https://10.8.40.225:8443\",\"filter\":{\"SUBJECT\":{\"CN\":\"user\"},\"ISSUER\":{\"CN\":\"personalDemo Intermediate CA\",\"O\":\"personalDemo\",\"C\":\"CN\"}}}"

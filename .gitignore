@@ -1,14 +1,23 @@
-.venv/
-__pycache__/
-.pytest_cache/
-.platform/
-.platform-*/
-.env
-frontend/node_modules/
-platform_app/web/
-*:Zone.Identifier
+# 编辑器 / IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
 
-frontend/test-results/
+# 构建产物与依赖
+target/
+dist/
+node_modules/
+logs/
+*.log
 
-# User-provided templates have no recorded redistribution grant.
-pptx-ooxml-skill/templates/local-*/
+# 私钥、证书包等敏感材料（公开仓库禁止提交）
+*.key
+*.p12
+*.pfx
+*.pem
+*.csr
+*.srl
+backend/docs/API-test.txt
+application-local.yml

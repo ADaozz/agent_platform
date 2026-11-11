@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "personalDemo 系统架构",
+    "output": "personal-demo-architecture.html",
+    "quality_profile": "showcase",
+    "locale": "zh-CN",
+    "viewBox": [1000, 700],
+    "views": [
+      {
+        "id": "login-api",
+        "label": "账密登录与 API",
+        "focus": ["users", "frontend", "nginx", "backend", "database"],
+        "note": "443 端口：Vue SPA 与 REST API，JWT Bearer 鉴权。"
+      },
+      {
+        "id": "security",
+        "label": "安全链路",
+        "focus": ["users", "nginx", "backend", "security", "database"],
+        "note": "JwtFilter → UserRealm → PermissionAspect，会话存 sys_login_session。"
+      },
+      {
+        "id": "mtls",
+        "label": "证书登录",
+        "focus": ["users", "nginx", "ca", "backend", "database"],
+        "note": "8443 专口 mTLS，Nginx 验链后后端匹配指纹白名单。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "用户浏览器",
+      "sublabel": "Chrome / Edge",
+      "pos": [60, 260],
+      "size": [120, 60]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Vue SPA",
+      "sublabel": "frontEnd :443",
+      "pos": [240, 260],
+      "size": [130, 60]
+    },
+    {
+      "id": "nginx",
+      "type": "cloud",
+      "label": "Nginx",
+      "sublabel": ":443 / :8443",
+      "pos": [440, 260],
+      "size": [130, 60]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "Spring Boot",
+      "sublabel": "backend :8080",
+      "pos": [640, 260],
+      "size": [140, 60]
+    },
+    {
+      "id": "security",
+      "type": "security",
+      "label": "JWT + Shiro",
+      "sublabel": "RBAC 授权",
+      "pos": [640, 90],
+      "size": [140, 64],
+      "tag": "jti 会话校验"
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "KingbaseES",
+      "sublabel": "RBAC · 会话 · 证书",
+      "pos": [820, 260],
+      "size": [130, 60]
+    },
+    {
+      "id": "ca",
+      "type": "security",
+      "label": "私有 CA",
+      "sublabel": "sign / encrypt 证",
+      "pos": [440, 440],
+      "size": [130, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "应用服务层",
+      "wraps": ["nginx", "backend", "security", "database"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "users-spa",
+      "from": "users",
+      "to": "frontend",
+      "label": "HTTPS :443",
+      "variant": "emphasis",
+      "labelDy": -24
+    },
+    {
+      "id": "spa-api",
+      "from": "frontend",
+      "to": "nginx",
+      "label": "/api/* 代理"
+    },
+    {
+      "id": "nginx-backend",
+      "from": "nginx",
+      "to": "backend",
+      "label": "反向代理"
+    },
+    {
+      "id": "auth-stack",
+      "from": "security",
+      "to": "backend",
+      "label": "Filter + Realm",
+      "variant": "security",
+      "labelDy": 24
+    },
+    {
+      "id": "backend-db",
+      "from": "backend",
+      "to": "database",
+      "label": "MyBatis-Plus",
+      "labelAt": [800, 256]
+    },
+    {
+      "id": "users-mtls",
+      "from": "users",
+      "to": "nginx",
+      "label": "mTLS :8443",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [[120, 400], [505, 400]],
+      "labelDy": 54
+    },
+    {
+      "id": "ca-chain",
+      "from": "ca",
+      "to": "nginx",
+      "label": "PKI 链校验",
+      "variant": "dashed"
+    },
+    {
+      "id": "cert-fingerprint",
+      "from": "backend",
+      "to": "database",
+      "label": "指纹白名单",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [[710, 400], [885, 400]],
+      "labelDy": 54
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "前端",
+      "items": [
+        "Vue 3 SPA 托管于 443",
+        "账密登录 POST /login，Bearer token 调 API",
+        "证书登录整页跳转 8443，hash 回传 token"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "后端",
+      "items": [
+        "Spring Boot 2.6 + MyBatis-Plus",
+        "JWT jti 绑定 sys_login_session 单点登录",
+        "@RequiresPermissions + PermissionAspect RBAC"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "安全",
+      "items": [
+        "443 不做 mTLS；8443 ssl_verify_client on",
+        "Nginx 注入 X-Client-Cert，后端匹配 sys_user_cert",
+        "BouncyCastle 签发 sign/encrypt 客户端证"
+      ]
+    }
+  ]
+}
