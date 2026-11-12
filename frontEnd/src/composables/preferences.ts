@@ -80,6 +80,23 @@ const EN: Record<string, string> = {
   取消: 'Cancel',
   确定: 'OK',
   '处理中…': 'Working…',
+  // 登录页
+  '智能体工作平台 · 对话、执行与交付在同一座控制台完成': 'One console for conversation, execution and delivery',
+  使用平台账号或客户端证书进入工作区: 'Sign in with your platform account or client certificate',
+  用户名: 'Username',
+  请输入用户名: 'Enter your username',
+  密码: 'Password',
+  请输入密码: 'Enter your password',
+  '登 录': 'Sign in',
+  '登录中…': 'Signing in…',
+  或: 'or',
+  证书登录: 'Sign in with certificate',
+  '证书登录中…': 'Signing in with certificate…',
+  证书登录成功: 'Signed in with certificate',
+  证书登录失败: 'Certificate sign-in failed',
+  请输入用户名和密码: 'Enter your username and password',
+  登录成功: 'Signed in',
+  '未检测到客户端证书，请确认已导入 sign.p12': 'No client certificate found. Make sure sign.p12 is imported.',
 }
 
 export function tr(text: string) {

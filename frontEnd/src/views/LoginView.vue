@@ -9,6 +9,8 @@ import BrandMark from '@/components/BrandMark.vue'
 import OrbitDial from '@/components/OrbitDial.vue'
 import SpaceField from '@/components/SpaceField.vue'
 import TapeMask from '@/components/TapeMask.vue'
+import TopbarControls from '@/components/TopbarControls.vue'
+import { tr } from '@/composables/preferences'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -38,7 +40,7 @@ function parseLoginPayload(json: string): LoginResult {
 onMounted(() => {
   const certError = route.query.certError as string | undefined
   if (certError) {
-    toast.error(CERT_ERROR_MESSAGES[certError] ?? decodeURIComponent(certError))
+    toast.error(CERT_ERROR_MESSAGES[certError] ? tr(CERT_ERROR_MESSAGES[certError]) : decodeURIComponent(certError))
     router.replace({ path: '/login' })
   }
 
@@ -49,24 +51,24 @@ onMounted(() => {
     const data = parseLoginPayload(decodeBase64Url(match[1]!))
     auth.persistLogin(data)
     history.replaceState(null, '', location.pathname + location.search)
-    toast.success('证书登录成功')
+    toast.success(tr('证书登录成功'))
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
   } catch {
     history.replaceState(null, '', location.pathname)
-    toast.error('证书登录失败')
+    toast.error(tr('证书登录失败'))
   }
 })
 
 async function handleLogin() {
   if (!userName.value.trim() || !passWord.value) {
-    toast.error('请输入用户名和密码')
+    toast.error(tr('请输入用户名和密码'))
     return
   }
   loading.value = true
   try {
     await auth.login(userName.value.trim(), passWord.value)
-    toast.success('登录成功')
+    toast.success(tr('登录成功'))
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch {
@@ -95,7 +97,7 @@ function handleCertLogin() {
 
       <div class="login-hero-copy">
         <div class="login-wordmark" aria-hidden="true">DEEP<br />AGENT</div>
-        <p class="login-slogan">智能体工作平台 · 对话、执行与交付在同一座控制台完成</p>
+        <p class="login-slogan">{{ tr('智能体工作平台 · 对话、执行与交付在同一座控制台完成') }}</p>
       </div>
 
       <p class="login-credit">
@@ -107,48 +109,49 @@ function handleCertLogin() {
 
     <!-- 右：身份验证表单（跟随主题） -->
     <section class="login-pane dot-grid">
+      <TopbarControls class="login-controls" />
       <div class="login-form-wrap">
         <div class="login-mobile-brand">
           <BrandMark :size="40" />
         </div>
         <h1 class="login-title">Agent Platform</h1>
-        <p class="login-sub">使用平台账号或客户端证书进入工作区</p>
+        <p class="login-sub">{{ tr('使用平台账号或客户端证书进入工作区') }}</p>
 
         <form class="mt-8 space-y-4" @submit.prevent="handleLogin">
           <div>
-            <label class="form-label" for="username">用户名</label>
+            <label class="form-label" for="username">{{ tr('用户名') }}</label>
             <input
               id="username"
               v-model="userName"
               class="input login-input"
               type="text"
-              placeholder="请输入用户名"
+              :placeholder="tr('请输入用户名')"
               maxlength="64"
               autocomplete="username"
             />
           </div>
           <div>
-            <label class="form-label" for="password">密码</label>
+            <label class="form-label" for="password">{{ tr('密码') }}</label>
             <input
               id="password"
               v-model="passWord"
               class="input login-input"
               type="password"
-              placeholder="请输入密码"
+              :placeholder="tr('请输入密码')"
               maxlength="128"
               autocomplete="current-password"
             />
           </div>
           <button class="btn-primary login-submit" type="submit" :disabled="loading || certLoading">
-            <span>{{ loading ? '登录中…' : '登 录' }}</span>
+            <span>{{ tr(loading ? '登录中…' : '登 录') }}</span>
           </button>
         </form>
 
-        <div class="login-divider"><span>或</span></div>
+        <div class="login-divider"><span>{{ tr('或') }}</span></div>
 
         <button class="btn-ghost login-cert" type="button" :disabled="loading || certLoading" @click="handleCertLogin">
           <AppIcon name="verified_user" class="!text-[17px]" />
-          {{ certLoading ? '证书登录中…' : '证书登录' }}
+          {{ tr(certLoading ? '证书登录中…' : '证书登录') }}
         </button>
 
         <p class="login-foot">© 2026 Agent Workspace</p>
@@ -266,10 +269,16 @@ function handleCertLogin() {
 }
 
 .login-pane {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.5rem;
+}
+.login-controls {
+  position: absolute;
+  top: 0.75rem;
+  right: 1.5rem;
 }
 .login-form-wrap {
   width: 100%;

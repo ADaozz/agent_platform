@@ -2,10 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { locale, theme, toggleLocale, toggleTheme, tr } from '@/composables/preferences'
+import { tr } from '@/composables/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import AgentNav from '@/components/AgentNav.vue'
 import BrandMark from '@/components/BrandMark.vue'
+import TopbarControls from '@/components/TopbarControls.vue'
 import SessionDeleteConfirm from '@/components/SessionDeleteConfirm.vue'
 import type { IconName } from '@/icons'
 
@@ -47,25 +48,6 @@ function closeSidebar() {
   sidebarTimer = setTimeout(() => (sidebarOpen.value = false), 150)
 }
 onUnmounted(() => clearTimeout(sidebarTimer))
-
-// 页头的本地时钟读数（分钟精度）
-const clock = ref('')
-const zone = (() => {
-  const offset = -new Date().getTimezoneOffset()
-  const hours = Math.trunc(offset / 60)
-  const minutes = Math.abs(offset % 60)
-  return `UTC${offset >= 0 ? '+' : '-'}${Math.abs(hours)}${minutes ? ':' + String(minutes).padStart(2, '0') : ''}`
-})()
-function tick() {
-  const now = new Date()
-  clock.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-}
-let clockTimer: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
-  tick()
-  clockTimer = setInterval(tick, 15000)
-})
-onUnmounted(() => clearInterval(clockTimer))
 
 // 「平台设置」点击展开/收起；当前页面属于该分组时默认展开
 const settingsOpen = ref(settingsActive.value)
@@ -165,31 +147,7 @@ function handleLogout() {
             <span class="topbar-current truncate">{{ tr(currentTitle) }}</span>
           </div>
         </div>
-        <div class="flex shrink-0 items-center gap-1.5">
-          <div class="topbar-clock" :title="zone">
-            <span class="topbar-clock-time">{{ clock }}</span>
-            <span>{{ zone }}</span>
-          </div>
-          <button
-            type="button"
-            class="topbar-toggle topbar-locale"
-            :title="tr('切换语言')"
-            :aria-label="tr('切换语言')"
-            @click="toggleLocale"
-          >
-            {{ locale === 'zh' ? '中' : 'EN' }}
-          </button>
-          <button
-            type="button"
-            class="topbar-toggle"
-            :title="tr(theme === 'dark' ? '切换为白天模式' : '切换为黑夜模式')"
-            :aria-label="tr(theme === 'dark' ? '切换为白天模式' : '切换为黑夜模式')"
-            :aria-pressed="theme === 'dark'"
-            @click="toggleTheme"
-          >
-            <AppIcon :name="theme === 'dark' ? 'dark_mode' : 'light_mode'" class="!text-[17px]" />
-          </button>
-        </div>
+        <TopbarControls />
       </header>
       <main class="min-h-0 flex-1 overflow-y-auto" :class="route.path === '/agent' ? 'p-0' : 'page-canvas dot-grid'">
         <RouterView />
@@ -386,23 +344,6 @@ function handleLogout() {
   border-bottom: 1px solid var(--color-line);
   background-color: var(--color-page);
 }
-.topbar-toggle {
-  display: inline-flex;
-  height: 2rem;
-  width: 2rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  color: var(--color-ink-muted);
-  transition:
-    background-color 0.16s,
-    color 0.16s;
-}
-.topbar-toggle:hover {
-  background-color: var(--glass-strong);
-  color: var(--color-ink);
-}
 .topbar-path {
   display: flex;
   min-width: 0;
@@ -419,40 +360,15 @@ function handleLogout() {
   font-weight: 600;
   color: var(--color-ink);
 }
-.topbar-clock {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-right: 0.375rem;
-  padding-right: 0.875rem;
-  border-right: 1px solid var(--color-line);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--color-ink-faint);
-}
-.topbar-clock-time {
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-ink-secondary);
-}
 @media (max-width: 720px) {
   .topbar {
     padding: 0 0.875rem;
-  }
-  .topbar-clock {
-    display: none;
   }
   .topbar-path > :not(.topbar-current) {
     display: none;
   }
 }
 
-.topbar-locale {
-  font-size: 12.5px;
-  font-weight: 600;
-}
 
 .page-canvas {
   padding: 1.75rem 2rem 2.5rem;
