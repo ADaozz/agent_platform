@@ -60,6 +60,10 @@ def test_middleware_enforces_owner_and_admin_config(monkeypatch):
     def get_session(session_id: str):
         return {'id': session_id, 'owner': itam_bridge.owner()}
 
+    @app.post('/api/agent/sessions/{session_id}/fork')
+    def fork_session(session_id: str):
+        return {'id': session_id}
+
     @app.put('/api/models')
     def save_models():
         return {'ok': True}
@@ -82,6 +86,11 @@ def test_middleware_enforces_owner_and_admin_config(monkeypatch):
         assert ok.status_code == 200 and ok.json()['owner'] == '1001'
         path = '/api/agent/sessions/other'
         assert client.get(path, headers=signed('GET', path)).status_code == 404
+        # Branching reads the source session, so it is owner-scoped like every session route.
+        path = '/api/agent/sessions/other/fork'
+        assert client.post(path, headers=signed('POST', path)).status_code == 404
+        path = '/api/agent/sessions/own/fork'
+        assert client.post(path, headers=signed('POST', path)).status_code == 200
         path = '/api/models'
         assert client.put(path, headers=signed('PUT', path, role='user')).status_code == 403
         assert client.put(path, headers=signed('PUT', path, role='admin')).status_code == 200

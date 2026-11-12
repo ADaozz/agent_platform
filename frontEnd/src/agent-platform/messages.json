@@ -2070,5 +2070,33 @@
   "pptx.deckReviewRequest": {
     "zh": "请对 {path} 的当前版本做整套视觉一致性审查：如没有待处理的整套审查，先运行 request-deck-review；再运行 review-images，用 read_file 查看整套缩略图 deck.sheet，最后用 submit-review 提交整套审查。审查结果只作建议，不要据此修改 PPT。",
     "en": "Please review deck consistency for the current revision of {path}: run request-deck-review if no deck review is pending, run review-images, open deck.sheet with read_file, then submit the deck review with submit-review. Findings are advice only; do not edit the PPT because of them."
+  },
+  "复制": {
+    "zh": "复制",
+    "en": "Copy"
+  },
+  "已复制": {
+    "zh": "已复制",
+    "en": "Copied"
+  },
+  "复制失败": {
+    "zh": "复制失败",
+    "en": "Copy failed"
+  },
+  "从这里创建分支": {
+    "zh": "从这里创建分支",
+    "en": "Branch from here"
+  },
+  "分支已创建": {
+    "zh": "分支已创建",
+    "en": "Branch created"
+  },
+  "分支": {
+    "zh": "分支",
+    "en": "Branch"
+  },
+  "（分支）": {
+    "zh": "（分支）",
+    "en": " (branch)"
   }
 }

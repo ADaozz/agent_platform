@@ -60,6 +60,8 @@ class CoreModel(BaseChatModel):
         elif text == 'remember the first request':
             assert any(isinstance(message, HumanMessage) and message.content == 'write a file' for message in messages)
             msg = AIMessage(content='Conversation restored from the native checkpoint.')
+        elif text == 'what came before':
+            msg = AIMessage(content='History: ' + ' | '.join(str(message.content) for message in messages if isinstance(message, HumanMessage)))
         elif text == 'cached answer':
             msg = AIMessage(content='Cached response.', usage_metadata={'input_tokens': 1000, 'output_tokens': 10, 'total_tokens': 1010, 'input_token_details': {'cache_read': 750}})
         else:
@@ -225,6 +227,85 @@ def test_completed_session_journal_retains_streams_and_persisted_timestamps(clie
     for event in events:
         assert datetime.fromisoformat(event['occurred_at']).tzinfo is not None
     assert client.get(f'/api/agent/sessions/{session_id}/journal').json()['events']==events
+
+
+def fork_journal(client, session_id):
+    return client.get(f'/api/agent/sessions/{session_id}/journal').json()['events']
+
+
+def test_fork_resumes_from_the_turn_checkpoint_with_its_history(client):
+    source = new_session(client)
+    for text in ('first question', 'second question'):
+        assert client.post(f'/api/agent/sessions/{source}/messages', json={'text': text}).status_code == 202
+    (d.files_root(source) / 'notes.txt').write_text('kept', encoding='utf-8')
+    # Page renders are cached by the document store's absolute path.
+    import hashlib
+    key = lambda path: hashlib.sha256(str(path).encode()).hexdigest()
+    origin = rt.resolve(source)
+    store = origin.files_root / '.docx-state' / 'report.docx'
+    store.mkdir(parents=True)
+    (store / 'history.sqlite').write_bytes(b'')
+    (origin.workspace_root / 'tmp' / 'office-renders' / key(store) / 'render-00000001').mkdir(parents=True)
+    (origin.workspace_root / 'tmp' / 'office-renders' / key(store) / 'render-00000001' / 'page-001.png').write_bytes(b'png')
+    results = [event for event in fork_journal(client, source) if event['type'] == 'result' and event['status'] == 'completed']
+    assert len(results) == 2 and all(event.get('checkpoint_id') for event in results)
+    first = results[0]
+
+    response = client.post(f'/api/agent/sessions/{source}/fork', json={'seq': first['seq']})
+    assert response.status_code == 201, response.text
+    branch = response.json()
+    assert branch['id'] != source and branch['status'] == 'completed'
+    assert branch['branched_from'] == {'session_id': source, 'seq': first['seq']}
+    assert [message['content'] for message in branch['messages']] == ['first question']
+    history = fork_journal(client, branch['id'])
+    assert history[-1]['seq'] == first['seq'] and all(event['session_id'] == branch['id'] for event in history)
+    assert [event['text'] for event in history if event['type'] == 'operation'] == ['first question']
+    assert (d.files_root(branch['id']) / 'notes.txt').read_text(encoding='utf-8') == 'kept'
+    target = rt.resolve(branch['id'])
+    moved = target.files_root / '.docx-state' / 'report.docx'
+    assert (target.workspace_root / 'tmp' / 'office-renders' / key(moved) / 'render-00000001' / 'page-001.png').read_bytes() == b'png'
+    listed = {item['id']: item for item in client.get('/api/agent/sessions?summary=true').json()}
+    assert listed[branch['id']]['branched_from'] and listed[source]['branched_from'] is None
+    # The session list is ordered by these: user send time while running, turn end time once settled.
+    assert listed[source]['last_message_at'] <= listed[source]['turn_ended_at']
+    assert listed[branch['id']]['turn_ended_at'] == first['occurred_at']
+    copies = {item['session_id']: item['branched_from'] for item in client.get('/api/agent/files').json() if item['path'] == 'notes.txt'}
+    assert copies == {source: False, branch['id']: True}
+
+    # The branch continues from the first turn only; the source keeps its full history.
+    assert client.post(f'/api/agent/sessions/{branch["id"]}/messages', json={'text': 'what came before'}).status_code == 202
+    assert client.get(f'/api/agent/sessions/{branch["id"]}').json()['output'] == 'History: first question | what came before'
+    assert client.post(f'/api/agent/sessions/{source}/messages', json={'text': 'what came before'}).status_code == 202
+    assert client.get(f'/api/agent/sessions/{source}').json()['output'] == 'History: first question | second question | what came before'
+
+
+def test_turn_end_time_is_backfilled_from_the_journal(client):
+    session_id = new_session(client)
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'first question'}).status_code == 202
+    ended = [event for event in fork_journal(client, session_id) if event['type'] == 'result'][-1]['occurred_at']
+    record = d.get('session', session_id); record.pop('turn_ended_at'); d.put('session', record)
+    rt.runtime(session_id).event({'type': 'document_review'})  # later activity must not count as the turn end
+    rt.initialize()
+    assert d.get('session', session_id)['turn_ended_at'] == ended
+
+
+def test_fork_falls_back_to_checkpoint_time_and_rejects_other_points(client):
+    source = new_session(client)
+    for text in ('first question', 'second question'):
+        assert client.post(f'/api/agent/sessions/{source}/messages', json={'text': text}).status_code == 202
+    events = fork_journal(client, source)
+    first = next(event for event in events if event['type'] == 'result')
+    # Journals written before checkpoint ids were recorded.
+    legacy = {key: value for key, value in d.get('event', first['id']).items() if key != 'checkpoint_id'}
+    d.put('event', legacy)
+    branch = client.post(f'/api/agent/sessions/{source}/fork', json={'seq': first['seq']}).json()
+    assert client.post(f'/api/agent/sessions/{branch["id"]}/messages', json={'text': 'what came before'}).status_code == 202
+    assert client.get(f'/api/agent/sessions/{branch["id"]}').json()['output'] == 'History: first question | what came before'
+
+    message = next(event for event in events if event['type'] == 'operation')
+    assert client.post(f'/api/agent/sessions/{source}/fork', json={'seq': message['seq']}).status_code == 422
+    assert client.post(f'/api/agent/sessions/{source}/fork', json={'seq': 99999}).status_code == 404
+    assert client.post('/api/agent/sessions/missing/fork', json={'seq': first['seq']}).status_code == 404
 
 
 def test_journal_keeps_only_renderable_snapshots(client):
@@ -501,7 +582,9 @@ def test_session_output_list_is_current_and_excludes_uploads(client):
     adapter.event({'type':'output_files','files':[{'path':'report.txt','size':11}]})
     (root/'uploads').mkdir()
     (root/'uploads'/'input.txt').write_text('input')
-    assert client.get('/api/agent/sessions/'+session_id).json()['output_files'] == [{'path':'report.txt','size':11}]
+    listed = client.get('/api/agent/sessions/'+session_id).json()['output_files']
+    assert [{key: item[key] for key in ('path', 'size')} for item in listed] == [{'path':'report.txt','size':11}]
+    assert listed[0]['modified_at'] == pytest.approx(report.stat().st_mtime)
     report.unlink()
     assert client.get('/api/agent/sessions/'+session_id).json()['output_files'] == []
 
@@ -803,6 +886,40 @@ def test_docx_steering_persists_viewed_revision_and_uses_current_version(client)
     assert event['document']['revision'] == 0 and event['status'] == 'accepted_pending_boundary'
     assert client.post(f'/api/agent/sessions/{session_id}/actions/steer', json=dict(text='bad', artifact=dict(feature='docx',document_id='report', revision=999))).status_code == 409
     runtime.runner = None
+
+
+def test_docx_rebuilt_from_scratch_replaces_the_previous_history(client):
+    import shutil
+    Documents = format_plugins.load_plugin('docx').Documents
+    session_id = new_session(client); runtime = rt.runtime(session_id)
+    root = files_root()
+    emit = lambda event: runtime.event(dict(event, artifact_extension=dict(feature='docx', id=event.get('document_id'), state_key='documents')))
+    docs = runtime.artifact_services['docx'] = Documents(root, emit)
+    def build(texts, service=None):
+        store = docs.store(root / 'report.docx'); store.init('report')
+        for n, text in enumerate(texts):
+            store.apply_one(dict(document_id='report', base_revision=n, operation_id=f'p{n}',
+                operation=dict(type='append_paragraph', block_id=f'p{n}', text=text)))
+        if service: service.sync()
+    def rebuild(texts, service=None):
+        # The Agent deletes the document and its state, then builds it again from revision 0.
+        (root / 'report.docx').unlink(); shutil.rmtree(root / '.docx-state')
+        build(texts, service)
+    current = lambda: d.get('session', session_id)['documents']['report']
+
+    build(['a', 'b', 'c'], docs)
+    assert current()['revision'] == 3
+    rebuild(['only'], docs)
+    assert current()['revision'] == 1
+    assert client.get(f'/api/agent/sessions/{session_id}/documents/report/revisions/1').status_code == 200
+
+    # State recorded before history ids existed is repaired when the session is bound again.
+    rebuild(['a', 'b', 'c'], docs)
+    record = d.get('session', session_id); record['documents']['report'].pop('history_id'); d.put('session', record)
+    rebuild(['again'])
+    restarted = runtime.artifact_services['docx'] = Documents(root, emit)
+    restarted.bind_state(d.get('session', session_id)); restarted.sync()
+    assert current()['revision'] == 1
 
 
 def test_nested_native_docx_is_tracked_and_downloadable(client):

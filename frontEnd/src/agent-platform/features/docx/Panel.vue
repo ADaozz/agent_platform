@@ -108,7 +108,7 @@ watch(()=>[activeDocument.value?.revision,renderedRevision.value,props.active],(
 <template>
     <button v-if="activeDocument && (!documentOpen || !active)" type="button" class="docx-reopen secondary" @click="showDocument"><Icon name="FileText" :size="15" />{{ activeDocument.path }}</button>
     <aside v-if="activeDocument && documentOpen && active" class="docx-panel" :aria-label="t('docx.preview')">
-      <header class="docx-panel-header"><Icon name="FileText" :size="17" /><PreviewFileSelect :model-value="activeDocument.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="documentUrl" download :aria-label="t('Download')"><Icon name="Download" :size="17" /></a><button type="button" class="icon-button" :aria-label="t('docx.close')" @click="closeDocument"><Icon name="X" :size="17" /></button></header>
+      <header class="docx-panel-header"><PreviewFileSelect :model-value="activeDocument.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="documentUrl" download :aria-label="t('Download')"><Icon name="Download" :size="17" /></a><button type="button" class="icon-button" :aria-label="t('docx.close')" @click="closeDocument"><Icon name="X" :size="17" /></button></header>
       <p class="docx-gate-note">{{ activeDocument.finalized ? t('docx.finalized') : t('docx.draft') }}</p>
       <p v-if="activeDocument.external_conflict" class="docx-gate-error">{{ t('docx.externalConflict') }}</p>
       <p v-if="activeDocument.preview_error" class="docx-gate-error">{{ t('docx.previewUnavailable') }}</p>

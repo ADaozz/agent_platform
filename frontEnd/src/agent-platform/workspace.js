@@ -19,7 +19,8 @@ export function dispatch(type, payload = {}) {
 }
 
 export function sessionTitle(s) {
-  return s.title || s.messages?.[0]?.content?.split('\n')[0] || t('New chat')
+  const title = s.title || s.messages?.[0]?.content?.split('\n')[0] || t('New chat')
+  return s.branched_from ? `${t('分支')}·${title}` : title
 }
 
 export function deletable(s) {
@@ -33,10 +34,18 @@ export function loadSessions() {
   return sessionLoad
 }
 
+// Newest first: a turn in progress counts from when the user sent it, a settled one from
+// when the Agent finished it. Sessions saved before turn end times existed use their last update.
+const IN_PROGRESS = new Set(['queued', 'running', 'waiting_confirmation', 'waiting_human'])
+export function sessionTime(s) {
+  const value = (IN_PROGRESS.has(s.status) ? s.last_message_at : s.turn_ended_at) || s.updated_at || s.created_at
+  return Date.parse(value) || 0
+}
+
 async function fetchSessions() {
   const response = await runtimeFetch('/agent/sessions?summary=true')
   if (!response.ok) throw new Error(t('请求失败，请检查输入配置'))
-  sessions.value = await response.json()
+  sessions.value = (await response.json()).sort((a, b) => sessionTime(b) - sessionTime(a))
   return sessions.value
 }
 

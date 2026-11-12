@@ -34,7 +34,7 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
   let turn, model
   const ensureTurn = (event, index) => {
     if (!turn) {
-      turn = { key: event.seq ?? index, models: [], steps: [], tools: new Map(), notes: [], result: '', startedAt: eventTime(event), lastEventAt: eventTime(event), endedAt: null, status: null }
+      turn = { key: event.seq ?? index, models: [], steps: [], tools: new Map(), notes: [], files: [], result: '', startedAt: eventTime(event), lastEventAt: eventTime(event), endedAt: null, status: null }
       turns.push(turn)
     }
     return turn
@@ -82,7 +82,7 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
     if (event.type === 'operation' && event.operation === 'message') {
       turn = null; model = null
       const current = ensureTurn(event, index)
-      current.user = { kind: 'user', key: `user-${current.key}`, content: event.text, attachments: event.attachments || [] }
+      current.user = { kind: 'user', key: `user-${current.key}`, content: event.text, attachments: event.attachments || [], at: eventTime(event) }
       current.status = 'running'
     } else if (event.type === 'operation' && event.operation === 'resume') {
       if (turn) {
@@ -136,6 +136,7 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
       }
     } else if (event.type === 'result') {
       ensureTurn(event, index).status = event.status
+      turn.resultSeq = event.status === 'completed' ? event.seq : null
       if (settledStatuses.has(event.status)) turn.endedAt = eventTime(event)
       else if (['waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'].includes(event.status)) {
         for (const step of turn.steps) if (!terminalStatuses.has(step.status)) step.status = 'pending'
@@ -146,6 +147,9 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
       turn.endedAt = eventTime(event)
     } else if (event.type === 'task_progress' && event.content) {
       ensureTurn(event, index).steps.push({ key: `progress-${event.seq ?? index}`, kind: 'progress', name: 'progress', order: index, content: rawText(event.content), status: 'completed', startedAt: eventTime(event), endedAt: eventTime(event) })
+    } else if (event.type === 'output_files') {
+      const current = ensureTurn(event, index)
+      for (const file of event.files || []) if (file.path && !current.files.includes(file.path)) current.files.push(file.path)
     } else if (event.type === 'steering_queued') {
       if (event.result?.id) queued.push(event.result.id)
     } else if (event.type === 'steer' || event.type === 'follow_up') {
@@ -216,9 +220,18 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
     })
     for (const chunk of answers) blocks.push({ kind: 'assistant', key: `answer-${chunk.key}`, content: chunk.content })
     if (item.result && ![...answers, ...texts].some(chunk => chunk.content === item.result)) blocks.push({ kind: 'assistant', key: `result-${item.key}`, content: item.result })
+    const agent = blocks.filter(block => block.kind === 'process' || block.kind === 'assistant')
+    if (agent.length) agent[0].lead = true
+    // Copy takes only the replies; reasoning and tool calls stay out of the copied text.
+    if (agent.length && ended) {
+      agent.at(-1).footer = {
+        at: endedAt ?? item.lastEventAt,
+        text: blocks.filter(block => block.kind === 'assistant').map(block => block.content).join('\n\n'),
+        branchSeq: currentStatus === 'completed' ? item.resultSeq ?? null : null,
+        files: item.files,
+      }
+    }
     blocks.push(...item.notes)
-    const lead = blocks.find(block => block.kind === 'process' || block.kind === 'assistant')
-    if (lead) lead.lead = true
     return blocks
   })
 }

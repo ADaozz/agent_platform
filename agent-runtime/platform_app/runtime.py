@@ -149,17 +149,32 @@ def public(record):
     value['enabled_features'] = [meta['id'] for meta in format_plugins.enabled()]
     context = resolve(record['id'])
     value['workspace_id'] = context.workspace_id
-    value['output_files'] = [{'path': path, 'size': size} for path, (_, size) in file_snapshot(context.files_root).items()
+    value['output_files'] = [{'path': path, 'size': size, 'modified_at': mtime / 1e9} for path, (mtime, size) in file_snapshot(context.files_root).items()
         if Path(path).parts[0] != 'uploads']
     root = context.artifacts_root
     value['artifacts'] = [p.name for p in root.iterdir() if p.is_file() and not p.is_symlink()] if root.exists() else []
     return value
 
 
+def last_turn_end(session_id):
+    prefix = f'{session_id}:'
+    with d.db() as connection:
+        row = connection.execute("SELECT json_extract(data,'$.occurred_at') FROM records WHERE kind=? AND id>? AND id<? "
+            "AND json_extract(data,'$.type') IN ('result','error') ORDER BY id DESC LIMIT 1", ('event', prefix, prefix + '~')).fetchone()
+    return row[0] if row else None
+
+
 def initialize():
     for record in d.all_records('session'):
+        changed = False
         if record['status'] in ACTIVE:
             record.update(status='interrupted', usage={}, error='服务重启，本轮已中断；可发送新消息恢复会话。')
+            changed = True
+        # Sessions saved before turn end times were recorded take it from their journal.
+        if 'turn_ended_at' not in record:
+            record['turn_ended_at'] = last_turn_end(record['id'])
+            changed = True
+        if changed:
             d.put('session', record)
 
 
@@ -209,6 +224,42 @@ def compact_journal(session_id):
     return dict(removed=len(removed), stripped=len(stripped))
 
 
+def regenerated(previous, event):
+    """Whether an artifact event starts a new revision history for the same document.
+
+    Revisions only fence events within one history; a store that was deleted and
+    initialized again restarts at 0. State recorded before history ids existed has none,
+    so a lower revision from an identified history is the only evidence available there.
+    """
+    history=event.get('history_id')
+    if not previous or not history or history==previous.get('history_id'):
+        return False
+    return bool(previous.get('history_id')) or event.get('revision',-1)<previous.get('revision',-1)
+
+
+def apply_artifact(record, event):
+    """Fold one Office artifact event into the session's per-document state."""
+    artifact=event.get('artifact_extension')
+    if not artifact:
+        return
+    items=record.setdefault(artifact['state_key'],{})
+    previous=items.get(artifact['id'],{})
+    if regenerated(previous,event) or event.get('revision',-1)>=previous.get('revision',-1):
+        newer=regenerated(previous,event) or event.get('revision',-1)>previous.get('revision',-1)
+        items[artifact['id']]={**previous,**({'pages':[],'finalized':False,'render_error':None,'document_check':None,'aesthetic_reviews':{},'document_review':None,'delivery':None,'delivery_status':'draft_pending_check'} if newer else {}),**event}
+    if event.get('store_seq') and event.get('path'):
+        record.setdefault('artifact_cursors',{}).setdefault(artifact['feature'],{})[event['path']]=event['store_seq']
+
+
+def latest_checkpoint(runner, thread_id):
+    """The checkpoint the next turn resumes from, i.e. where this turn ended."""
+    try:
+        return runner.prepared.graph.get_state({'configurable': {'thread_id': thread_id}}).config['configurable'].get('checkpoint_id')
+    except Exception:  # noqa: BLE001 - the result must be published even if the state cannot be read
+        LOG.warning('Checkpoint lookup failed: session=%s', thread_id)
+        return None
+
+
 class Runtime:
     def __init__(self, session_id):
         self.id = session_id
@@ -238,15 +289,7 @@ class Runtime:
             # Empty usage events mark request start, not zero token consumption.
             if event['type'] == 'usage' and (event.get('result') or {}).get('input_tokens') is not None:
                 record['usage'] = event['result']
-            artifact=event.get('artifact_extension')
-            if artifact:
-                items=record.setdefault(artifact['state_key'],{})
-                previous=items.get(artifact['id'],{})
-                if event.get('revision',-1)>=previous.get('revision',-1):
-                    newer=event.get('revision',-1)>previous.get('revision',-1)
-                    items[artifact['id']]={**previous,**({'pages':[],'finalized':False,'render_error':None,'document_check':None,'aesthetic_reviews':{},'document_review':None,'delivery':None,'delivery_status':'draft_pending_check'} if newer else {}),**event}
-                if event.get('store_seq') and event.get('path'):
-                    record.setdefault('artifact_cursors',{}).setdefault(artifact['feature'],{})[event['path']]=event['store_seq']
+            apply_artifact(record, event)
             # Event journal is durable; reconnecting clients resume by sequence.
             record['updated_at'] = now()
             row_id = f'{self.id}:{event["seq"]:010d}'
@@ -427,7 +470,7 @@ class Runtime:
                 usage = runner_usage(runner)
                 if result.error and usage.get('input_tokens') is None:
                     usage = record.get('usage', {})
-                record.update(status=result.status, output=result.output or '',
+                record.update(status=result.status, output=result.output or '', turn_ended_at=now(),
                     error=public_run_error(result.error) if result.error else None,
                     pending_tool_calls=result.pending_tool_calls, human_input=result.human_input,
                     usage=usage, model_id=runner.current_model().id,
@@ -440,7 +483,8 @@ class Runtime:
             changed = changed_files(files_root, before)
             if changed:
                 self.event({'type': 'output_files', 'files': changed})
-            self.event({'type': 'result', **{**asdict(result), 'error': record['error'] or ''}})
+            self.event({'type': 'result', **{**asdict(result), 'error': record['error'] or ''},
+                **({'checkpoint_id': checkpoint} if result.status == 'completed' and (checkpoint := latest_checkpoint(runner, self.id)) else {})})
         except Exception as exc:
             # Provider errors may contain credentials; only publish known safe diagnoses.
             from platform_app.agent_core.sandbox import SandboxUnavailableError
@@ -448,7 +492,7 @@ class Runtime:
             LOG.error('Agent operation failed: session=%s exception=%s', self.id, type(exc).__name__)
             with self.lock:
                 record = find(self.id)
-                record.update(status='failed', error=message)
+                record.update(status='failed', error=message, turn_ended_at=now())
                 d.put('session', record)
             self.event({'type': 'error', 'content': message})
 
@@ -521,8 +565,9 @@ def sessions(summary: bool = False):
     if summary:
         # Project in SQLite: do not load complete conversations, decrypt model
         # configs or walk every workspace for a sidebar refresh.
-        fields=('id','model_id','reasoning_effort','status','created_at','updated_at','event_seq','permission_mode','sandbox_mode')
+        fields=('id','model_id','reasoning_effort','status','created_at','updated_at','event_seq','permission_mode','sandbox_mode','branched_from')
         pairs=','.join("'%s',json_extract(data,'$.%s')" % (key,key) for key in fields)
+        pairs+=",'turn_ended_at',json_extract(data,'$.turn_ended_at'),'last_message_at',json_extract(data,'$.messages[#-1].created_at')"
         title="coalesce(json_extract(data,'$.messages[0].content'),'')"
         pairs+=",'title',substr("+title+",1,min(200,instr("+title+"||char(10),char(10))-1))"
         owner=itam_bridge.owner() if itam_bridge.is_enabled() else None
@@ -586,6 +631,138 @@ def delete_session(session_id: str):
             shutil.rmtree(path, ignore_errors=True)
     with LOCK:
         RUNTIMES.pop(session_id, None)
+
+
+class Fork(BaseModel):
+    model_config = {'extra': 'forbid'}
+    seq: int = Field(ge=1)
+
+
+def checkpoint_rows(session_id, result):
+    """Rows of the source thread's checkpoint history up to the turn's final checkpoint.
+
+    A checkpoint alone does not carry the conversation: LangGraph rebuilds channel values
+    from the writes of earlier checkpoints, so the whole prefix is copied. Writes made from
+    the final checkpoint itself belong to the next turn and are left out. Journals written
+    before checkpoint ids were recorded fall back to the newest root checkpoint saved no
+    later than the turn's result event.
+    """
+    import sqlite3
+    from langgraph.checkpoint.sqlite import SqliteSaver
+    from platform_app.agent_core.session import _strict_serde
+    path = resolve(session_id).session_root / 'checkpoint.sqlite'
+    if not path.is_file():
+        return None
+    # A private connection: the live runner keeps its own store, lock and attachment lease.
+    connection = sqlite3.connect(str(path), check_same_thread=False)
+    try:
+        saver = SqliteSaver(connection, serde=_strict_serde())
+        config = {'configurable': {'thread_id': session_id, 'checkpoint_ns': ''}}
+        if result.get('checkpoint_id'):
+            found = saver.get_tuple({'configurable': {**config['configurable'], 'checkpoint_id': result['checkpoint_id']}})
+        else:
+            ended = datetime.fromisoformat(result['occurred_at'])
+            found = next((item for item in saver.list(config) if datetime.fromisoformat(item.checkpoint['ts']) <= ended), None)
+        if found is None:
+            return None
+        last = found.config['configurable']['checkpoint_id']
+        def rows(table, operator):
+            cursor = connection.execute(f'SELECT * FROM {table} WHERE thread_id=? AND checkpoint_id{operator}?', (session_id, last))
+            return [description[0] for description in cursor.description], cursor.fetchall()
+        return {'checkpoints': rows('checkpoints', '<='), 'writes': rows('writes', '<')}
+    finally:
+        connection.close()
+
+
+def copy_tree(source, destination, ignore=None):
+    if source.is_dir():
+        shutil.copytree(source, destination, symlinks=True, dirs_exist_ok=True, ignore=ignore)
+
+
+def copy_renders(origin, target):
+    """Office page renders are cached under a hash of each document store's absolute path,
+    so a copied store needs its renders under the hash of its new location."""
+    import hashlib
+    key = lambda path: hashlib.sha256(str(path).encode()).hexdigest()
+    roots = [(origin.workspace_root / 'tmp' / 'office-renders', target.workspace_root / 'tmp' / 'office-renders')]
+    roots += [(root, target.session_root / root.relative_to(origin.session_root))
+        for root in (origin.session_root / 'artifact-review').glob('*/renders')]
+    for history in origin.files_root.rglob('history.sqlite'):
+        store = history.parent
+        moved = target.files_root / store.relative_to(origin.files_root)
+        for source, destination in roots:
+            copy_tree(source / key(store), destination / key(moved))
+
+
+@router.post('/sessions/{session_id}/fork', status_code=201)
+def fork_session(session_id: str, value: Fork):
+    """Start a new session from the state a completed turn ended on, with its history."""
+    from platform_app.agent_core.session import SessionStore
+    source = find(session_id)
+    prefix = f'{session_id}:'
+    try:
+        result = d.get('event', f'{prefix}{value.seq:010d}')
+    except KeyError:
+        raise HTTPException(404, '分支点不存在')
+    if result.get('type') != 'result' or result.get('status') != 'completed':
+        raise HTTPException(422, '只能从已完成的回复创建分支')
+    history = checkpoint_rows(session_id, result)
+    if history is None:
+        raise HTTPException(409, '找不到这条回复对应的会话状态，无法创建分支')
+    with d.db() as connection:
+        rows = connection.execute('SELECT data FROM records WHERE kind=? AND id>? AND id<=? ORDER BY id',
+            ('event', prefix, f'{prefix}{value.seq:010d}')).fetchall()
+    events = [json.loads(row[0]) for row in rows]
+    asked = sum(e.get('type') == 'operation' and e.get('operation') == 'message' for e in events)
+    new_id = uuid4().hex
+    origin, target = resolve(session_id), resolve(new_id)
+    try:
+        # Files are not snapshotted per turn: the branch starts from the current library.
+        copy_tree(origin.files_root, target.files_root)
+        copy_tree(origin.artifacts_root, target.artifacts_root)
+        copy_tree(origin.session_root / 'artifact-review', target.session_root / 'artifact-review', ignore=shutil.ignore_patterns('renders'))
+        copy_renders(origin, target)
+        store = SessionStore(target.session_root / 'checkpoint.sqlite')
+        try:
+            store.checkpointer.setup()
+            with store.checkpointer.lock:
+                for table, (columns, rows) in history.items():
+                    thread = columns.index('thread_id')
+                    store._conn.executemany(
+                        f'INSERT INTO {table} ({",".join(columns)}) VALUES ({",".join("?" * len(columns))})',
+                        [row[:thread] + (new_id,) + row[thread + 1:] for row in rows])
+                store._conn.commit()
+            # Uploaded images are stored beside the database and referenced by key.
+            attachments = origin.session_root / 'checkpoint.attachments'
+            for key in store.attachment_storage_keys():
+                if (attachments / key).is_file():
+                    shutil.copy2(attachments / key, store.attachment_store.root / key)
+        finally:
+            store.close()
+        record = dict(id=new_id, owner_user_id=source.get('owner_user_id'), config=source['config'],
+            model_snapshot=source['model_snapshot'], model_id=source['model_id'], reasoning_effort=source.get('reasoning_effort'),
+            status='completed', messages=source['messages'][:asked], output=result.get('output') or '', error=None,
+            created_at=now(), updated_at=now(), turn_ended_at=result['occurred_at'], event_seq=value.seq, pending_tool_calls=[], human_input={}, usage={},
+            permission_mode=source.get('permission_mode', 'ask'), pending_permission_mode=None,
+            sandbox_mode=source.get('sandbox_mode', 'restricted'), pending_sandbox_mode=None,
+            branched_from={'session_id': session_id, 'seq': value.seq})
+        copied = []
+        for event in events:
+            event = {**event, 'id': f'{new_id}:{event["seq"]:010d}', 'session_id': new_id}
+            apply_artifact(record, event)
+            copied.append(event)
+        with d.LOCK, d.db() as connection:
+            connection.executemany('INSERT INTO records VALUES (?,?,?)',
+                [('event', event['id'], json.dumps(event, ensure_ascii=False)) for event in copied])
+            connection.execute('INSERT INTO records VALUES (?,?,?)', ('session', new_id, json.dumps(record, ensure_ascii=False)))
+    except Exception:
+        LOG.exception('Session fork failed: source=%s', session_id)
+        with d.LOCK, d.db() as connection:
+            connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('thread_workspace', new_id))
+        for path in (target.workspace_root, target.session_root, target.sandbox_state_root, target.skills_root):
+            shutil.rmtree(path, ignore_errors=True)
+        raise HTTPException(500, '创建分支失败，请稍后重试')
+    return public(record)
 
 
 @router.get('/sessions/{session_id}/artifacts/{filename}')
@@ -761,7 +938,8 @@ def all_files():
             continue
         title = next((m.get('content') or '' for m in record.get('messages', []) if m.get('role') == 'user'), '').split('\n')[0][:80]
         for item in files(record['id']):
-            result.append({**item, 'session_id': record['id'], 'session_title': title, 'session_status': record['status']})
+            result.append({**item, 'session_id': record['id'], 'session_title': title, 'session_status': record['status'],
+                'branched_from': bool(record.get('branched_from'))})
     result.sort(key=lambda item: item['modified_at'], reverse=True)
     return result[:500]
 

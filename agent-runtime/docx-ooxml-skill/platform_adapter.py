@@ -22,6 +22,7 @@ class Documents:
         self.emit = emit or (lambda event: None)
         self.lock = threading.RLock()
         self.cursors = {}
+        self.histories = {}
         self.bound_paths = {}
         self.live_preview = live_preview
         self.preview_jobs = {}
@@ -36,6 +37,20 @@ class Documents:
     def bind_state(self,record):
         self.bound_paths = {identity: item['path'] for identity, item in record.get('documents', {}).items()}
         self.cursors=dict(record.get('artifact_cursors',{}).get('docx',{}))
+        self.histories={}
+        for item in record.get('documents',{}).values():
+            relative=item.get('path')
+            if not relative:continue
+            if item.get('history_id'):
+                self.histories[relative]=item['history_id']
+                continue
+            # Recorded before history ids existed: a store now behind the recorded revision
+            # was deleted and initialized again, so its new history is replayed from the start.
+            path=self.root/relative
+            if (path.parent/'.docx-state'/path.name/'history.sqlite').exists():
+                try:
+                    if self.store(path).metadata()['revision']<item.get('revision',-1):self.cursors[relative]=0
+                except (ValueError,OSError):pass
         for path in self.paths():
             relative=path.relative_to(self.root).as_posix()
             if relative not in self.cursors and not any(doc.get('path')==relative for doc in record.get('documents',{}).values()):
@@ -119,9 +134,13 @@ class Documents:
                     continue
                 relative = path.relative_to(self.root).as_posix()
                 store = self.store(path)
+                history = store.history_id()
+                if self.histories.get(relative) not in (None, history):
+                    self.cursors[relative] = 0
+                self.histories[relative] = history
                 for event in store.events(self.cursors.get(relative, 0)):
                     seq = event['store_seq']
-                    event.update(path=relative)
+                    event.update(path=relative, history_id=history)
                     identity = event.get('document_id')
                     if identity in self.bound_paths and self.bound_paths[identity] != relative:
                         self.cursors[relative] = seq

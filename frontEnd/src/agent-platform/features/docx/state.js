@@ -1,8 +1,10 @@
 // Revisions and review-request generations fence asynchronous snapshots/events.
 export function mergeDocument(previous, update) {
  if (!update?.document_id || !Number.isInteger(update.revision)) return previous
- if (previous && update.revision < previous.revision) return previous
- const newer=!previous||update.revision>previous.revision
+ // A store deleted and initialized again restarts its revisions; its events carry a new history id.
+ const regenerated=!!previous&&!!update.history_id&&update.history_id!==previous.history_id&&(!!previous.history_id||update.revision<previous.revision)
+ if (previous && !regenerated && update.revision < previous.revision) return previous
+ const newer=!previous||regenerated||update.revision>previous.revision
  const retired=newer?[]:[...(previous._retired_review_requests||[])]
  const incoming=update.visual_request?.request_id,old=previous?.visual_request?.request_id
  if(!newer&&incoming&&retired.includes(incoming))return previous

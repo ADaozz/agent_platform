@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { API_BASE, ensureRuntimeCookie, runtimeFetch } from './runtime'
-import { sessions, activeSessionId, workspaceView, command, sessionTitle, deletable, removeSession, loadSessions } from './workspace'
+import { sessions, activeSessionId, workspaceView, command, sessionTitle, sessionTime, deletable, removeSession, loadSessions } from './workspace'
 import MarkdownContent from './MarkdownContent.vue'
 import Icon from './Icon.vue'
 import FileBlock from './FileBlock.vue'
@@ -70,6 +70,14 @@ const statusLabels = computed(() => ({ idle: t('新会话'), queued: t('排队�
 
 const timeline = computed(() => conversationTimeline(events.value, selected.value?.status))
 const outputFiles = computed(() => sessionOutputFiles(selected.value))
+// Files are listed under the turn that wrote them; only files no turn claims (older sessions,
+// artifacts) stay in the closing list. Deleted files drop out because the index is the current library.
+const fileIndex = computed(() => new Map(outputFiles.value.map(file => [file.path, file])))
+const turnFiles = block => (block.footer?.files || []).map(path => fileIndex.value.get(path)).filter(Boolean)
+const unclaimedFiles = computed(() => {
+  const claimed = new Set(timeline.value.flatMap(block => block.footer?.files || []))
+  return outputFiles.value.filter(file => !claimed.has(file.path))
+})
 const latestFile = computed(() => featurePanels.value?.latestFile || null)
 function actionLabel(name) {
   const labels = { ...toolLabels.value, create_docx: t('activity.document'), create_pptx: t('activity.presentation'), create_xlsx: t('activity.spreadsheet') }
@@ -86,7 +94,7 @@ function approvalFields(call) {
   return Object.entries(call.args || {}).filter(([key]) => !hidden(key)).map(([key, value]) => ({ label: t(labels[key] || key.replaceAll('_', ' ')), content: text(value) })).filter(field => field.content)
 }
 
-function dateLabel(s) { const date = new Date(s.updated_at || s.created_at); return date.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' }) }
+function dateLabel(s) { const date = new Date(sessionTime(s)); return `${date.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })} ${pad2(date.getHours())}:${pad2(date.getMinutes())}` }
 function fileIcon(name) { return /\.(docx?|pptx?|xlsx?|pdf|md|txt|csv|json|log|py|js|ts|vue|html?|css|zip|png|jpe?g|gif|webp)$/i.test(name) ? 'FileText' : 'FileBox' }
 function toast(text) { notice.value = text; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => notice.value = '', 4500) }
 function resetStream() { clearTimeout(flushTimer); flushTimer = 0; pendingEvents = []; seenSeqs = new Set() }
@@ -148,6 +156,46 @@ async function openSessionFile(f) {
   featurePanels.value?.openFile(f.path)
 }
 function fileTime(f) { return new Date(f.modified_at * 1000).toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+const pad2 = n => String(n).padStart(2, '0')
+function messageTime(ms) {
+  const date = new Date(ms), today = new Date()
+  const clock = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  return date.toDateString() === today.toDateString() ? clock : `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${clock}`
+}
+function messageStamp(ms) { return new Date(ms).toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US') }
+const copiedKey = ref(''), branching = ref(false)
+let copiedTimer = 0
+// Plain-HTTP deployments have no Clipboard API, and it can also be denied; fall back to a selection copy.
+function selectionCopy(text) {
+  const area = Object.assign(document.createElement('textarea'), { value: text, readOnly: true })
+  area.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+  document.body.appendChild(area); area.select()
+  const done = document.execCommand('copy'); area.remove()
+  return done
+}
+async function copyText(key, text) {
+  let done = false
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); done = true } } catch { /* fall back below */ }
+  if (!done) done = selectionCopy(text)
+  if (!done) return toast(t('复制失败'))
+  copiedKey.value = key; clearTimeout(copiedTimer); copiedTimer = setTimeout(() => copiedKey.value = '', 1600)
+}
+async function branchFrom(seq) {
+  if (!selected.value || branching.value) return
+  branching.value = true
+  await guard(async () => {
+    const next = await api(`/agent/sessions/${selected.value.id}/fork`, { method: 'POST', body: { seq } })
+    await loadSessions()
+    await openSession(next.id)
+    toast(t('分支已创建'))
+  })
+  branching.value = false
+}
+// Display-only marker: a branch keeps the original file names, which its Agent history refers to.
+function branchFileName(name) {
+  const dot = name.lastIndexOf('.'), mark = t('（分支）')
+  return dot > 0 ? name.slice(0, dot) + mark + name.slice(dot) : name + mark
+}
 function fileSize(size) { return size < 1024 ? `${size} B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB` }
 // Commands from the platform sidebar; handled once init() has loaded models and sessions.
 function runCommand(cmd) {
@@ -388,8 +436,8 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
       <header v-if="selected || mainView !== 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ mainView === 'files' ? t('全局文件') : selected ? sessionTitle(selected) : t('All chats') }}</span><button v-if="selected && mainView === 'agents' && latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
 
       <div v-if="loading" class="loading"><Icon name="LoaderCircle" class="spin" /> {{ t("Loading…") }}</div>
-      <div v-else-if="mainView === 'history'" class="history-view"><div class="section-eyebrow">{{ t("YOUR CHATS") }}</div><h1>{{ t("Chats") }}</h1><input v-model="search" class="search-input" :placeholder='t("Search chats…")'><button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon name="MessageSquare" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length" class="empty-state"><Icon name="MessagesSquare" :size="28" /><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div>
-      <div v-else-if="mainView === 'files'" class="history-view"><div class="section-eyebrow">{{ t("ALL FILES") }}</div><h1>{{ t("全局文件") }}</h1><button v-for="f in allFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.path.split('/').pop() }}</strong><small>{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && !allFiles.length" class="empty-state"><Icon name="Files" :size="28" /><h3>{{ t("暂无文件") }}</h3></div></div>
+      <div v-else-if="mainView === 'history'" class="history-view"><div class="section-eyebrow">{{ t("YOUR CHATS") }}</div><h1>{{ t("Chats") }}</h1><input v-model="search" class="search-input" :placeholder='t("Search chats…")'><button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon :name="s.branched_from ? 'GitBranch' : 'MessageSquare'" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length" class="empty-state"><Icon name="MessagesSquare" :size="28" /><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div>
+      <div v-else-if="mainView === 'files'" class="history-view"><div class="section-eyebrow">{{ t("ALL FILES") }}</div><h1>{{ t("全局文件") }}</h1><button v-for="f in allFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.branched_from ? branchFileName(f.path.split('/').pop()) : f.path.split('/').pop() }}</strong><small>{{ f.branched_from ? t('分支') + '·' : '' }}{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && !allFiles.length" class="empty-state"><Icon name="Files" :size="28" /><h3>{{ t("暂无文件") }}</h3></div></div>
 
 
       <div v-else class="chat-page" :class="{ 'has-session': selected }">
@@ -401,15 +449,17 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
         <div v-if="selected" ref="transcriptEl" class="transcript" @scroll.passive="updateScrollState">
           <template v-for="b in timeline" :key="b.key">
             <div v-if="b.lead" class="message-label agent-label"><img class="mark-light" src="/deep-agent-mark-light.svg" alt=""><img class="mark-dark" src="/deep-agent-mark-dark.svg" alt=""> {{ t("Agent") }}</div>
-            <article v-if="b.kind === 'user'" class="user-message"><div class="message-label">{{ t("You") }}</div><div>{{ b.content }}</div><div v-if="b.attachments?.length" class="message-attachments"><a v-for="file in b.attachments" :key="file.id" :href="fileUrl(file.path)" download><Icon name="Paperclip" :size="13" />{{ file.name }}</a></div></article>
+            <template v-if="b.kind === 'user'"><article class="user-message"><div class="message-label">{{ t("You") }}</div><div>{{ b.content }}</div><div v-if="b.attachments?.length" class="message-attachments"><a v-for="file in b.attachments" :key="file.id" :href="fileUrl(file.path)" download><Icon name="Paperclip" :size="13" />{{ file.name }}</a></div></article><div class="message-meta user-meta"><time v-if="b.at" :datetime="new Date(b.at).toISOString()" :title="messageStamp(b.at)">{{ messageTime(b.at) }}</time><button type="button" class="icon-button" :title="t(copiedKey === b.key ? '已复制' : '复制')" :aria-label="t(copiedKey === b.key ? '已复制' : '复制')" @click="copyText(b.key, b.content)"><Icon :name="copiedKey === b.key ? 'Check' : 'Copy'" :size="13" /></button></div></template>
             <WorkProcess v-else-if="b.kind === 'process'" :process="b" :action-label="actionLabel" :status-labels="statusLabels" />
             <article v-else-if="b.kind === 'assistant'" class="assistant-message"><MarkdownContent :content="b.content" /></article>
             <div v-else class="turn-note"><Icon name="CornerDownRight" :size="14" />{{ b.type === 'steer' ? t('追加指令') : t('后续任务') }}：{{ b.content }}</div>
+            <section v-if="turnFiles(b).length" class="output-files turn-files" :aria-label="t('artifacts.title')"><div class="output-files-heading"><Icon name="FileBox" :size="14" />{{ t("artifacts.title") }}</div><FileBlock v-for="file in turnFiles(b)" :key="file.url" :path="file.path" :size="file.size" :modified-at="file.modified_at" :download-url="file.url" @preview="featurePanels?.openFile($event)" /></section>
+            <div v-if="b.footer" class="message-meta agent-meta"><time v-if="b.footer.at" :datetime="new Date(b.footer.at).toISOString()" :title="messageStamp(b.footer.at)">{{ messageTime(b.footer.at) }}</time><button v-if="b.footer.text" type="button" class="icon-button" :title="t(copiedKey === b.key ? '已复制' : '复制')" :aria-label="t(copiedKey === b.key ? '已复制' : '复制')" @click="copyText(b.key, b.footer.text)"><Icon :name="copiedKey === b.key ? 'Check' : 'Copy'" :size="13" /></button><button v-if="b.footer.branchSeq" type="button" class="icon-button" :disabled="branching" :title="t('从这里创建分支')" :aria-label="t('从这里创建分支')" @click="branchFrom(b.footer.branchSeq)"><Icon name="GitBranch" :size="13" /></button></div>
           </template>
           <div v-if="selected.error" class="session-error"><Icon name="CircleAlert" />{{ t(selected.error) }}</div>
-          <section v-if="outputFiles.length" class="output-files" :aria-label="t('artifacts.title')">
+          <section v-if="unclaimedFiles.length" class="output-files" :aria-label="t('artifacts.title')">
             <div class="output-files-heading"><Icon name="FileBox" :size="14" />{{ t("artifacts.title") }}</div>
-            <FileBlock v-for="file in outputFiles" :key="file.url" :path="file.path" :size="file.size" :download-url="file.url" @preview="featurePanels?.openFile($event)" />
+            <FileBlock v-for="file in unclaimedFiles" :key="file.url" :path="file.path" :size="file.size" :modified-at="file.modified_at" :download-url="file.url" @preview="featurePanels?.openFile($event)" />
           </section>
           <section v-if="selected.status === 'waiting_confirmation'" class="approval-panel"><div class="panel-title"><Icon name="ShieldCheck" />{{ t("Review tool calls") }}</div><p>{{ t("Agent 请求执行以下操作，请逐项确认。") }}</p><div v-for="call in selected.pending_tool_calls" :key="call.toolCallId" class="approval-call"><div><strong>{{ actionLabel(call.name) }}</strong><select v-model="decisions[call.toolCallId]" :aria-label="t('reviewTool', { name: actionLabel(call.name) })"><option :value="undefined">{{ t("Approve") }}</option><option value="approve">{{ t("Approve") }}</option><option value="reject">{{ t("Reject") }}</option></select></div><dl class="approval-details"><div v-for="(field, index) in approvalFields(call)" :key="index"><dt>{{ field.label }}</dt><dd><pre>{{ field.content }}</pre></dd></div></dl></div><button class="primary" @click="approval">{{ t("Submit decisions") }} <Icon name="ArrowUpRight" :size="14" /></button></section>
           <section v-if="selected.status === 'waiting_human'" class="approval-panel"><div class="panel-title"><Icon name="MessageCircleQuestion" />{{ selected.human_input.title || t('Agent needs your input') }}</div><p>{{ selected.human_input.reason }}</p><h4>{{ selected.human_input.question }}</h4><div v-for="field in selected.human_input.fields" :key="field.id" class="field"><label :for="'human-' + field.id">{{ field.label }}{{ field.required ? ' *' : '' }}</label><div v-if="['single_select', 'multi_select'].includes(field.type)" :id="'human-' + field.id" class="human-options" role="group" :aria-label="field.label"><div v-for="o in field.options" :key="o.value" class="human-option-group"><button type="button" class="human-option" :class="{ selected: humanOptionSelected(field, o.value) }" :aria-pressed="humanOptionSelected(field, o.value)" @click="selectHumanOption(field, o.value, !humanOptionSelected(field, o.value))"><span>{{ customHumanOption(o) ? t('human.other') : o.label }}<small v-if="o.description">{{ o.description }}</small></span><Icon v-if="humanOptionSelected(field, o.value)" name="Check" :size="16" /></button><textarea v-if="customHumanOption(o) && humanOptionSelected(field, o.value)" v-model="humanOtherValues[field.id]" class="human-other-input" :aria-label="t('human.otherAnswer', { field: field.label })" :placeholder="t('human.otherPlaceholder')" rows="2" required></textarea></div></div><input v-else-if="field.type === 'boolean'" :id="'human-' + field.id" type="checkbox" v-model="humanValues[field.id]"><textarea v-else :id="'human-' + field.id" v-model="humanValues[field.id]" :placeholder="field.placeholder"></textarea></div><button class="primary" :disabled="!humanAnswerValid || humanSubmitting" @click="answer">{{ t("Continue") }} <Icon name="ArrowRight" :size="14" /></button></section>
@@ -447,7 +497,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
           <div v-if="error && !modal" role="alert" class="error-inline"><Icon name="CircleAlert" :size="14" />{{ t(error) }}<button @click="error = ''" class="icon-button" :aria-label='t("关闭错误")'><Icon name="X" :size="13" /></button></div>
         </div>
 
-        <section v-if="!selected" class="recent-chats"><template v-if="visibleSessions.length"><button v-for="s in visibleSessions.slice(0, 12)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div><span class="status-dot" :class="s.status"></span><span>{{ s.model_id.split('/').at(-1) }}</span><span>{{ dateLabel(s) }}</span></div></div><Icon class="chat-arrow" name="ArrowUpRight" :size="15" /></button></template><div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div></section>
+        <section v-if="!selected" class="recent-chats"><template v-if="visibleSessions.length"><button v-for="s in visibleSessions.slice(0, 12)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div><span class="status-dot" :class="s.status"></span><span>{{ s.model_id.split('/').at(-1) }}</span><span>{{ dateLabel(s) }}</span></div></div><Icon class="chat-arrow" name="ArrowUpRight" :size="15" /></button></template><div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div></section>
       </div>
       <div v-if="error && mainView === 'history'" class="error-inline">{{ t(error) }}</div>
     </main>

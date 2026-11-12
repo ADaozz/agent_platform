@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { conversationTimeline } from '../frontend/src/conversation.js'
-import { stepBody, elapsed } from '../frontend/src/processView.js'
+import { conversationTimeline } from '../../frontEnd/src/agent-platform/conversation.js'
+import { stepBody, elapsed } from '../../frontEnd/src/agent-platform/processView.js'
 const processOf = (events, status='running') => conversationTimeline(events,status).find(block=>block.kind==='process')
 const at=(second)=>`2026-10-29T14:00:${String(second).padStart(2,'0')}.000Z`
 
-test('reasoning, interim summary and distinct calls stay in their occurrence order',()=>{
+test('interim text splits execution into segments that keep occurrence order',()=>{
  const events=[
   {seq:1,type:'operation',operation:'message',text:'Inspect files',occurred_at:at(0)},
   {seq:2,type:'assistant_started',occurred_at:at(1)},
@@ -19,12 +19,17 @@ test('reasoning, interim summary and distinct calls stay in their occurrence ord
   {seq:10,type:'assistant_started',occurred_at:at(10)},
   {seq:11,type:'thinking_delta',content:'Checking results.',occurred_at:at(11)},
  ]
- const original=JSON.stringify(events),process=processOf(events)
- assert.deepEqual(process.steps.map(step=>step.kind),['reasoning','summary','tool','tool','reasoning'])
- assert.equal(process.steps[0].content,'Inspect the files.')
- assert.deepEqual(process.steps.filter(s=>s.kind==='tool').map(s=>[s.name,s.finalOutput,s.durationMs]),[['read_file','A finished',4000],['read_file','B finished',1000]])
- assert.equal(process.steps.at(-1).status,'running')
- assert.equal(process.finished,false)
+ const original=JSON.stringify(events),blocks=conversationTimeline(events,'running')
+ assert.deepEqual(blocks.map(block=>block.kind),['user','process','assistant','process'])
+ const [before,after]=blocks.filter(block=>block.kind==='process')
+ assert.deepEqual(before.steps.map(step=>step.kind),['reasoning'])
+ assert.equal(before.steps[0].content,'Inspect the files.')
+ assert.equal(before.finished,true)
+ assert.equal(blocks[2].content,'Reading now.')
+ assert.deepEqual(after.steps.map(step=>step.kind),['tool','tool','reasoning'])
+ assert.deepEqual(after.steps.filter(s=>s.kind==='tool').map(s=>[s.name,s.finalOutput,s.durationMs]),[['read_file','A finished',4000],['read_file','B finished',1000]])
+ assert.equal(after.steps.at(-1).status,'running')
+ assert.equal(after.finished,false)
  assert.equal(JSON.stringify(events),original)
 })
 
@@ -197,4 +202,39 @@ test('session pause freezes the latest execution even before its result event ar
  const run=processOf(events,'paused')
  assert.equal(run.status,'paused');assert.equal(run.active,false);assert.equal(run.finished,true)
  assert.equal(run.endedAt,Date.parse(at(3)));assert.equal(run.durationMs,3000)
+})
+
+test('a settled turn carries its time, reply-only copy text and branch point',()=>{
+ const events=[
+  {seq:1,type:'operation',operation:'message',text:'Summarize',occurred_at:at(0)},
+  {seq:2,type:'assistant_started',occurred_at:at(1)},
+  {seq:3,type:'thinking_delta',content:'Plan the summary.',occurred_at:at(1)},
+  {seq:4,type:'assistant_completed',content:'Reading the file.',occurred_at:at(2)},
+  {seq:5,type:'tool_started',name:'read_file',tool_call_id:'a',occurred_at:at(3)},
+  {seq:6,type:'tool_completed',name:'read_file',tool_call_id:'a',content:'raw file text',occurred_at:at(4)},
+  {seq:7,type:'assistant_started',occurred_at:at(5)},
+  {seq:8,type:'assistant_completed',content:'Here is the summary.',occurred_at:at(6)},
+  {seq:9,type:'result',status:'completed',output:'Here is the summary.',occurred_at:at(7)},
+ ]
+ const blocks=conversationTimeline(events,'completed')
+ assert.deepEqual(blocks.at(-1).footer.files,[])
+ assert.equal(blocks[0].at,Date.parse(at(0)))
+ const footers=blocks.filter(block=>block.footer)
+ assert.equal(footers.length,1)
+ assert.equal(footers[0],blocks.at(-1))
+ assert.deepEqual(footers[0].footer,{at:Date.parse(at(7)),text:'Reading the file.\n\nHere is the summary.',branchSeq:9,files:[]})
+ const failed=conversationTimeline([...events.slice(0,8),{seq:9,type:'result',status:'failed',occurred_at:at(7)}],'failed')
+ assert.equal(failed.find(block=>block.footer).footer.branchSeq,null)
+ assert.equal(conversationTimeline(events.slice(0,8),'running').some(block=>block.footer),false)
+})
+
+test('output files belong to the turn that wrote them',()=>{
+ const turn=(base,text,files)=>[
+  {seq:base,type:'operation',operation:'message',text,occurred_at:at(base)},
+  {seq:base+1,type:'assistant_completed',content:'Done '+text,occurred_at:at(base+1)},
+  {seq:base+2,type:'output_files',files,occurred_at:at(base+2)},
+  {seq:base+3,type:'result',status:'completed',occurred_at:at(base+3)},
+ ]
+ const blocks=conversationTimeline([...turn(1,'one',[{path:'a.py',size:1}]),...turn(10,'two',[{path:'b.wav',size:2},{path:'a.py',size:3}])],'completed')
+ assert.deepEqual(blocks.filter(block=>block.footer).map(block=>block.footer.files),[['a.py'],['b.wav','a.py']])
 })

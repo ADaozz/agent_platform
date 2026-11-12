@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sqlite3
 import tempfile
+import uuid
 
 
 def identifier(value):
@@ -112,6 +113,15 @@ class ArtifactStore:
                 raise ValueError('Unknown historical revision')
             state=self.prepare_restore(c,state,revision)
             return self.commit(c, state, row[0], operation_id, request, ['*'])
+
+    def history_id(self):
+        """Random identity of this revision history. Deleting the state directory and
+        initializing again starts a new history whose revisions and events restart at 0."""
+        with self.locked() as (c, state):
+            c.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
+            c.execute('INSERT OR IGNORE INTO meta VALUES (?,?)', ('history_id', uuid.uuid4().hex))
+            c.commit()
+            return c.execute("SELECT value FROM meta WHERE key='history_id'").fetchone()[0]
 
     def events(self, after=0):
         with self.locked() as (c, state):

@@ -97,7 +97,7 @@ function goToPage(item){if(!reviewView.value.wholeCurrent)return;const target=sl
 <template>
  <button v-if="deck&&(!opened||!active)" class="secondary pptx-reopen" type="button" @click="show"><Icon name="Presentation" :size="15" />{{ deck.path }}</button>
  <aside v-if="deck&&opened&&active" class="docx-panel pptx-panel" :aria-label="t('pptx.preview')">
-  <header class="docx-panel-header"><Icon name="Presentation" :size="18"/><PreviewFileSelect :model-value="deck.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="`${base}/revisions/${deck.revision}`" download :aria-label="t('Download')"><Icon name="Download" :size="17"/></a><button class="icon-button" type="button" :aria-label="t('pptx.close')" @click="close"><Icon name="X" :size="17"/></button></header>
+  <header class="docx-panel-header"><PreviewFileSelect :model-value="deck.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="`${base}/revisions/${deck.revision}`" download :aria-label="t('Download')"><Icon name="Download" :size="17"/></a><button class="icon-button" type="button" :aria-label="t('pptx.close')" @click="close"><Icon name="X" :size="17"/></button></header>
   <div class="pptx-status">
    <span>{{ t('docx.revision',{revision:deck.revision}) }}</span>
    <span>{{ deck.finalized?t('pptx.finalized'):t('pptx.draft') }}</span>

@@ -403,6 +403,15 @@
     background:
       repeating-linear-gradient(-45deg, var(--ws-hatch) 0 1px, transparent 1px 7px),
       var(--surface);
+    position: relative;
+  }
+  /* 分支会话：缩略图右上角的分支标记 */
+  .chat-branch {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    color: var(--signal-text);
   }
   .chat-info > strong {
     font-size: 13.5px;
@@ -598,6 +607,50 @@
     background: var(--surface);
     padding: 12px 16px 13px;
     font-size: 13.5px;
+  }
+
+  /* 消息时间与操作：用户气泡右下，Agent 每轮回复左下 */
+  .message-meta {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    white-space: normal;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+  }
+  .message-meta > time {
+    margin-right: 4px;
+  }
+  .message-meta .icon-button {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-faint);
+    transition:
+      background 0.16s,
+      color 0.16s;
+  }
+  .message-meta .icon-button:hover:not(:disabled) {
+    background: var(--ws-glass-strong);
+    color: var(--signal-text);
+  }
+  .message-meta .icon-button:disabled {
+    opacity: 0.45;
+    cursor: wait;
+  }
+  .user-message:has(+ .user-meta) {
+    margin-bottom: 4px;
+  }
+  .user-meta {
+    justify-content: flex-end;
+    margin: 0 -4px 22px 0;
+  }
+  .agent-meta {
+    margin: -2px 0 22px;
   }
   .markdown {
     font-size: 13.5px;
