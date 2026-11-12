@@ -444,7 +444,6 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
       <div v-else class="chat-page" :class="{ 'has-session': selected }">
         <div v-if="!selected" class="home-content">
           <div v-if="!dismissed && !profiles.some(p => p.configured)" class="setup-banner"><Icon name="TriangleAlert" :size="15" /><div><strong>{{ t("Connect a model to get started") }}</strong><span>{{ t("配置模型，即可使用 Deep Agent 的完整能力") }}</span></div><button @click="openModels">{{ t("Set up model") }}</button><button class="icon-button" :aria-label='t("关闭提示")' @click="dismissBanner"><Icon name="X" :size="13" /></button></div>
-          <div v-else-if="!dismissed" class="ready-banner"><span class="status-dot completed"></span><span>{{ t("Ready to start") }}</span><button @click="dismissBanner" class="icon-button" :aria-label='t("关闭提示")'><Icon name="X" :size="13" /></button></div>
         </div>
 
         <div v-if="selected" ref="transcriptEl" class="transcript" @scroll.passive="updateScrollState">
