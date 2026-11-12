@@ -17,7 +17,7 @@ import {
   // @ts-ignore: shared with the JavaScript workspace UI
 } from '@/agent-platform/workspace'
 
-defineProps<{ open: boolean }>()
+const props = defineProps<{ open: boolean }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +31,8 @@ const actions: { type: string; title: string; icon: IconName }[] = [
 
 function actionActive(type: string) {
   if (!onAgent.value) return false
-  if (type === 'new') return workspaceView.value === 'agents' && !activeSessionId.value
+  // Recent rows are hidden when collapsed; the Agent entry carries their selection.
+  if (type === 'new') return workspaceView.value === 'agents' && (!activeSessionId.value || !props.open)
   return type === workspaceView.value
 }
 
@@ -88,7 +89,7 @@ onUnmounted(() => clearInterval(timer))
       :key="s.id"
       type="button"
       class="rail-item recent-row"
-      :class="{ 'recent-row-active': onAgent && activeSessionId === s.id }"
+      :class="{ 'recent-row-active': onAgent && workspaceView === 'agents' && activeSessionId === s.id }"
       @click="go('open', { id: s.id })"
     >
       <span class="status-lamp" :class="s.status" />

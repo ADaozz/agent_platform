@@ -262,9 +262,10 @@ function handleLogout() {
 .rail-item::before {
   content: '';
   position: absolute;
-  inset: 9px auto 9px 2px;
-  width: 6px;
+  inset: 9px auto 9px 0;
+  width: 3px;
   background: var(--color-signal);
+  pointer-events: none;
   opacity: 0;
   transform: scaleY(0.35);
   transition:
@@ -282,6 +283,11 @@ function handleLogout() {
 }
 .rail-item:hover::before,
 .rail-item:focus-visible::before {
+  opacity: 0.35;
+  transform: none;
+}
+.rail-item.rail-item-active::before,
+.rail-item.recent-row-active::before {
   opacity: 1;
   transform: none;
 }
