@@ -1,11 +1,13 @@
 <script setup>
 import { ref, watch, computed, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { t } from '../../preferences'
+import {normalizedRegion} from '../office/reviewModel'
 const props = defineProps({ revision: Number, renderRevision: Number, renderPages: Number, pageHashes: Array, renderBaseUrl: String,
   imageBaseUrl: String, pages: { type: Array, default: () => [] }, storageKey: String })
 const emit = defineEmits(['rendered'])
 const stage = ref(null), thumbs = ref(null), loading = ref(false), error = ref(''), follow = ref(true), images = ref([]), shownRevision = ref(-1)
 const selected = ref(Number(props.storageKey && sessionStorage.getItem(props.storageKey + ':page')) || 1)
+const focusedRegion=ref(null)
 const changed = ref(new Set()), zoom = ref('page'), paperWidth = ref(500)
 const pending = computed(() => shownRevision.value < props.revision)
 const current = computed(() => images.value[Math.min(selected.value, images.value.length) - 1])
@@ -68,7 +70,19 @@ async function show(page) {
   if (stage.value) stage.value.scrollTop = 0
   thumbs.value?.querySelector(`[data-page="${selected.value}"]`)?.scrollIntoView({ block: 'nearest' })
 }
-function select(page) { follow.value = false; show(page) }
+function select(page) { focusedRegion.value=null;follow.value = false; show(page) }
+function locate(request){
+ if(request.revision!==props.revision||request.revision!==shownRevision.value||props.renderRevision!==request.revision||!images.value.some(p=>p.page===request.page))return false
+ const page=props.pages.find(p=>p.page===request.page)
+ if(!page||!request.fingerprint||page.fingerprint!==request.fingerprint)return false
+ select(request.page)
+ focusedRegion.value=request.blockId?normalizedRegion(request.region):null
+ stage.value?.focus({preventScroll:true})
+ return true
+}
+defineExpose({locate})
+watch(selected,()=>{focusedRegion.value=null},{flush:'sync'})
+watch(()=>[props.revision,props.renderRevision],()=>{focusedRegion.value=null},{flush:'sync'})
 function resumeFollow() { follow.value = true; show(changed.value.size ? Math.min(...changed.value) : images.value.length) }
 function onKey(event) {
   const step = { ArrowDown: 1, PageDown: 1, ArrowRight: 1, ArrowUp: -1, PageUp: -1, ArrowLeft: -1 }[event.key]
@@ -87,12 +101,12 @@ function onKey(event) {
       </button>
     </nav>
     <div ref="stage" class="docx-stage" tabindex="0" @keydown="onKey">
-      <figure v-if="current" class="docx-paper" :style="{ width: paperWidth + 'px' }"><img :src="current.url" :alt="t('docx.page', { page: current.page })" decoding="async" draggable="false"><figcaption>{{ t('docx.page', { page: current.page }) }} / {{ images.length }}</figcaption></figure>
+      <figure v-if="current" class="docx-paper" :style="{ width: paperWidth + 'px' }"><div class="docx-page-image"><img :src="current.url" :alt="t('docx.page', { page: current.page })" decoding="async" draggable="false"><i v-if="focusedRegion" class="docx-issue-region" :aria-label="t('office.highlight')" :style="{left:focusedRegion[0]*100+'%',top:focusedRegion[1]*100+'%',width:focusedRegion[2]*100+'%',height:focusedRegion[3]*100+'%'}"></i></div><figcaption>{{ t('docx.page', { page: current.page }) }} / {{ images.length }}</figcaption></figure>
       <figure v-else class="docx-paper" :style="{ width: paperWidth + 'px' }"><div class="docx-blank-sheet"></div><figcaption>{{ t('docx.page', { page: 1 }) }}</figcaption></figure>
     </div>
   </div>
 </template>
 <style>
-.docx-workbench{display:flex;flex:1;min-height:0;background:var(--page)}.docx-thumbnails{width:120px;flex-shrink:0;overflow:auto;padding:14px 10px;border-right:1px solid var(--border)}.docx-thumbnails>button{display:block;width:100%;padding:5px;border:1px solid transparent;border-radius:6px;margin-bottom:12px}.docx-thumbnails>button.selected{border-color:var(--blue-text);background:var(--blue-bg)}.docx-thumb{display:block;position:relative}.docx-thumb>img{display:block;width:100%;height:auto;background:white;box-shadow:0 1px 4px #0002;user-select:none}.docx-changed-dot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--blue-text);box-shadow:0 0 0 2px white}.docx-thumb-label{display:block;font-size:9px;margin-top:7px;color:var(--text-muted);font-variant-numeric:tabular-nums}.docx-stage{flex:1;min-width:0;overflow:auto;padding:20px 18px;display:flex;flex-direction:column;align-items:center;outline:none;overscroll-behavior:contain;color-scheme:light}.docx-paper{margin:0;flex-shrink:0}.docx-paper>img{display:block;width:100%;height:auto;background:white;box-shadow:0 2px 10px #0002;user-select:none}.docx-paper>figcaption{text-align:center;font-size:10px;color:var(--text-muted);margin-top:8px;font-variant-numeric:tabular-nums}.docx-blank-sheet{width:100%;aspect-ratio:210/297;background:white;box-shadow:0 2px 10px #0002}.docx-preview-status{display:flex;align-items:center;gap:15px;padding:9px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted)}.docx-changed-note{color:var(--blue-text)}.docx-preview-status>select{margin-left:auto;font-size:10px;max-width:115px;padding:3px 6px}.docx-preview-error{padding:10px;font-size:12px;color:var(--error-text)}
+.docx-workbench{display:flex;flex:1;min-height:0;background:var(--page)}.docx-thumbnails{width:120px;flex-shrink:0;overflow:auto;padding:14px 10px;border-right:1px solid var(--border)}.docx-thumbnails>button{display:block;width:100%;padding:5px;border:1px solid transparent;border-radius:6px;margin-bottom:12px}.docx-thumbnails>button.selected{border-color:var(--blue-text);background:var(--blue-bg)}.docx-thumb{display:block;position:relative}.docx-thumb>img{display:block;width:100%;height:auto;background:white;box-shadow:0 1px 4px #0002;user-select:none}.docx-changed-dot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--blue-text);box-shadow:0 0 0 2px white}.docx-thumb-label{display:block;font-size:9px;margin-top:7px;color:var(--text-muted);font-variant-numeric:tabular-nums}.docx-stage{flex:1;min-width:0;overflow:auto;padding:20px 18px;display:flex;flex-direction:column;align-items:center;outline:none;overscroll-behavior:contain;color-scheme:light}.docx-paper{margin:0;flex-shrink:0}.docx-page-image{position:relative}.docx-issue-region{position:absolute;pointer-events:none;box-sizing:border-box;border:2px solid var(--error-text,#c33);background:#e443331f}.docx-page-image>img{display:block;width:100%;height:auto;background:white;box-shadow:0 2px 10px #0002;user-select:none}.docx-paper>figcaption{text-align:center;font-size:10px;color:var(--text-muted);margin-top:8px;font-variant-numeric:tabular-nums}.docx-blank-sheet{width:100%;aspect-ratio:210/297;background:white;box-shadow:0 2px 10px #0002}.docx-preview-status{display:flex;align-items:center;gap:15px;padding:9px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted)}.docx-changed-note{color:var(--blue-text)}.docx-preview-status>select{margin-left:auto;font-size:10px;max-width:115px;padding:3px 6px}.docx-preview-error{padding:10px;font-size:12px;color:var(--error-text)}
 @media(max-width:700px){.docx-thumbnails{width:84px}.docx-stage{padding:12px 10px}}
 </style>

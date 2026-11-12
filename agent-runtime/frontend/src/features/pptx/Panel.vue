@@ -6,6 +6,10 @@ import {t} from '../../preferences'
 import {api} from '../../featureApi'
 import SlideCanvas from './SlideCanvas.vue'
 import ReviewDisclosure from './ReviewDisclosure.vue'
+import ReviewIssueList from '../office/ReviewIssueList.vue'
+import ReviewMetadata from '../office/ReviewMetadata.vue'
+import {pptxReviews,normalizeStatus} from '../office/reviewModel'
+import {delegateOfficeIssue,delegationKey} from '../office/delegate'
 const props=defineProps({session:Object,events:{type:Array,default:()=>[]},active:Boolean,files:{type:Array,default:()=>[]},openRequest:Object})
 const emit=defineEmits(['open','context','error','catalog','select-file'])
 const decks=ref({}),identity=ref(''),opened=ref(false),selectedSlide=ref(''),follow=ref(true),focused=ref(''),busy=ref(false),delegated=ref({})
@@ -13,17 +17,18 @@ const deck=computed(()=>decks.value[identity.value]),slides=computed(()=>deck.va
 const profile=computed(()=>deck.value?.manifest?.profile||null)
 const base=computed(()=>props.session&&identity.value?`/api/agent/sessions/${props.session.id}/presentations/${encodeURIComponent(identity.value)}`:'')
 const route=computed(()=>base.value.replace(/^\/api/,''))
-let cursor=0
+let cursor=0,deckEpoch=0
 function key(id){return `pptx-preview:${props.session?.id}:${id}:closed`}
-function receive(updates){for(const update of updates){if(!update.presentation_id||!Number.isInteger(update.revision))continue;const old=decks.value[update.presentation_id];if(old&&old.revision>update.revision)continue;const next={...old,...update};decks.value={...decks.value,[update.presentation_id]:next};if(!old){identity.value=update.presentation_id;opened.value=sessionStorage.getItem(key(identity.value))!=='true';emit('open',opened.value)}if(follow.value&&update.slide_id)selectedSlide.value=update.slide_id;if(!selectedSlide.value&&next.manifest?.slides.length)selectedSlide.value=next.manifest.slides[0].slide_id}}
+function receive(updates){deckEpoch++;for(const update of updates){if(!update.presentation_id||!Number.isInteger(update.revision))continue;const old=decks.value[update.presentation_id];if(old&&old.revision>update.revision)continue;const next={...old,...update};decks.value={...decks.value,[update.presentation_id]:next};if(!old){identity.value=update.presentation_id;opened.value=sessionStorage.getItem(key(identity.value))!=='true';emit('open',opened.value)}if(follow.value&&update.slide_id)selectedSlide.value=update.slide_id;if(!selectedSlide.value&&next.manifest?.slides.length)selectedSlide.value=next.manifest.slides[0].slide_id}}
+function receiveSnapshots(values,epoch){receive(values.filter(value=>epoch===deckEpoch||!decks.value[value.presentation_id]||decks.value[value.presentation_id].revision<value.revision))}
 watch(decks,values=>emit('catalog',Object.values(values).filter(file=>file.path)))
 watch(()=>props.openRequest,async request=>{
  if(!request||!props.session)return
  const id=props.session.id
  try{
-  const values=await api(`/agent/sessions/${id}/presentations`)
+  const epoch=deckEpoch,values=await api(`/agent/sessions/${id}/presentations`)
   if(props.session?.id!==id||props.openRequest?.token!==request.token)return
-  receive(values)
+  receiveSnapshots(values,epoch)
   const item=Object.values(decks.value).find(file=>file.path===request.path)
   if(!item)throw new Error(t('artifacts.previewUnavailable'))
   identity.value=item.presentation_id;selectedSlide.value=item.manifest?.slides[0]?.slide_id||'';show()
@@ -36,14 +41,15 @@ watch(()=>props.openRequest,async request=>{
 function close(){opened.value=false;sessionStorage.setItem(key(identity.value),'true');emit('open',false)}
 function show(){opened.value=true;sessionStorage.removeItem(key(identity.value));emit('open',true)}
 function select(sid){selectedSlide.value=sid;follow.value=false;focused.value=''}
-async function post(path,body){busy.value=true;try{const result=await api(route.value+path,{method:'POST',body});receive([result]);return result}catch(e){emit('error',e.message)}finally{busy.value=false}}
+async function post(path,body){const id=props.session?.id,epoch=deckEpoch;busy.value=true;try{const result=await api(route.value+path,{method:'POST',body});if(props.session?.id===id)receiveSnapshots([result],epoch);return result}catch(e){if(props.session?.id===id)emit('error',e.message)}finally{if(props.session?.id===id)busy.value=false}}
 const dismissIssue=id=>post('/aesthetic-decision',{revision:deck.value.revision,decision:'dismiss_issues',issue_ids:[id],slide_id:slide.value.slide_id})
 const requestDeck=()=>post('/aesthetic-review',{revision:deck.value.revision})
-watch(()=>props.session?.id,async id=>{decks.value={};identity.value='';opened.value=false;selectedSlide.value='';follow.value=true;cursor=0;emit('open',false);if(!id)return;receive(props.events.filter(e=>e.type.startsWith('presentation_')));cursor=props.events.at(-1)?.seq||0;try{const values=await api(`/agent/sessions/${id}/presentations`);if(props.session?.id===id)receive(values)}catch(e){emit('error',e.message)}},{immediate:true})
+watch(()=>props.session?.id,async id=>{decks.value={};identity.value='';opened.value=false;selectedSlide.value='';follow.value=true;cursor=0;emit('open',false);if(!id)return;receive(props.events.filter(e=>e.type.startsWith('presentation_')));cursor=props.events.at(-1)?.seq||0;try{const epoch=deckEpoch,values=await api(`/agent/sessions/${id}/presentations`);if(props.session?.id===id)receiveSnapshots(values,epoch)}catch(e){emit('error',e.message)}},{immediate:true})
 watch(()=>props.events.at(-1)?.seq,()=>{const batch=props.events.filter(e=>e.seq>cursor);cursor=props.events.at(-1)?.seq||cursor;receive(batch.filter(e=>e.type.startsWith('presentation_')))})
 watch(()=>[deck.value?.revision,slide.value?.slide_id,props.active],()=>{emit('context',deck.value&&slide.value?{feature:'pptx',presentation_id:identity.value,slide_id:slide.value.slide_id,revision:deck.value.revision}:null)})
 const styleReference=computed(()=>deck.value?.manifest?.style_reference||null)
 const profileName=computed(()=>styleReference.value?.folder_name||t('pptx.styleUnspecified'))
+const reviewView=computed(()=>pptxReviews(deck.value,slide.value))
 const review=computed(()=>slide.value?.review||{})
 const issues=computed(()=>review.value.layout_issues||[])
 const aesthetic=computed(()=>review.value.aesthetic_review||null)
@@ -56,30 +62,29 @@ const visibleFindings=items=>(items||[]).filter(item=>!item.dismissed).sort((a,b
 const currentFindings=computed(()=>visibleFindings(findings.value))
 const deckFindings=computed(()=>visibleFindings(deckReview.value?.issues))
 const reviewScope=computed(()=>`${props.session?.id}:${identity.value}:${slide.value?.slide_id}:${deck.value?.revision}`)
-const automaticStatus=computed(()=>{
- if(review.value.render_error||review.value.visual_integrity?.status==='unavailable'||review.value.technical_review?.status==='unavailable')return 'unavailable'
- if(review.value.automatic_passed===true)return 'passed'
- if(review.value.automatic_passed===false||issues.value.some(issue=>(issue.severity||'error')==='error'))return 'failed'
- return 'not_requested'
-})
-const visualStatus=computed(()=>!aesthetic.value?'not_requested':aesthetic.value.error?'unavailable':['blocked_by_automatic_checks','deferred_until_deck_checked'].includes(aesthetic.value.reason)?'waiting':effective.value)
-const deckStatus=computed(()=>!deckReview.value?'not_requested':deckReview.value.error?'unavailable':deckReview.value.status)
-const reviewLabel=status=>t('pptx.reviewState.'+status)
+const automaticStatus=computed(()=>reviewView.value.automatic)
+const visualStatus=computed(()=>reviewView.value.visual)
+const deckStatus=computed(()=>reviewView.value.document)
+const reviewLabel=status=>t('office.state.'+normalizeStatus(status))
 const slideNumber=computed(()=>slides.value.findIndex(item=>item.slide_id===slide.value?.slide_id)+1)
+function delegatedKey(item,pages){return delegationKey({feature:'pptx',identity:identity.value,revision:deck.value.revision,requestId:pages?deckReview.value?.request_id:aesthetic.value?.review_id,issueId:item.id,pages:pages||slideNumber.value})}
 async function delegate(item,pages){
- const text=t('pptx.fixRequest',{pages:pages||slideNumber.value,id:item.id,observation:item.observation,suggestion:item.suggestion})
- const id=props.session.id,running=['running','queued'].includes(props.session.status)
+ const id=props.session.id,scope=`${id}:${identity.value}:${deck.value.revision}`,key=delegatedKey(item,pages)
+ const valid=pages?reviewView.value.wholeCurrent:reviewView.value.visualCurrent
+ if(!valid){emit('error',t('office.staleNote'));return}
+ const pageNumbers=pages?item.slides:[slideNumber.value]
+ const target=slides.value[(pageNumbers?.[0]||1)-1]
  busy.value=true
  try{
-  if(running)await api(`/agent/sessions/${id}/actions/steer`,{method:'POST',body:{text,artifact:{feature:'pptx',presentation_id:identity.value,slide_id:slide.value.slide_id,revision:deck.value.revision}}})
-  else await api(`/agent/sessions/${id}/messages`,{method:'POST',body:{text}})
-  delegated.value={...delegated.value,[item.id+':'+(pages||slideNumber.value)]:true}
- }catch(e){emit('error',e.message)}finally{busy.value=false}
+  await delegateOfficeIssue(api,{session:{...props.session},artifact:{feature:'pptx',presentation_id:identity.value,slide_id:target?.slide_id||slide.value.slide_id,revision:deck.value.revision,element_ids:item.element_ids||[]},pages:pageNumbers,issue:{...item,pages:pageNumbers,requestId:pages?deckReview.value?.request_id:null,reviewId:pages?deckReview.value?.review_id:aesthetic.value?.review_id}})
+  if(`${props.session?.id}:${identity.value}:${deck.value?.revision}`===scope)delegated.value={...delegated.value,[key]:true}
+ }catch(e){if(props.session?.id===id)emit('error',e.message)}finally{if(props.session?.id===id)busy.value=false}
 }
+watch(()=>`${props.session?.id}:${identity.value}:${deck.value?.revision}`,()=>{delegated.value={};focused.value=''})
 const deckReview=computed(()=>deck.value?.deck_review||null)
-const highlights=computed(()=>findings.value.filter(item=>!item.dismissed&&(isCritical(item)||item.id===focused.value)).map(item=>({id:item.id,region:item.region,element_ids:item.element_ids,severity:item.severity,active:item.id===focused.value})))
+const highlights=computed(()=>!reviewView.value.visualCurrent?[]:findings.value.filter(item=>!item.dismissed&&(isCritical(item)||item.id===focused.value)).map(item=>({id:item.id,region:item.region,element_ids:item.element_ids,severity:item.severity,active:item.id===focused.value})))
 function pageList(item){return item.slides?.join(', ')}
-function goToPage(item){const target=slides.value[(item.slides?.[0]||1)-1];if(target)select(target.slide_id)}
+function goToPage(item){if(!reviewView.value.wholeCurrent)return;const target=slides.value[(item.slides?.[0]||1)-1];if(target)select(target.slide_id)}
 </script>
 <template>
  <button v-if="deck&&(!opened||!active)" class="secondary pptx-reopen" type="button" @click="show"><Icon name="Presentation" :size="15" />{{ deck.path }}</button>
@@ -98,54 +103,54 @@ function goToPage(item){const target=slides.value[(item.slides?.[0]||1)-1];if(ta
     <div v-if="slide" class="pptx-slide-heading"><span>{{ t('pptx.profile') }}: <strong :title="styleReference?.style_id">{{ profileName }}</strong></span><span>{{ review.rendered?t('pptx.formal'):t('pptx.instant') }}</span></div>
     <SlideCanvas v-if="slide" :slide="slide" :profile="profile" :revision="deck.revision" :base-url="base" :highlights="highlights"/>
     <div v-else class="pptx-empty">{{ t('pptx.creating') }}</div>
-    <section v-if="slide" class="pptx-slide-reviews">
+    <section v-if="slide" class="pptx-slide-reviews"><p v-if="reviewView.carried" class="pptx-meta">{{ t('office.carriedReview',{reviewed:review.revision,current:deck.revision}) }}</p>
      <ReviewDisclosure :key="reviewScope+':automatic'" :title="t('pptx.automatic')" :status="automaticStatus" :status-label="reviewLabel(automaticStatus)" :issues="issues" kind="automatic">
      <div class="pptx-checks">
       <span v-if="review.technical_review">{{ t('pptx.technical') }}: <b :class="'pptx-check-'+review.technical_review.status">{{ t('pptx.check.'+review.technical_review.status) }}</b></span>
       <span v-if="review.visual_integrity">{{ t('pptx.integrity') }}: <b :class="'pptx-check-'+review.visual_integrity.status">{{ t('pptx.check.'+review.visual_integrity.status) }}</b></span>
      </div>
-     <p v-for="(issue,index) in issues" :key="index" :class="'pptx-issue-'+(issue.severity||'error')"><span>{{ issue.severity||'error' }}</span> {{ issue.type }} · {{ issue.element_id||issue.elements?.join(', ') }}<template v-if="issue.message"> — {{ issue.message }}</template></p>
+     <p v-for="(issue,index) in issues" :key="index" :class="'pptx-issue-'+(issue.severity||'ungraded')"><span>{{ issue.severity||t('office.ungraded') }}</span> {{ issue.type }} · {{ issue.element_id||issue.elements?.join(', ') }}<template v-if="issue.message"> — {{ issue.message }}</template></p>
      <p v-if="review.agent_inspection" class="pptx-meta">{{ t('pptx.agentNote',{notes:review.agent_inspection.notes}) }}</p>
 
      </ReviewDisclosure>
      <ReviewDisclosure :key="reviewScope+':visual'" :title="t('pptx.aesthetic')" :status="visualStatus" :status-label="reviewLabel(visualStatus)" :issues="findings">
      <p v-if="review.revision!==undefined" class="pptx-meta">{{ t('pptx.reviewVersions',{reviewed:aesthetic?.revision??review.revision,current:deck.revision}) }}</p>
      <div v-if="aesthetic" class="pptx-aesthetic">
-      <p v-if="aesthetic.model_id" class="pptx-meta">{{ t('pptx.model',{model:aesthetic.model_id,prompt:aesthetic.prompt_version}) }}</p>
+      <ReviewMetadata :review="aesthetic" />
       <p v-if="aesthetic.summary">{{ aesthetic.summary }}</p>
       <p v-if="aesthetic.error" class="pptx-meta">{{ t('pptx.reviewError',{code:errorLabel(aesthetic.error.code)}) }}<template v-if="aesthetic.error.message"> — {{ aesthetic.error.message }}</template></p>
       <p v-if="review.constraints?.length" class="pptx-meta">{{ t('pptx.constraints',{items:review.constraints.join('；')}) }}</p>
       <p v-if="aesthetic.auto_repair===false&&!aesthetic.advisory_only" class="pptx-warning">{{ t('pptx.autoRepairStopped') }}</p>
       <p v-if="!currentFindings.length&&['passed','failed'].includes(aesthetic.status)" class="pptx-meta">{{ t('pptx.noIssues') }}</p>
-      <ul v-if="currentFindings.length" class="pptx-findings">
-       <li v-for="item in currentFindings" :key="item.id" :class="['pptx-finding-'+item.severity,{focused:item.id===focused,dismissed:item.dismissed}]" @mouseenter="focused=item.id" @mouseleave="focused=''" @click="focused=focused===item.id?'':item.id">
-        <div class="pptx-finding-head"><span class="pptx-badge">{{ t('pptx.severity.'+item.severity) }}</span><code>{{ item.category }}</code><span v-if="item.needs_verification" class="pptx-badge pptx-badge-muted">{{ t('pptx.needsVerification') }}</span><span v-if="item.dismissed" class="pptx-badge pptx-badge-muted">{{ t('pptx.dismissed') }}</span><span class="pptx-meta">{{ t('pptx.confidence',{value:item.confidence}) }}</span></div>
+      <ReviewIssueList v-if="currentFindings.length" class="pptx-findings" :issues="currentFindings"><template #item="{item}">
+       <li :class="['pptx-finding-'+item.severity,{focused:item.id===focused,dismissed:item.dismissed}]" @mouseenter="focused=item.id" @mouseleave="focused=''" @click="focused=focused===item.id?'':item.id">
+        <div class="pptx-finding-head"><span class="pptx-badge">{{ item.severity?t('pptx.severity.'+item.severity):t('office.ungraded') }}</span><code>{{ item.category }}</code><span v-if="item.needs_verification" class="pptx-badge pptx-badge-muted">{{ t('pptx.needsVerification') }}</span><span v-if="item.dismissed" class="pptx-badge pptx-badge-muted">{{ t('pptx.dismissed') }}</span><span class="pptx-meta">{{ t('pptx.confidence',{value:item.confidence??t('office.unknown')}) }}</span></div>
         <p>{{ item.observation }}</p>
         <p class="pptx-meta">{{ t('pptx.reason') }}：{{ item.reason }}</p>
         <p class="pptx-meta">{{ t('pptx.suggestion') }}：{{ item.suggestion }}</p>
         <p v-if="item.element_ids?.length" class="pptx-meta">{{ t('pptx.elementsRef',{ids:item.element_ids.join(', ')}) }}</p>
         <p v-if="item.unmapped_element_ids?.length" class="pptx-warning">{{ t('pptx.unmapped',{ids:item.unmapped_element_ids.join(', ')}) }}</p>
-        <div v-if="!item.dismissed" class="pptx-finding-actions"><button type="button" class="text-button" :disabled="busy||delegated[item.id+':'+slideNumber]" @click.stop="delegate(item)">{{ delegated[item.id+':'+slideNumber]?t('pptx.delegated'):t('pptx.delegate') }}</button><button type="button" class="text-button" :disabled="busy" @click.stop="dismissIssue(item.id)">{{ t('pptx.dismiss') }}</button></div>
+        <div v-if="!item.dismissed" class="pptx-finding-actions"><button type="button" class="text-button" :disabled="busy||!reviewView.visualCurrent||delegated[delegatedKey(item)]" @click.stop="delegate(item)">{{ delegated[delegatedKey(item)]?t('pptx.delegated'):t('pptx.delegate') }}</button><button type="button" class="text-button" :disabled="busy||!reviewView.visualCurrent" @click.stop="reviewView.visualCurrent&&dismissIssue(item.id)">{{ t('pptx.dismiss') }}</button></div>
        </li>
-      </ul>
+      </template></ReviewIssueList>
 
      </div>
      </ReviewDisclosure>
     </section>
-    <ReviewDisclosure v-if="slides.length>1" :key="reviewScope+':deck'" class="pptx-deck-review" :title="t('pptx.deckReview')" :status="deckStatus" :status-label="reviewLabel(deckStatus)" :issues="deckReview?.issues||[]">
-     <span v-if="deckReview" class="pptx-meta">{{ t('pptx.reviewVersions',{reviewed:deckReview.revision,current:deck.revision}) }}</span>
+    <ReviewDisclosure v-if="slides.length" :key="`${props.session?.id}:${identity}:${deck.revision}:${deckReview?.request_id||''}:deck`" class="pptx-deck-review" :title="t('pptx.deckReview')" :status="deckStatus" :status-label="reviewLabel(deckStatus)" :issues="deckReview?.issues||[]">
+     <ReviewMetadata v-if="deckReview" :review="deckReview" /><span v-if="deckReview" class="pptx-meta">{{ t('pptx.reviewVersions',{reviewed:deckReview.revision,current:deck.revision}) }}</span>
      <span v-else class="pptx-meta">{{ t('pptx.deckNotRequested') }}</span>
      <p v-if="deckReview?.status==='stale'" class="pptx-meta">{{ t('pptx.reviewExpired') }}</p>
      <p v-if="deckReview?.summary">{{ deckReview.summary }}</p>
      <p v-if="deckReview?.error" class="pptx-meta">{{ t('pptx.reviewError',{code:errorLabel(deckReview.error.code)}) }}</p>
-     <ul v-if="deckFindings.length" class="pptx-findings">
-      <li v-for="item in deckFindings" :key="item.id" :class="['pptx-finding-'+item.severity,{dismissed:item.dismissed}]" @click="goToPage(item)">
-       <div class="pptx-finding-head"><span class="pptx-badge">{{ t('pptx.severity.'+item.severity) }}</span><code>{{ item.category }}</code><span class="pptx-meta">{{ t('pptx.pages',{pages:pageList(item)}) }}</span></div>
+     <ReviewIssueList v-if="deckFindings.length" class="pptx-findings" :issues="deckFindings"><template #item="{item}">
+      <li :class="['pptx-finding-'+item.severity,{dismissed:item.dismissed}]" @click="goToPage(item)">
+       <div class="pptx-finding-head"><span class="pptx-badge">{{ item.severity?t('pptx.severity.'+item.severity):t('office.ungraded') }}</span><code>{{ item.category }}</code><span class="pptx-meta">{{ t('pptx.pages',{pages:pageList(item)}) }}</span></div>
        <p>{{ item.observation }}</p>
        <p class="pptx-meta">{{ t('pptx.suggestion') }}：{{ item.suggestion }}</p>
-       <div class="pptx-finding-actions"><button type="button" class="text-button" :disabled="busy||delegated[item.id+':'+pageList(item)]" @click.stop="delegate(item,pageList(item))">{{ delegated[item.id+':'+pageList(item)]?t('pptx.delegated'):t('pptx.delegate') }}</button></div>
+       <div class="pptx-finding-actions"><button type="button" class="text-button" :disabled="busy||!reviewView.wholeCurrent||delegated[delegatedKey(item,pageList(item))]" @click.stop="delegate(item,pageList(item))">{{ delegated[delegatedKey(item,pageList(item))]?t('pptx.delegated'):t('pptx.delegate') }}</button></div>
       </li>
-     </ul>
+     </template></ReviewIssueList>
 
      <p v-if="deckReview?.rejected_issues?.length" class="pptx-meta">{{ t('pptx.rejectedIssues',{count:deckReview.rejected_issues.length}) }}</p>
      <div class="pptx-actions">

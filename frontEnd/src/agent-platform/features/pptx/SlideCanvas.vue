@@ -61,7 +61,7 @@ const boxes=computed(()=>{
     </g>
    </template>
   </svg>
-  <div v-for="item in boxes" :key="item.key" class="pptx-highlight" :class="['pptx-highlight-'+(item.severity||'minor'),'pptx-highlight-'+item.kind,{active:item.active}]" :style="{left:item.x*100+'%',top:item.y*100+'%',width:item.w*100+'%',height:item.h*100+'%'}"></div>
+  <div v-for="item in boxes" :key="item.key" class="pptx-highlight" :class="['pptx-highlight-'+(item.severity||'ungraded'),'pptx-highlight-'+item.kind,{active:item.active}]" :style="{left:item.x*100+'%',top:item.y*100+'%',width:item.w*100+'%',height:item.h*100+'%'}"></div>
  </div>
 </template>
 <style>
