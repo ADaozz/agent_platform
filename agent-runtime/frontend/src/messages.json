@@ -1888,11 +1888,11 @@
     "en": "Deterministic layout"
   },
   "docx.quality.pageVisual": {
-    "zh": "单页视觉验收",
+    "zh": "逐页视觉审查",
     "en": "Page visual review"
   },
   "docx.quality.documentVisual": {
-    "zh": "整稿视觉验收",
+    "zh": "整稿视觉审查",
     "en": "Document visual review"
   },
   "docx.quality.passed": {
@@ -1970,5 +1970,121 @@
   "docx.quality.stop.render_failed": {
     "zh": "渲染失败，无法验证修复",
     "en": "Rendering failed; repair cannot be verified"
+  },
+  "office.quality": {
+    "zh": "文档质量审查",
+    "en": "Document quality review"
+  },
+  "office.state.passed": {
+    "zh": "已通过",
+    "en": "Passed"
+  },
+  "office.state.issues": {
+    "zh": "有待处理问题",
+    "en": "Issues"
+  },
+  "office.state.pending": {
+    "zh": "待审查",
+    "en": "Pending"
+  },
+  "office.state.unavailable": {
+    "zh": "不可用",
+    "en": "Unavailable"
+  },
+  "office.state.stale": {
+    "zh": "已过期",
+    "en": "Stale"
+  },
+  "office.unknown": {
+    "zh": "未知",
+    "en": "Unknown"
+  },
+  "office.ungraded": {
+    "zh": "未提供严重程度",
+    "en": "Severity not provided"
+  },
+  "office.confidence": {
+    "zh": "置信度",
+    "en": "Confidence"
+  },
+  "office.model": {
+    "zh": "模型 ID",
+    "en": "Model ID"
+  },
+  "office.prompt": {
+    "zh": "Prompt 版本",
+    "en": "Prompt version"
+  },
+  "office.reviewedAt": {
+    "zh": "审查时间",
+    "en": "Reviewed at"
+  },
+  "office.rawStatus": {
+    "zh": "后端状态",
+    "en": "Backend status"
+  },
+  "office.viewError": {
+    "zh": "查看错误",
+    "en": "View error"
+  },
+  "office.checkEvidence": {
+    "zh": "检查依据",
+    "en": "Check evidence"
+  },
+  "office.pages": {
+    "zh": "页",
+    "en": "Pages"
+  },
+  "office.suggestion": {
+    "zh": "修复建议",
+    "en": "Suggestion"
+  },
+  "office.pageOnly": {
+    "zh": "仅支持页面定位：没有可靠的 Block 区域坐标",
+    "en": "Page navigation only: reliable Block coordinates are unavailable"
+  },
+  "office.noLocation": {
+    "zh": "没有可靠的页面定位信息",
+    "en": "Page location is unavailable"
+  },
+  "office.locate": {
+    "zh": "定位问题",
+    "en": "Locate issue"
+  },
+  "office.delegate": {
+    "zh": "交给 Agent 修复",
+    "en": "Ask the Agent to fix"
+  },
+  "office.delegated": {
+    "zh": "已交给 Agent",
+    "en": "Sent to the Agent"
+  },
+  "office.retryVisual": {
+    "zh": "重新审查全文视觉",
+    "en": "Review all pages and document again"
+  },
+  "office.staleNote": {
+    "zh": "此结果不对应当前版本或审查请求，无法用于定位或委派。",
+    "en": "This result does not match the current revision or review request. Location and delegation are disabled."
+  },
+  "office.previewNotCurrent": {
+    "zh": "当前版本预览尚未就绪，请等待分页完成。",
+    "en": "The current revision preview is not ready. Wait for pagination."
+  },
+  "office.highlight": {
+    "zh": "当前问题区域",
+    "en": "Current issue region"
+  },
+  "office.carriedReview": {
+    "zh": "复用未变化页面的 R{reviewed} 审查，当前文档 R{current}",
+    "en": "Reused unchanged-page review R{reviewed}; document R{current}"
+  },
+  "office.rawReview": {
+    "zh": "原始审查数据",
+    "en": "Raw review data"
+  },
+  "office.fixRequest": {
+    "zh": "请根据审查意见局部修复当前文档：{observation}。建议：{suggestion}。修改前读取最新版本，仅调整相关内容并保留必要内容，修改后重新渲染检查。",
+    "en": "Please locally repair the current document based on this review: {observation}. Suggestion: {suggestion}. Read the latest revision first, preserve necessary and unrelated content, then render and recheck."
   }
 }

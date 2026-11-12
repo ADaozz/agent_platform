@@ -794,10 +794,11 @@ def test_docx_steering_persists_viewed_revision_and_uses_current_version(client)
     runtime.artifact_services['docx'].sync()
     record = d.get('session', session_id); record['status'] = 'running'; d.put('session', record)
     runtime.runner = Mock()
-    result = client.post(f'/api/agent/sessions/{session_id}/actions/steer', json=dict(text='Use business language', artifact=dict(feature='docx',document_id='report', revision=0)))
+    result = client.post(f'/api/agent/sessions/{session_id}/actions/steer', json=dict(text='Office local repair request: block_id=p1, page=1, observation=Use business language; recheck after local editing', artifact=dict(feature='docx',document_id='report', revision=0,pages=[1],block_id='p1',issue_id='layout-1',request_id='review-request')))
     assert result.status_code == 202
     instruction = runtime.runner.steer.call_args.args[0]
     assert 'viewed_revision=0' in instruction and 'current_revision=1' in instruction
+    assert 'block_id=p1' in instruction and 'recheck after local editing' in instruction
     event = [e for e in rt.journal(session_id, 0) if e['type'] == 'steer'][-1]
     assert event['document']['revision'] == 0 and event['status'] == 'accepted_pending_boundary'
     assert client.post(f'/api/agent/sessions/{session_id}/actions/steer', json=dict(text='bad', artifact=dict(feature='docx',document_id='report', revision=999))).status_code == 409

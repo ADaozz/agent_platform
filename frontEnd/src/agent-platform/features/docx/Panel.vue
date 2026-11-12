@@ -4,6 +4,8 @@ import Icon from '../../Icon.vue'
 import PreviewFileSelect from '../../PreviewFileSelect.vue'
 import DocxPreview from './DocxPreview.vue'
 import QualityReview from './QualityReview.vue'
+import {docxReviews} from '../office/reviewModel'
+import {delegateOfficeIssue} from '../office/delegate'
 import {t} from '../../preferences'
 import {mergeDocument,previewKey} from './state'
 import {api} from '../../featureApi'
@@ -13,10 +15,13 @@ const emit=defineEmits(['open','context','error','catalog','select-file'])
 const selected=computed(()=>props.session)
 async function guard(fn){try{return await fn()}catch(error){emit('error',error.message)}}
 const documents = ref({}), activeDocumentId = ref(''), documentOpen = ref(false), reviewPage = ref(null), reviewNotes = ref(''), renderedRevision = ref(null)
+const preview=ref(null), reviewBusy=ref(false), reviewError=ref(''), delegatedIssues=ref({})
+let documentEpoch=0
 const activeDocument = computed(() => documents.value[activeDocumentId.value])
 const documentUrl = computed(() => activeDocument.value && selected.value ? `${API_BASE}/agent/sessions/${selected.value.id}/documents/${encodeURIComponent(activeDocumentId.value)}/revisions/${activeDocument.value.revision}` : '')
 const documentStorageKey = computed(() => previewKey(selected.value?.id, activeDocumentId.value))
 function receiveDocuments(updates) {
+  documentEpoch++
   for (const event of updates) {
     if (!event.document_id || !Number.isInteger(event.revision)) continue
     const previous = documents.value[event.document_id]
@@ -29,14 +34,16 @@ function receiveDocuments(updates) {
     }
   }
 }
+function receiveSnapshots(values,epoch){receiveDocuments(values.filter(value=>epoch===documentEpoch||!documents.value[value.document_id]||documents.value[value.document_id].revision<value.revision))}
 watch(documents,values=>emit('catalog',Object.values(values).filter(file=>file.path)))
 watch(()=>props.openRequest,async request=>{
  if(!request||!props.session)return
  const id=props.session.id
  await guard(async()=>{
+  const epoch=documentEpoch
   const values=await api(`/agent/sessions/${id}/documents`)
   if(props.session?.id!==id||props.openRequest?.token!==request.token)return
-  receiveDocuments(values)
+  receiveSnapshots(values,epoch)
   const document=Object.values(documents.value).find(file=>file.path===request.path)
   if(!document)throw new Error(t('artifacts.previewUnavailable'))
   activeDocumentId.value=document.document_id;showDocument()
@@ -53,14 +60,43 @@ async function reviewDocumentPage(passed) {
 }
 watch(() => [activeDocumentId.value, activeDocument.value?.revision], () => { reviewPage.value = null; reviewNotes.value = '' })
 watch(activeDocumentId, () => { renderedRevision.value = null })
-async function retryVisualReview() {
-  const id = selected.value.id, identity = activeDocumentId.value
-  await guard(async () => {
-    await api(`/agent/sessions/${id}/documents/${encodeURIComponent(identity)}/visual-review`, {method:'POST', body:{revision:activeDocument.value.revision}})
-    const values = await api(`/agent/sessions/${id}/documents`)
-    if (selected.value?.id === id) receiveDocuments(values)
-  })
+function currentScope(){return `${selected.value?.id}:${activeDocumentId.value}:${activeDocument.value?.revision}:${activeDocument.value?.visual_request?.request_id||''}`}
+function currentIssue(item){
+ if(!activeDocument.value)return null
+ const view=docxReviews(activeDocument.value)
+ return [view.deterministic,...view.pages.reviews,view.document].flatMap(g=>g.issues).find(i=>i.key===item.key&&!i.stale)
 }
+function locateIssue(item){
+ const issue=currentIssue(item),page=item.selectedPage||issue?.pages[0]
+ if(!issue||!issue.pages.includes(page)){reviewError.value=t('office.staleNote');return}
+ const fingerprint=activeDocument.value.pages?.find(p=>p.page===page)?.fingerprint
+ if(!preview.value?.locate({revision:activeDocument.value.revision,page,fingerprint,blockId:issue.blockId,region:issue.region}))reviewError.value=t('office.previewNotCurrent')
+ else reviewError.value=''
+}
+async function delegateIssue(item){
+ const issue=currentIssue(item),scope=currentScope(),session={...selected.value},identity=activeDocumentId.value,revision=activeDocument.value?.revision
+ if(!issue){reviewError.value=t('office.staleNote');return}
+ reviewBusy.value=true;reviewError.value=''
+ try{
+  await delegateOfficeIssue(api,{session,text:t('office.fixRequest',{observation:issue.observation,suggestion:issue.suggestion||t('office.unknown')}),artifact:{feature:'docx',document_id:activeDocumentId.value,revision:activeDocument.value.revision},issue})
+  if(currentScope()===scope)delegatedIssues.value={...delegatedIssues.value,[issue.key]:true}
+ }catch(error){if(currentScope()===scope)reviewError.value=error.message}
+ finally{if(selected.value?.id===session.id&&activeDocumentId.value===identity&&activeDocument.value?.revision===revision)reviewBusy.value=false}
+}
+async function retryVisualReview() {
+ const id=selected.value.id,identity=activeDocumentId.value,revision=activeDocument.value.revision
+ const scope=currentScope();reviewBusy.value=true;reviewError.value=''
+ try{
+  const result=await api(`/agent/sessions/${id}/documents/${encodeURIComponent(identity)}/visual-review`,{method:'POST',body:{revision}})
+  if(selected.value?.id!==id||activeDocumentId.value!==identity||activeDocument.value?.revision!==revision)return
+  if(activeDocument.value.visual_request?.request_id!==result.request_id)receiveDocuments([{document_id:identity,revision,visual_request:{...activeDocument.value.visual_request,revision,request_id:result.request_id},aesthetic_reviews:{},document_review:null,delivery:null,finalized:false}])
+  const epoch=documentEpoch,values=await api(`/agent/sessions/${id}/documents`)
+  if(selected.value?.id===id&&activeDocumentId.value===identity)receiveSnapshots(values,epoch)
+ }catch(error){if(selected.value?.id===id&&activeDocumentId.value===identity&&activeDocument.value?.revision===revision)reviewError.value=error.message}
+ finally{if(selected.value?.id===id&&activeDocumentId.value===identity&&activeDocument.value?.revision===revision)reviewBusy.value=false}
+}
+watch(()=>currentScope(),()=>{delegatedIssues.value={};reviewError.value=''})
+watch(()=>`${selected.value?.id}:${activeDocumentId.value}:${activeDocument.value?.revision}`,()=>{reviewBusy.value=false})
 function resetDocuments() { renderedRevision.value = null; documents.value = {}; activeDocumentId.value = ''; documentOpen.value = false; reviewPage.value = null }
 
 let cursor=0
@@ -69,7 +105,8 @@ watch(()=>props.session?.id,async id=>{
  if(!id)return
  receiveDocuments(props.events.filter(e=>e.type.startsWith('document_')))
  cursor=props.events.at(-1)?.seq||0
- await guard(async()=>{const values=await api(`/agent/sessions/${id}/documents`);if(props.session?.id===id)receiveDocuments(values)})
+ const epoch=documentEpoch
+ await guard(async()=>{const values=await api(`/agent/sessions/${id}/documents`);if(props.session?.id===id)receiveSnapshots(values,epoch)})
 },{immediate:true})
 watch(()=>props.events.at(-1)?.seq,()=>{
  const batch=props.events.filter(e=>e.seq>cursor);cursor=props.events.at(-1)?.seq||cursor
@@ -79,15 +116,16 @@ watch(()=>[documentOpen.value,activeDocumentId.value],()=>emit('open',documentOp
 watch(()=>[activeDocument.value?.revision,renderedRevision.value,props.active],()=>emit('context',activeDocument.value?{feature:'docx',...feedbackContext()}:null))
 </script>
 <template>
+    <button v-if="activeDocument && (!documentOpen || !active)" type="button" class="docx-reopen secondary" @click="showDocument"><Icon name="FileText" :size="15" />{{ activeDocument.path }}</button>
     <aside v-if="activeDocument && documentOpen && active" class="docx-panel" :aria-label="t('docx.preview')">
-      <header class="docx-panel-header"><PreviewFileSelect :model-value="activeDocument.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="documentUrl" download :aria-label="t('Download')"><Icon name="Download" :size="17" /></a><button type="button" class="icon-button" :aria-label="t('docx.close')" @click="closeDocument"><Icon name="X" :size="17" /></button></header>
+      <header class="docx-panel-header"><Icon name="FileText" :size="17" /><PreviewFileSelect :model-value="activeDocument.path" :files="files" @update:model-value="emit('select-file',$event)" /><a :href="documentUrl" download :aria-label="t('Download')"><Icon name="Download" :size="17" /></a><button type="button" class="icon-button" :aria-label="t('docx.close')" @click="closeDocument"><Icon name="X" :size="17" /></button></header>
       <p class="docx-gate-note">{{ activeDocument.finalized ? t('docx.finalized') : t('docx.draft') }}</p>
       <p v-if="activeDocument.external_conflict" class="docx-gate-error">{{ t('docx.externalConflict') }}</p>
       <p v-if="activeDocument.preview_error" class="docx-gate-error">{{ t('docx.previewUnavailable') }}</p>
       <p v-if="activeDocument.render_error" class="docx-gate-error" role="alert">{{ t('docx.checkFailed') }} {{ activeDocument.render_error }}</p>
       <p v-else-if="activeDocument.gate && activeDocument.gate !== 'open'" class="docx-gate-note">{{ t('docx.gate.' + activeDocument.gate) }}</p>
-      <QualityReview :document="activeDocument" @retry="retryVisualReview" />
-      <DocxPreview :key="selected.id + activeDocumentId" :revision="activeDocument.revision" :render-revision="activeDocument.preview_revision" :render-pages="activeDocument.preview_pages" :page-hashes="activeDocument.preview_page_hashes" :render-base-url="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders`" :image-base-url="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/page-images`" :pages="activeDocument.pages || []" :storage-key="documentStorageKey" @rendered="renderedRevision = $event" />
+      <QualityReview :document="activeDocument" :busy="reviewBusy" :error="reviewError" :delegated="delegatedIssues" @retry="retryVisualReview" @locate="locateIssue" @delegate="delegateIssue" />
+      <DocxPreview ref="preview" :key="selected.id + activeDocumentId" :revision="activeDocument.revision" :render-revision="activeDocument.preview_revision" :render-pages="activeDocument.preview_pages" :page-hashes="activeDocument.preview_page_hashes" :render-base-url="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders`" :image-base-url="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/page-images`" :pages="activeDocument.pages || []" :storage-key="documentStorageKey" @rendered="renderedRevision = $event" />
       <div v-if="activeDocument.pages?.length" class="docx-review-controls"><span>{{ t('docx.layoutNote') }}</span><button v-for="page in activeDocument.pages.filter(p => p.checks?.automatic_passed && p.checks?.visual_review !== 'passed')" :key="page.page" type="button" class="text-button" @click="reviewPage = page.page; reviewNotes = ''">{{ t('docx.inspectPage', { page: page.page }) }}</button></div>
       <div v-if="reviewPage" class="docx-human-review"><button class="icon-button" type="button" :aria-label="t('docx.close')" @click="reviewPage = null"><Icon name="X" :size="16" /></button><p>{{ t('docx.actualReview') }}</p><a :href="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders/${activeDocument.revision}/page-${String(reviewPage).padStart(3, '0')}.png`" target="_blank" rel="noopener">{{ t('docx.fullPage') }}</a><img :src="`${API_BASE}/agent/sessions/${selected.id}/documents/${encodeURIComponent(activeDocumentId)}/renders/${activeDocument.revision}/page-${String(reviewPage).padStart(3, '0')}.png`" :alt="t('docx.page', { page: reviewPage })"><textarea v-model="reviewNotes" :placeholder="t('docx.reviewNotes')"></textarea><div><button class="secondary" type="button" :disabled="!reviewNotes.trim()" @click="reviewDocumentPage(false)">{{ t('docx.reject') }}</button><button class="primary" type="button" :disabled="!reviewNotes.trim()" @click="reviewDocumentPage(true)">{{ t('docx.approve') }}</button></div></div>
     </aside>
