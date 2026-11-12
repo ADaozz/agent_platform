@@ -24,12 +24,12 @@ def test_removed_controls_are_rejected_before_reaching_storage():
             for decision in ('accept','reject'):
                 response=await client.post(prefix+'/aesthetic-decision',json={'revision':0,'slide_id':'p1','decision':decision})
                 assert response.status_code==422
-            response=await client.post(prefix+'/aesthetic-review',json={'revision':0,'slide_id':'p1'})
-            assert response.status_code==422
+            response=await client.post(prefix+'/aesthetic-review',json={'revision':0})
+            assert response.status_code==404
     asyncio.run(check())
 
 
-def test_historical_human_flags_do_not_replace_model_results():
+def test_historical_human_flags_do_not_replace_review_results():
     reviewer=adapter.engine.reviewer()
     critical=dict(id='issue',severity='critical',confidence='high')
     review=dict(automatic_passed=True,aesthetic_review={'status':'failed','issues':[critical],'human':{'decision':'accept'}})
@@ -42,7 +42,7 @@ def test_historical_human_flags_do_not_replace_model_results():
 
 
 def test_ledger_only_records_issue_dismissals(tmp_path):
-    ledger=adapter.vision.ReviewLedger(tmp_path/'reviews.sqlite')
+    ledger=adapter.ReviewLedger(tmp_path/'reviews.sqlite')
     for decision in ('accept','reject'):
         with pytest.raises(ValueError,match='no longer supported'):ledger.decide(decision=decision)
     identity=ledger.decide(decision='dismiss_issues',issue_ids=['issue'])

@@ -630,7 +630,9 @@ def main(argv=None):
     x = sub.add_parser('status'); x.add_argument('docx')
     x = sub.add_parser('restore'); x.add_argument('docx'); x.add_argument('--revision', type=int, required=True); x.add_argument('--base-revision', type=int, required=True); x.add_argument('--operation-id', required=True)
     x = sub.add_parser('checkpoint'); x.add_argument('docx'); x.add_argument('--final', action='store_true')
-    x = sub.add_parser('review-page'); x.add_argument('docx'); x.add_argument('--revision', type=int, required=True); x.add_argument('--page', type=int, required=True); x.add_argument('--reviewer', choices=['human','vision_model'], required=True); x.add_argument('--notes', required=True); x.add_argument('--passed', action='store_true')
+    x = sub.add_parser('review-page'); x.add_argument('docx'); x.add_argument('--revision', type=int, required=True); x.add_argument('--page', type=int, required=True); x.add_argument('--reviewer', choices=['main_agent','human','vision_model'], required=True); x.add_argument('--notes', required=True); x.add_argument('--passed', action='store_true')
+    x = sub.add_parser('review-images'); x.add_argument('docx')
+    x = sub.add_parser('submit-review'); x.add_argument('docx'); x.add_argument('request')
     x = sub.add_parser('publish'); x.add_argument('docx'); x.add_argument('--base-revision', type=int, required=True)
     a = p.parse_args(argv)
     try:
@@ -648,7 +650,7 @@ def main(argv=None):
             spec.loader.exec_module(importer)
             json_print(importer.import_template(a.template, a.template_id, a.output, a.license_note))
             return 0
-        if a.command in ('apply-one', 'apply-section', 'save-plan', 'check-document', 'repair-document', 'status', 'restore', 'checkpoint', 'review-page', 'publish') or (a.command == 'init' and a.document_id) or (a.command == 'finalize' and a.base_revision is not None):
+        if a.command in ('apply-one', 'apply-section', 'save-plan', 'check-document', 'repair-document', 'status', 'restore', 'checkpoint', 'review-page', 'review-images', 'submit-review', 'publish') or (a.command == 'init' and a.document_id) or (a.command == 'finalize' and a.base_revision is not None):
             from atomic_docx import DocumentStore
             store = DocumentStore(a.output if a.command == 'init' else a.docx)
             if a.command == 'init': result = store.init(a.document_id, a.template, a.mode, a.design,a.columns,2)
@@ -660,6 +662,8 @@ def main(argv=None):
             elif a.command == 'restore': result = store.restore(a.revision, a.base_revision, a.operation_id)
             elif a.command == 'checkpoint': result = store.checkpoint(a.final)
             elif a.command == 'review-page': result = store.visual_review(a.revision, a.page, a.passed, a.reviewer, a.notes)
+            elif a.command == 'review-images': result = store.review_images()
+            elif a.command == 'submit-review': result = store.submit_review(json.loads(Path(a.request).read_text(encoding='utf-8')))
             elif a.command in ('publish', 'finalize'): result = store.finalize(a.base_revision)
             else: result = store.status()
             json_print(result)

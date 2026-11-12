@@ -64,18 +64,18 @@ def test_only_declared_margin_units_are_used_and_declared_font_pairs_are_valid()
     assert any(i['type']=='out_of_bounds' for i in engine.validator.layout_issues(slide))
 
 
-def test_manifest_snapshot_and_both_model_requests_use_real_design(tmp_path):
+def test_manifest_snapshot_and_both_review_contexts_use_real_design(tmp_path):
     path=tmp_path/'deck.pptx';prs=make_prs({'palette':{'accent':'308050'},'margins':{'unit':'fraction','left':.04,'right':.04,'top':.04,'bottom':.04}});prs.save(path)
     store=engine.PresentationStore(path);store.track_external('deck')
     manifest=store.status()['manifest']
     assert manifest['profile']['id']=='corporate_blue'  # Internal generation fallback only.
     assert manifest['review_profile']['id']==STYLE
     assert manifest['review_profile']['colors']['accent']=='308050'
-    spec=importlib.util.spec_from_file_location('selected_design_vision',ROOT/'vision_review_service.py')
-    vision=importlib.util.module_from_spec(spec);spec.loader.exec_module(vision)
+    spec=importlib.util.spec_from_file_location('selected_design_review',ROOT/'scripts'/'agent_review.py')
+    review=importlib.util.module_from_spec(spec);spec.loader.exec_module(review)
     context={'profile':manifest['review_profile'],'design':manifest['review_design']}
-    page=json.loads(vision.slide_request(dict(context,slide=manifest['slides'][0],index=0,total=1)))
-    deck=json.loads(vision.deck_request(dict(context,slides=[])))
+    page=review.slide_request(dict(context,slide=manifest['slides'][0],index=0,total=1))
+    deck=review.deck_request(dict(context,slides=[]))
     for request in (page,deck):
         assert request['selected_design']['style_id']==STYLE
         assert request['selected_design']['design_md']

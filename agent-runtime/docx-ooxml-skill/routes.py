@@ -30,17 +30,6 @@ def create_router(host):
         return result
 
 
-    class ReviewRequest(BaseModel):
-        revision:int=Field(ge=0)
-
-    @router.post('/sessions/{session_id}/documents/{document_id}/visual-review')
-    def request_visual_review(session_id:str,document_id:str,value:ReviewRequest):
-        store=document_store(session_id,document_id)
-        service=host.service(session_id,'docx')
-        try:result=service.reviews.request(store.path,value.revision)
-        except ValueError as exc:raise HTTPException(409,str(exc))
-        service.sync();return result
-
     def document_store(session_id, document_id):
         host.service(session_id,'docx')
         record = host.session(session_id)

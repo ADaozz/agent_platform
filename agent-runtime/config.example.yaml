@@ -4,9 +4,8 @@
 llm:
   default: deepseek/deepseek-flash
   timeout: 60
-  # Optional: image-capable model for host-side Office (DOCX/PPTX) visual review when the
-  # session model is text-only. It must declare input: [text, image].
-  # vision_model: deepseek/deepseek-flash
+  # Office (DOCX/PPTX) visual review is done by the session model itself, which
+  # opens the rendered pages; it needs a model that declares input: [text, image].
   models:
     deepseek:
       base_url: https://api.deepseek.com/v1

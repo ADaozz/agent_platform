@@ -16,6 +16,7 @@ from pathlib import Path
 import sys
 import tempfile
 import time
+import uuid
 
 from pptx import Presentation
 from pptx.util import Inches,Pt
@@ -46,6 +47,7 @@ def load(name):
 repair_policy=load('office_repair')
 shared=load('artifact_runtime'); renderer=load('slide_renderer'); validator=load('slide_validator'); component_renderer=load('component_renderer')
 style_library=load('style_library'); review_design=load('review_design'); native_charts=load('native_charts'); native_math=load('native_math'); native_style=load('native_style'); native_diagram=load('native_diagram')
+agent_review=load('agent_review')
 template_importer=load('template_importer'); template_clone=load('template_clone')
 template_slide_import=load('template_slide_import')
 template_recolor=load('template_recolor'); template_fill=load('template_fill')
@@ -801,10 +803,7 @@ class PresentationStore(shared.ArtifactStore):
             for sid,render in list(state.get('renders',{}).items()):
                 if render.get('revision') not in kept:
                     del state['renders'][sid];state_changed=True
-            for review in state.get('reviews',{}).values():
-                if review.get('revision') not in kept and (review.get('aesthetic_review') or {}).get('status')=='pending':
-                    review['aesthetic_review']=dict(status='unavailable',error=dict(code='snapshot_expired',message='The reviewed snapshot is outside the two-version history window'))
-                    review['status']=reviewer().derive_status(review);state_changed=True
+            # Pending visual reviews stay pending: review-images renders the current revision and matches each slide's checked pixels.
             self.save_state(c,state);c.commit()
             if state_changed:self.review_event(c,state,'presentation_history_pruned')
         self.prune_render_cache(kept)
@@ -1245,14 +1244,14 @@ class PresentationStore(shared.ArtifactStore):
                     sid=slide['slide_id'];review=state['reviews'][sid]
                     aesthetic=review.get('aesthetic_review') or {}
                     if aesthetic.get('reason')=='deferred_until_deck_checked':
-                        aesthetic['reason']='awaiting_vision_review'
+                        aesthetic['reason']='awaiting_agent_review'
                         self.review_event(c,state,'presentation_review_requested',sid,requested_by='deck_check')
         if not targets and not blockers and len(slides)>1:self.request_deck_review(revision)
         return dict(revision=revision,status='needs_repair' if targets or blockers else 'passed',
             overlap_passed=not targets,repair_targets=targets,other_errors=blockers,repair_control=repair_control,
             next_action=(('Stop autonomous repairs: '+repair_control['stop_reason']+'. Report the remaining deterministic issues; retain the editable draft.') if repair_control['status']=='stopped' else 'Fix only listed overlapping elements on the listed slides, preserve all other slides, then run check-deck again. Re-render and recheck after every repair; continue only while repair_control allows progress. Never regenerate the whole deck.' if targets else
                          'Resolve the listed check errors locally and run check-deck again.' if blockers else
-                         'Checks passed. Visual review is advice only; report suggestions without modifying the PPT.'))
+                         'Checks passed. Run review-images, open every listed slide image (and the deck overview) with read_file, then submit-review with your own visual review. Visual findings are advice only; report them without modifying the PPT.'))
     def current_manifest(self,c,state):
         return self.view(c,state)['manifest']
     def review_event(self,c,state,kind,slide_id=None,**extra):
@@ -1261,7 +1260,7 @@ class PresentationStore(shared.ArtifactStore):
         if slide_id:event.update(slide_id=slide_id,review=state['reviews'].get(slide_id))
         return self.emit_state(c,state,event)
     def record_aesthetic_review(self,slide_id,check_revision,fingerprint,result):
-        """Host only: apply a model review if it still describes the current check of this slide."""
+        """Apply a visual review only if it still describes the current check of this slide."""
         with self.locked() as(c,state):
             if state is None:return dict(applied=False,reason='uninitialized')
             review=state.get('reviews',{}).get(slide_id)
@@ -1274,7 +1273,7 @@ class PresentationStore(shared.ArtifactStore):
             if current.get('status') not in ('pending',None) and current.get('reviewed_at',0)>result.get('reviewed_at',0):
                 return dict(applied=False,reason='newer_review_present')
             aesthetic=dict(result,revision=check_revision)
-            # Keep issue-dismissal history; model answers own the visual verdict.
+            # Keep issue-dismissal history; the submitted review owns the visual verdict.
             for key in ('dismissals',):
                 if current.get(key):aesthetic[key]=current[key]
             aesthetic.update(auto_repair=False,advisory_only=True)
@@ -1282,19 +1281,111 @@ class PresentationStore(shared.ArtifactStore):
             review['status']=reviewer().derive_status(review);review['visual_review']=reviewer().compat_visual(review)
             self.review_event(c,state,'presentation_aesthetic_review',slide_id)
             return dict(applied=True)
-    def request_review(self,slide_id):
-        """Agent: re-request a model review after a transient failure (not to fish for a pass)."""
+    def _review_render(self,revision,count):
+        import pymupdf as fitz
+        directory=reviewer().render_snapshot(self,revision)
+        with fitz.open(directory/(self.path.stem+'.pdf')) as pdf:
+            if len(pdf)!=count:raise ValueError('Rendered slide count mismatch; run check-deck again')
+            fingerprints=[hashlib.sha256(page.get_pixmap(alpha=False).samples).hexdigest() for page in pdf]
+        return directory,fingerprints
+    def _reviewable(self,review,fingerprint):
+        if not review or not review.get('automatic_passed') or not review.get('rendered'):return 'automatic checks have not passed; run check-deck'
+        if review.get('fingerprint')!=fingerprint:return 'slide changed since its check; run check-deck'
+        if ((review.get('aesthetic_review') or {}).get('error') or {}).get('code')=='unsupported_chart_renderer':
+            return 'native chart preview is not authoritative; verify this slide in PowerPoint'
+        return None
+    def review_images(self,slide_id=None):
+        """Agent: formal renders plus context for the main Agent's own visual review of the current revision."""
         with self.locked() as(c,state):
-            self.assert_current(state);review=state.get('reviews',{}).get(slide_id)
-            if not review or not review.get('automatic_passed') or not review.get('rendered'):raise ValueError('Run check-slide successfully before requesting a vision review')
-            aesthetic=review.get('aesthetic_review') or {}
-            if aesthetic.get('status') not in ('unavailable',):
-                raise ValueError(f'Vision review is {aesthetic.get("status","pending")}; only an unavailable review may be re-requested. Fix reported issues and run check-slide, or ask the user')
-            requests=aesthetic.get('requests',0)+1
-            if requests>3:raise ValueError('Vision review re-request limit reached for this check; report the visual review as unavailable')
-            review['aesthetic_review']=dict(status='pending',reason='re_requested',requests=requests,previous_error=aesthetic.get('error'))
-            review['status']=reviewer().derive_status(review);review['visual_review']=reviewer().compat_visual(review)
-            return self.review_event(c,state,'presentation_review_requested',slide_id,requested_by='agent')
+            self.assert_current(state);revision=state['revision']
+            manifest=self.current_manifest(c,state);reviews=copy.deepcopy(state.get('reviews',{}));deck=copy.deepcopy(state.get('deck_review'))
+        slides=manifest['slides']
+        if not slides:raise ValueError('Empty presentation')
+        if slide_id is not None and slide_id not in {s['slide_id'] for s in slides}:raise ValueError('Unknown slide')
+        directory,fingerprints=self._review_render(revision,len(slides))
+        profile=manifest.get('review_profile') or manifest.get('profile');design=manifest.get('review_design')
+        items=[];contexts=[];overview=[]
+        for index,slide in enumerate(slides):
+            sid=slide['slide_id'];review=reviews.get(sid) or {};aesthetic=review.get('aesthetic_review') or {}
+            image=(directory/f'slide-{index+1:03d}.png').resolve();reason=self._reviewable(review,fingerprints[index])
+            overview.append(dict(page=index+1,slide_id=sid,layout=slide.get('layout'),title=agent_review.slide_title(slide),
+                elements={kind:sum(1 for e in slide['elements'] if e.get('type')==kind) for kind in {e.get('type') for e in slide['elements']}},
+                aesthetic=aesthetic.get('status')))
+            if slide_id is not None and sid!=slide_id:continue
+            items.append(dict(page=index+1,slide_id=sid,image=str(image),reviewable=reason is None,reason=reason,
+                status=aesthetic.get('status','pending') if review else 'writing'))
+            contexts.append(dict(agent_review.slide_request(dict(slide=slide,index=index,total=len(slides),profile=profile,design=design,
+                intent=review.get('intent'),constraints=review.get('constraints'),technical_issues=review.get('layout_issues'))),image=str(image)))
+        deck_entry=None
+        if slide_id is None and len(slides)>1:
+            sheet=directory/'deck-sheet.png'
+            if not sheet.is_file():
+                sheet.write_bytes(agent_review.contact_sheet([(directory/f'slide-{i+1:03d}.png').read_bytes() for i in range(len(slides))]))
+            deck_entry=dict(sheet=str(sheet.resolve()),status=(deck or {}).get('status'),request_id=(deck or {}).get('request_id'),
+                reviewable=(deck or {}).get('status')=='pending' and (deck or {}).get('revision')==revision)
+        context_file=directory/(f'review-context-{slide_id}.json' if slide_id else 'review-context.json')
+        context_file.write_text(json.dumps(dict(presentation_id=state['presentation_id'],revision=revision,guidance_version=agent_review.GUIDANCE_VERSION,
+            slides=contexts,deck=agent_review.deck_request(dict(slides=overview,profile=profile,design=design)) if deck_entry else None),ensure_ascii=False),encoding='utf-8')
+        pending=[item['slide_id'] for item in items if item['reviewable'] and item['status']=='pending']
+        return dict(presentation_id=state['presentation_id'],revision=revision,guidance_version=agent_review.GUIDANCE_VERSION,
+            guidance=dict(slide=agent_review.SLIDE_GUIDANCE,deck=agent_review.DECK_GUIDANCE,dimensions=agent_review.DIMENSIONS,deck_categories=agent_review.DECK_CATEGORIES),
+            context_file=str(context_file.resolve()),slides=items,deck=deck_entry,
+            submit=dict(command='submit-review',request={'revision':revision,'slides':[{'slide_id':'<slide_id>','review':{'status':'pass|fail|uncertain','summary':'...',
+                'checks':{'<dimension>':{'verdict':'ok|issue|not_applicable|uncertain','evidence':'...'}},
+                'issues':[{'id':'visual-001','category':'<dimension>','severity':'critical|major|minor','element_ids':[],'region':[0,0,1,1],
+                    'observation':'...','reason':'...','suggestion':'...','confidence':'high|medium|low','needs_verification':False}]}}],
+                'deck':{'request_id':(deck or {}).get('request_id'),'review':'same shape; issue ids deck-001, categories from deck_categories, slides:[page numbers]'}},
+                unavailable='Use {"slide_id":"...","unavailable":"reason"} only when you cannot view images.'),
+            next_action=('Open every pending slide image with read_file, review it against the guidance and context_file, then submit-review. '
+                         'Findings are advice only; do not modify the PPT based on them unless the user asks.') if pending or (deck_entry or {}).get('reviewable') else
+                        'No pending visual review for this revision.')
+    def submit_review(self,request):
+        """Agent: record the main Agent's own visual review of rendered slides (advice only)."""
+        if not isinstance(request,dict):raise ValueError('Review request must be a JSON object')
+        entries=request.get('slides') or [];deck_input=request.get('deck')
+        if not isinstance(entries,list) or (deck_input is not None and not isinstance(deck_input,dict)) or not (entries or deck_input):
+            raise ValueError('Submit {"revision":N,"slides":[{"slide_id":...,"review":{...}}]} and/or "deck":{"review":{...}}')
+        with self.locked() as(c,state):
+            self.assert_current(state,request.get('revision'));revision=state['revision']
+            manifest=self.current_manifest(c,state);reviews=copy.deepcopy(state.get('reviews',{}));deck=copy.deepcopy(state.get('deck_review'))
+        slides=manifest['slides'];index={s['slide_id']:i for i,s in enumerate(slides)}
+        directory,fingerprints=self._review_render(revision,len(slides))
+        accepted=[];problems=[];seen=set()
+        for position,item in enumerate(entries):
+            sid=item.get('slide_id') if isinstance(item,dict) else None
+            try:
+                if sid not in index:raise ValueError(f'slides[{position}].slide_id is not a slide of revision {revision}')
+                if sid in seen:raise ValueError(f'{sid} is listed twice')
+                seen.add(sid);review=reviews.get(sid) or {}
+                reason=self._reviewable(review,fingerprints[index[sid]])
+                if reason:raise ValueError(f'{sid}: {reason}')
+                result=agent_review.unavailable(item['unavailable']) if 'unavailable' in item else agent_review.evaluate_slide(item.get('review'),slides[index[sid]])
+                accepted.append((sid,review,result,(directory/f'slide-{index[sid]+1:03d}.png').read_bytes()))
+            except ValueError as exc:problems.append(str(exc) if str(exc).startswith((f'{sid}:',f'{sid} ','slides[')) else f'{sid}: {exc}')
+        deck_result=None
+        if deck_input is not None:
+            try:
+                if not deck or deck.get('status')!='pending' or deck.get('revision')!=revision:
+                    raise ValueError('no pending deck review for this revision; run request-deck-review --base-revision N first')
+                if deck_input.get('request_id') not in (None,deck.get('request_id')):raise ValueError('request_id does not match the pending deck review')
+                deck_result=agent_review.unavailable(deck_input['unavailable']) if 'unavailable' in deck_input else agent_review.evaluate_deck(deck_input.get('review'),len(slides))
+                for issue in deck_result.get('issues',[])+deck_result.get('rejected_issues',[]):
+                    issue['slide_ids']=[slides[page-1]['slide_id'] for page in issue['slides'] if 0<page<=len(slides)]
+            except ValueError as exc:problems.append(f'deck: {exc}')
+        if problems:raise ValueError('Review rejected, nothing recorded: '+'; '.join(problems))
+        common=dict(reviewer='main_agent',model_id=None,prompt_version=agent_review.GUIDANCE_VERSION,presentation_id=state['presentation_id'],reviewed_at=time.time())
+        applied=[]
+        for sid,review,result,png in accepted:
+            payload=dict(result,review_id=uuid.uuid4().hex,slide_id=sid,render_sha256=hashlib.sha256(png).hexdigest(),pixel_sha256=agent_review.pixel_sha256(png),**common)
+            outcome=self.record_aesthetic_review(sid,review['revision'],review['fingerprint'],payload)
+            applied.append(dict(slide_id=sid,status=payload['status'],issues=len(payload['issues']),review_id=payload['review_id'],**outcome))
+        deck_outcome=None
+        if deck_result is not None:
+            sheet=directory/'deck-sheet.png'
+            payload=dict(deck_result,review_id=uuid.uuid4().hex,render_sha256=hashlib.sha256(sheet.read_bytes()).hexdigest() if sheet.is_file() else None,**common)
+            deck_outcome=dict(status=payload['status'],issues=len(payload['issues']),review_id=payload['review_id'],**self.record_deck_review(deck['request_id'],payload))
+        return dict(revision=revision,slides=applied,deck=deck_outcome,
+            next_action='Visual review recorded. Findings are advice only: list them briefly when you deliver and change nothing unless the user asks.')
     def review_status(self,slide_id=None,wait=0):
         """Agent: read (optionally wait for) aesthetic results and the next permitted action."""
         if type(wait) not in (int,float) or not 0<=wait<=180:raise ValueError('wait must be 0 to 180 seconds')
@@ -1386,16 +1477,6 @@ class PresentationStore(shared.ArtifactStore):
             if slide_id is not None:
                 review['status']=reviewer().derive_status(review);review['visual_review']=reviewer().compat_visual(review)
             return self.review_event(c,state,'presentation_review' if slide_id else 'presentation_deck_review',slide_id,decision=record)
-    def review(self,slide_id,revision,passed,notes,reviewer_kind='vision_model'):
-        """Agent self-inspection notes only; never acceptance or rejection."""
-        if type(passed)is not bool or not isinstance(notes,str) or not notes.strip():raise ValueError('Actual visual inspection and evidence required')
-        if reviewer_kind!='vision_model':raise ValueError('Manual visual verdicts are no longer supported')
-        with self.locked() as(c,state):
-            self.assert_current(state,revision);review=state['reviews'].get(slide_id)
-            if not review or not review['automatic_passed'] or review['revision']>revision:raise ValueError('Exact-revision successful formal check required')
-            review['agent_inspection']=dict(passed=passed,notes=notes.strip()[:2000],recorded_at=time.time(),
-                note='Agent self-inspection is advisory; visual verdicts come only from the host API review')
-            return self.review_event(c,state,'presentation_review',slide_id)
     def finalize(self,base_revision):
         with self.locked() as(c,state):
             self.assert_current(state,base_revision); prs=Presentation(io.BytesIO(self.snapshot_unlocked(c,base_revision)))
@@ -1437,7 +1518,7 @@ def next_action(review):
     if not review.get('automatic_passed'):return 'Fix only the listed automatic check errors on this slide, preserve other pages, then re-render and run check-deck again; follow repair_control and stop on no progress, repeated errors or a repair cycle.'
     aesthetic=review.get('aesthetic_review') or {}
     status=reviewer().effective_aesthetic(review)
-    if status=='pending':return 'Complete check-deck after generation. Visual review is advisory; never change the PPT based on it unless the user asks.'
+    if status=='pending':return 'Run review-images, open this slide image with read_file and submit-review. Visual review is advisory; never change the PPT based on it unless the user asks.'
     if status in ('unavailable','uncertain'):return 'No usable visual verdict; continue. Do not claim visual acceptance; mention it when you deliver.'
     if aesthetic.get('issues'):return 'Leave the suggestions to the user, including critical findings: list them briefly when you deliver and change nothing unless asked.'
     return 'No issues. Continue.'
@@ -1450,14 +1531,14 @@ def review_summary(slide_id,review):
     issues=aesthetic.get('issues') or []
     return dict(slide_id=slide_id,revision=review.get('revision'),status=review.get('status'),automatic_passed=review.get('automatic_passed'),
         technical_review=review.get('technical_review'),visual_integrity=review.get('visual_integrity'),
-        aesthetic_review={key:aesthetic.get(key) for key in ('status','summary','issues','model_id','prompt_version','error','auto_repair','advisory_only','escalated_issues','review_id','reason') if key in aesthetic},
+        aesthetic_review={key:aesthetic.get(key) for key in ('status','summary','issues','reviewer','model_id','prompt_version','error','auto_repair','advisory_only','escalated_issues','review_id','reason') if key in aesthetic},
         critical_issues=[issue for issue in issues if issue['id'] in critical],
         suggestions=[{key:issue.get(key) for key in ('id','severity','category','element_ids','observation','suggestion')} for issue in issues if issue['id'] not in critical and not issue.get('dismissed')],
         effective_aesthetic=reviewer().effective_aesthetic(review),next_action=next_action(review))
 
 
 def deck_summary(deck):
-    return {key:deck.get(key) for key in ('status','revision','request_id','summary','issues','rejected_issues','model_id','prompt_version','error','review_id','stale_at_revision') if key in deck}
+    return {key:deck.get(key) for key in ('status','revision','request_id','summary','issues','rejected_issues','reviewer','model_id','prompt_version','error','review_id','stale_at_revision') if key in deck}
 
 
 def _template_index(state):
@@ -1478,7 +1559,7 @@ def plan_request(store,request):
 
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument('command',choices=['init','apply-one','status','restore','check-deck','check-slide','review-slide','review-status','request-review','request-deck-review','finalize','profiles','layouts','components','catalog','charts','audit-charts','plan','import-template','list-templates','list-styles','match-template']); parser.add_argument('pptx',nargs='?'); parser.add_argument('--request'); parser.add_argument('--presentation-id'); parser.add_argument('--template'); parser.add_argument('--template-id'); parser.add_argument('--category'); parser.add_argument('--style-id'); parser.add_argument('--output'); parser.add_argument('--license-note',default=''); parser.add_argument('--role'); parser.add_argument('--profile'); parser.add_argument('--theme'); parser.add_argument('--slide-id'); parser.add_argument('--revision',type=int); parser.add_argument('--base-revision',type=int); parser.add_argument('--operation-id'); parser.add_argument('--notes',default=''); parser.add_argument('--intent'); parser.add_argument('--constraint',action='append',default=[]); parser.add_argument('--wait',type=float,default=0); parser.add_argument('--passed',action='store_true'); parser.add_argument('--reviewer',choices=['vision_model'],default='vision_model'); args=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument('command',choices=['init','apply-one','status','restore','check-deck','check-slide','review-images','submit-review','review-status','request-deck-review','finalize','profiles','layouts','components','catalog','charts','audit-charts','plan','import-template','list-templates','list-styles','match-template']); parser.add_argument('pptx',nargs='?'); parser.add_argument('--request'); parser.add_argument('--presentation-id'); parser.add_argument('--template'); parser.add_argument('--template-id'); parser.add_argument('--category'); parser.add_argument('--style-id'); parser.add_argument('--output'); parser.add_argument('--license-note',default=''); parser.add_argument('--role'); parser.add_argument('--profile'); parser.add_argument('--theme'); parser.add_argument('--slide-id'); parser.add_argument('--revision',type=int); parser.add_argument('--base-revision',type=int); parser.add_argument('--operation-id'); parser.add_argument('--notes',default=''); parser.add_argument('--intent'); parser.add_argument('--constraint',action='append',default=[]); parser.add_argument('--wait',type=float,default=0); args=parser.parse_args()
     if args.command in ('profiles','layouts','components','catalog','charts'):
         result=catalog() if args.command=='catalog' else {args.command:catalog()[args.command]}
         print(json.dumps(result,ensure_ascii=False)); return
@@ -1506,10 +1587,11 @@ def main():
     elif args.command=='restore':result=store.restore(args.revision,args.base_revision,args.operation_id)
     elif args.command=='check-deck':result=store.check_deck(json.loads(Path(args.request).read_text()).get('content_notes',{}))
     elif args.command=='check-slide':result=store.check_slide(args.slide_id,args.notes,args.intent,args.constraint)
-    elif args.command=='review-slide':
-        result=store.review(args.slide_id,args.revision,args.passed,args.notes,'vision_model')
+    elif args.command=='review-images':result=store.review_images(args.slide_id)
+    elif args.command=='submit-review':
+        if not args.request:parser.error('--request is required')
+        result=store.submit_review(json.loads(Path(args.request).read_text(encoding='utf-8')))
     elif args.command=='review-status':result=store.review_status(args.slide_id,args.wait)
-    elif args.command=='request-review':result=store.request_review(args.slide_id)
     elif args.command=='request-deck-review':result=store.request_deck_review(args.base_revision)
     else:result=store.finalize(args.base_revision)
     print(json.dumps(result,ensure_ascii=False))

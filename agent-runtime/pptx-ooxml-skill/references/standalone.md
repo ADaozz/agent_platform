@@ -44,7 +44,7 @@ fc-match 'Noto Sans CJK SC'
 根据我的颜色要求统一调整整稿；style_id 只记录来源，不能代替实际应用字体、配色和布局。
 统计图表优先用原生 chart 和嵌入式 Excel；公式用原生 Office Math。
 全部页面完成后做图表审计和 check-deck，只局部修复真实遮挡并复检。
-视觉审查只给建议，不自动修改。独立环境没有平台后台审查服务，不得把 pending 当作通过。
+检查通过后用 review-images 取得渲染图，逐页看图并 submit-review；视觉审查只给建议，不自动修改，不得把 pending 当作通过。
 交付 PPTX、检查结果，以及仍需 Microsoft PowerPoint 实机验证的项目。
 ```
 
@@ -85,6 +85,9 @@ PresentationStore('files/demo.pptx').track_external('demo')
 PY
 python "$PPTX_SKILL_DIR/scripts/office_pptx.py" status files/demo.pptx > tmp/status.json
 python "$PPTX_SKILL_DIR/scripts/office_pptx.py" check-deck files/demo.pptx --request tmp/deck-check.json > tmp/check-result.json
+python "$PPTX_SKILL_DIR/scripts/office_pptx.py" review-images files/demo.pptx > tmp/review-images.json
+# 逐页打开 tmp/review-images.json 中列出的 PNG 和 deck.sheet，看图后写 tmp/visual-review.json
+python "$PPTX_SKILL_DIR/scripts/office_pptx.py" submit-review files/demo.pptx --request tmp/visual-review.json
 python "$PPTX_SKILL_DIR/scripts/office_pptx.py" review-status files/demo.pptx
 ```
 
@@ -92,7 +95,7 @@ python "$PPTX_SKILL_DIR/scripts/office_pptx.py" review-status files/demo.pptx
 
 默认状态保存在 `files/.pptx-state/demo.pptx/`；渲染结果位于其中 `tmp/render-*`，可打开 PDF / PNG 查看。设置 OFFICE_RENDER_TMP 后渲染位置会变化，可从 Python 的 `store.render_directory(store.status()['revision'])` 获取实际目录。不要删除状态目录来绕过检查。
 
-可在自动检查通过后用当前 revision 执行 finalize。它表示满足脚本交付条件，不代表 API 视觉审查通过，更不代表已在 Microsoft PowerPoint 中测试编辑性。
+可在自动检查通过后用当前 revision 执行 finalize。它表示满足脚本交付条件，不代表视觉审查通过，更不代表已在 Microsoft PowerPoint 中测试编辑性。
 
 ## 6. 修改已有 PPT 与独立模式边界
 
@@ -104,6 +107,6 @@ python "$PPTX_SKILL_DIR/scripts/office_pptx.py" review-status files/demo.pptx
 | 原子操作、版本数据库、本地正式渲染和自动检查 | 随包提供；渲染需 LibreOffice 与字体 |
 | Python 覆盖保存后自动登记 | 手动调用 track_external；平台才自动检测 |
 | 右侧预览、SSE 通知、两版快照自动保留 | 平台功能，独立 CLI 不自动提供 |
-| 截图的模型 API 视觉审查 | 平台另外调用 API；独立 CLI 不自动启动审查服务 |
+| 截图视觉审查 | 支持：Agent 看 review-images 的渲染图后 submit-review，与平台流程相同 |
 
-独立 check-deck 记录的 visual pending 只表示请求已登记。没有后台 API 服务时可以交付，注明未进行 API 视觉审查；Agent 自己看图应单独说明检查方式，不冒充平台 API 的结果。结构中存在原生公式标记只能证明存储结构，实际可编辑性需在 PowerPoint 中打开验证。更多边界见 [平台集成说明](platform-integration.md)。
+check-deck 记录的 visual pending 表示等待 Agent 审查。未提交审查时可以交付，但须注明未进行视觉审查；当前模型无法读图时提交 unavailable，不冒充通过。结构中存在原生公式标记只能证明存储结构，实际可编辑性需在 PowerPoint 中打开验证。更多边界见 [平台集成说明](platform-integration.md)。

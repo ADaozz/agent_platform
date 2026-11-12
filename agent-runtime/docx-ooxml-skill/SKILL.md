@@ -1,6 +1,6 @@
 ---
 name: docx-ooxml-author
-description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. Section transactions, document plans, local repairs and asynchronous host visual review, with real LibreOffice pagination.
+description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. Section transactions, document plans, local repairs and main-Agent visual review of real LibreOffice page renders.
 compatibility: Python 3.10+, lxml, Pillow, PyMuPDF, LibreOffice. Runs through execute; no separate Agent or MCP server required.
 metadata:
   version: "0.6.0"
@@ -56,19 +56,28 @@ Prefer a template's sections, paragraphs, named styles, content controls and tab
    Unrepairable findings require a local Agent edit or an explicit
    failure report; never silently ignore them, delete necessary content or shrink
    all text. A failed final check cannot be accepted. Keep the downloadable draft.
-5. After the deterministic final pass, the shared platform Office service queues
-   **every page** for visual review concurrently, then separately executes
-   `document_review` over all numbered thumbnails, section mapping and page results.
-   Both are actual model invocations, bound to Document ID, Revision, pixels and
-   request ID. Missing/failed image models return unavailable. Visual advice never
-   edits the file. A revision or reflow invalidates affected review evidence; stale
-   jobs cannot update new content. Do not replace model review with guessed verdicts.
+5. After the deterministic final pass, **you (the main Agent) review the rendered
+   pages yourself**; no other model or external API is called.
+   `review-images files/report.docx` returns every page PNG (absolute path), a
+   numbered overview sheet, the review `guidance`, a `context_file` (design,
+   section mapping, page blocks, deterministic checks) and a `submit` template.
+   Open **every page** with `read_file`, then write `tmp/visual-review.json` and run
+   `submit-review files/report.docx tmp/visual-review.json` with
+   `{"revision":N,"request_id":"…","pages":[{"page":1,"review":{status,summary,checks,issues}}]}`.
+   Pages may be submitted in batches. After every page is reviewed, open the
+   overview sheet and submit `"document":{"review":{…}}` for cross-page issues
+   (each issue lists its `pages`). A malformed request is rejected as a whole and
+   records nothing; fix it and resubmit. Results are bound to Document ID,
+   Revision, page pixels and request ID; a revision or reflow invalidates them.
+   Never give a verdict for a page you did not open. If the current model cannot
+   read images, submit `{"page":N,"unavailable":"reason"}` (or
+   `"document":{"unavailable":"reason"}`) instead of guessing. Visual advice never
+   edits the file.
 6. `finalize files/report.docx --base-revision N` records DOCX + three independent
    states, design ID, repair counts and unresolved findings. Formal acceptance
    requires the final deterministic pass and completed page AND document visual
    passes. Pending/unavailable visual results and remaining visual issues remain
-   clearly labelled downloadable drafts. CLI-only execution has no host visual model,
-   so cannot claim visual completion. Persisted legacy contract 1 documents retain
+   clearly labelled downloadable drafts. Persisted legacy contract 1 documents retain
    their old APIs and gates; do not select legacy mode to bypass acceptance.
 
 For domestic research documents without a template, inspect and select
@@ -107,6 +116,8 @@ python "$S" init --document-id report --output files/report.docx --template file
 python "$S" status files/report.docx
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
 python "$S" check-document files/report.docx --final
+python "$S" review-images files/report.docx
+python "$S" submit-review files/report.docx tmp/visual-review.json
 python "$S" finalize files/report.docx --base-revision N
 ```
 
@@ -116,6 +127,8 @@ Blank path, only when nothing suitable exists:
 python "$S" init --document-id report --output files/report.docx
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
 python "$S" check-document files/report.docx --final
+python "$S" review-images files/report.docx
+python "$S" submit-review files/report.docx tmp/visual-review.json
 python "$S" finalize files/report.docx --base-revision N
 ```
 
@@ -164,9 +177,9 @@ The legacy apply-one engine asks for a checkpoint after three additions. apply-s
 
 ## 5. Render and finish
 
-`checkpoint` renders with LibreOffice and records pages. Inspect those images. A vision-capable reviewer can call `review-page` with notes from that image. Text-only inspection cannot pass a page. A missing renderer is a failed checkpoint.
+`checkpoint` renders with LibreOffice and records pages. Inspect those images. For legacy documents and strict-mode page gates, call `review-page --reviewer main_agent` with notes from the image you opened. Text-only inspection cannot pass a page. A missing renderer is a failed checkpoint.
 
-For legacy documents, `finalize --base-revision` requires the final checkpoint and a reviewed final page. New documents require final collision/layout checks plus both host visual reviews for formal acceptance; strict mode also retains its actual page approval gates. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
+For legacy documents, `finalize --base-revision` requires the final checkpoint and a reviewed final page. New documents require final collision/layout checks plus your page and document visual reviews (`submit-review`) for formal acceptance; strict mode also retains its actual page approval gates. The file can be downloaded while visual review is pending; call it a draft until the pages have been seen. Never execute macros or embedded programs from a template.
 
 ## Request
 

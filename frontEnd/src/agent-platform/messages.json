@@ -1139,46 +1139,6 @@
     "zh": "排版检查未完成：",
     "en": "Layout check incomplete:"
   },
-  "docx.gate.checkpoint": {
-    "zh": "等待排版检查，完成后继续生成。",
-    "en": "Waiting for a layout checkpoint."
-  },
-  "docx.gate.failed": {
-    "zh": "页面检查失败，正在等待修复与复检。",
-    "en": "Page check failed. Waiting for repairs and recheck."
-  },
-  "docx.gate.visual_pending": {
-    "zh": "严格模式：等待已完成页面的视觉检查。",
-    "en": "Strict mode: awaiting visual review of completed pages."
-  },
-  "docx.layoutNote": {
-    "zh": "预览与页面验收共用 LibreOffice 分页；Microsoft Word 可能存在排版差异。",
-    "en": "Preview and review use LibreOffice pagination; Microsoft Word layout may differ."
-  },
-  "docx.inspectPage": {
-    "zh": "检查第 {page} 页",
-    "en": "Inspect page {page}"
-  },
-  "docx.actualReview": {
-    "zh": "请查看实际渲染页面后填写检查依据。提交仅记录本页视觉审查，不会自动生成新内容。",
-    "en": "Inspect the rendered page and record evidence. This records visual review; it does not resume generation."
-  },
-  "docx.fullPage": {
-    "zh": "打开完整页面截图",
-    "en": "Open full page screenshot"
-  },
-  "docx.reviewNotes": {
-    "zh": "记录排版检查依据或需要修复的问题",
-    "en": "Record layout evidence or issues to fix"
-  },
-  "docx.approve": {
-    "zh": "本页视觉检查通过",
-    "en": "Page visually passed"
-  },
-  "docx.reject": {
-    "zh": "本页需要修复",
-    "en": "Page needs repairs"
-  },
   "docx.steerAccepted": {
     "zh": "已接收纠偏，等待当前操作完成后处理。",
     "en": "Correction received; waiting for the current operation to finish."
@@ -1376,8 +1336,8 @@
     "en": "Render integrity"
   },
   "pptx.aesthetic": {
-    "zh": "模型视觉审查",
-    "en": "Model visual review"
+    "zh": "Agent 视觉审查",
+    "en": "Agent visual review"
   },
   "pptx.aesthetic.pending": {
     "zh": "审查中",
@@ -1440,8 +1400,8 @@
     "en": "Elements {ids}"
   },
   "pptx.unmapped": {
-    "zh": "模型给出的元素 ID 不存在：{ids}",
-    "en": "Model referenced unknown element IDs: {ids}"
+    "zh": "审查引用的元素 ID 不存在：{ids}",
+    "en": "The review referenced unknown element IDs: {ids}"
   },
   "pptx.needsVerification": {
     "zh": "待验证",
@@ -1468,8 +1428,8 @@
     "en": "A critical issue survived two repair rounds; auto-repair stopped and awaits your decision."
   },
   "pptx.noIssues": {
-    "zh": "模型未发现问题",
-    "en": "No issues reported by the model"
+    "zh": "审查未发现问题",
+    "en": "No issues found in the review"
   },
   "pptx.constraints": {
     "zh": "用户版式约束：{items}",
@@ -1480,8 +1440,8 @@
     "en": "Deck visual consistency review"
   },
   "pptx.requestDeck": {
-    "zh": "审查整套一致性",
-    "en": "Review deck consistency"
+    "zh": "请 Agent 审查整套一致性",
+    "en": "Ask the Agent to review deck consistency"
   },
   "pptx.deckNotRequested": {
     "zh": "尚未进行整套审查",
@@ -1502,10 +1462,6 @@
   "pptx.unverified": {
     "zh": "定稿未通过宿主核验",
     "en": "Finalization failed host verification"
-  },
-  "pptx.agentNote": {
-    "zh": "Agent 自查（不作为验收依据）：{notes}",
-    "en": "Agent self-check (not acceptance): {notes}"
   },
   "Features": {
     "zh": "扩展功能",
@@ -1896,8 +1852,8 @@
     "en": "Deterministic layout"
   },
   "docx.quality.pageVisual": {
-    "zh": "逐页视觉审查",
-    "en": "Page visual review"
+    "zh": "当前页视觉审查",
+    "en": "Current page visual review"
   },
   "docx.quality.documentVisual": {
     "zh": "整稿视觉审查",
@@ -1944,7 +1900,7 @@
     "en": "Draft: deterministic checks pending"
   },
   "docx.quality.draft_visual_unavailable": {
-    "zh": "草稿：视觉模型不可用",
+    "zh": "草稿：视觉审查不可用",
     "en": "Draft: visual review unavailable"
   },
   "docx.quality.draft_pending_visual": {
@@ -2024,12 +1980,12 @@
     "en": "Confidence"
   },
   "office.model": {
-    "zh": "模型 ID",
-    "en": "Model ID"
+    "zh": "审查者",
+    "en": "Reviewer"
   },
   "office.prompt": {
-    "zh": "Prompt 版本",
-    "en": "Prompt version"
+    "zh": "审查规则版本",
+    "en": "Guidance version"
   },
   "office.reviewedAt": {
     "zh": "审查时间",
@@ -2059,10 +2015,6 @@
     "zh": "仅支持页面定位：没有可靠的 Block 区域坐标",
     "en": "Page navigation only: reliable Block coordinates are unavailable"
   },
-  "office.noLocation": {
-    "zh": "没有可靠的页面定位信息",
-    "en": "Page location is unavailable"
-  },
   "office.locate": {
     "zh": "定位问题",
     "en": "Locate issue"
@@ -2076,8 +2028,8 @@
     "en": "Sent to the Agent"
   },
   "office.retryVisual": {
-    "zh": "重新审查全文视觉",
-    "en": "Review all pages and document again"
+    "zh": "请 Agent 重新视觉审查",
+    "en": "Ask the Agent to review again"
   },
   "office.staleNote": {
     "zh": "此结果不对应当前版本或审查请求，无法用于定位或委派。",
@@ -2102,5 +2054,21 @@
   "office.fixRequest": {
     "zh": "请根据审查意见局部修复当前文档：{observation}。建议：{suggestion}。修改前读取最新版本，仅调整相关内容并保留必要内容，修改后重新渲染检查。",
     "en": "Please locally repair the current document based on this review: {observation}. Suggestion: {suggestion}. Read the latest revision first, preserve necessary and unrelated content, then render and recheck."
+  },
+  "office.mainAgent": {
+    "zh": "主 Agent",
+    "en": "Main Agent"
+  },
+  "pptx.error.agent_cannot_inspect": {
+    "zh": "当前模型无法查看图片",
+    "en": "The current model cannot view images"
+  },
+  "office.reviewRequest": {
+    "zh": "请对 {path} 的当前版本重新做视觉审查：运行 review-images，用 read_file 逐页查看渲染图和整稿缩略图，再用 submit-review 提交逐页与整稿审查结果。审查结果只作建议，不要据此修改文档。",
+    "en": "Please review the current revision of {path} visually again: run review-images, open every page render and the overview with read_file, then submit the page and document reviews with submit-review. Findings are advice only; do not edit the document because of them."
+  },
+  "pptx.deckReviewRequest": {
+    "zh": "请对 {path} 的当前版本做整套视觉一致性审查：如没有待处理的整套审查，先运行 request-deck-review；再运行 review-images，用 read_file 查看整套缩略图 deck.sheet，最后用 submit-review 提交整套审查。审查结果只作建议，不要据此修改 PPT。",
+    "en": "Please review deck consistency for the current revision of {path}: run request-deck-review if no deck review is pending, run review-images, open deck.sheet with read_file, then submit the deck review with submit-review. Findings are advice only; do not edit the PPT because of them."
   }
 }

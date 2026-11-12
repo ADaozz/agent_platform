@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import tempfile
 import time
+import uuid
 import zipfile
 
 _spec = importlib.util.spec_from_file_location('ooxml_engine', Path(__file__).with_name('office_docx.py'))
@@ -445,7 +446,7 @@ class DocumentStore(_shared.ArtifactStore):
     def visual_review(self, revision, page, passed, reviewer, notes):
         if type(passed) is not bool:
             raise ValueError('Visual verdict must be a boolean')
-        if reviewer not in ('human', 'vision_model') or not isinstance(notes, str) or not notes.strip():
+        if reviewer not in ('main_agent', 'human', 'vision_model') or not isinstance(notes, str) or not notes.strip():
             raise ValueError('Actual visual review requires reviewer and evidence notes')
         with self.locked() as (c, state):
             self.assert_current(state, revision)
@@ -468,6 +469,152 @@ class DocumentStore(_shared.ArtifactStore):
             c.execute('INSERT INTO events(data) VALUES (?)', (json.dumps(event),))
             c.commit()
             return event
+
+    def _visual_scope(self, state):
+        if state.get('quality_contract', 1) < 2:
+            raise ValueError('Legacy documents use review-page after checkpoint')
+        if state.get('external_conflict'):
+            raise ValueError('External modification detected; track before reviewing')
+        request = state.get('visual_request') or {}
+        if (state.get('render_revision') != state['revision'] or not request.get('eligible') or request.get('revision') != state['revision']
+                or not request.get('request_id') or request.get('fingerprints') != [p['fingerprint'] for p in state.get('pages', [])]):
+            raise ValueError('Run check-document --final until it passes before visual review')
+        return request
+
+    def _review_pages(self, revision, fingerprints):
+        import pymupdf as fitz
+        output, manifest = self.render_snapshot(revision)
+        with fitz.open(output / 'preview.pdf') as pdf:
+            actual = [hashlib.sha256(page.get_pixmap(alpha=False).samples).hexdigest() for page in pdf]
+        if actual != fingerprints:
+            raise ValueError('Rendered pages differ from the checked pages; run check-document --final again')
+        return output, manifest['images']
+
+    @staticmethod
+    def _current_review(review, revision, page, request_id):
+        return bool(review) and review.get('revision') == revision and review.get('fingerprint') == page['fingerprint'] and review.get('request_id') == request_id
+
+    def review_images(self):
+        """Agent: page renders, numbered overview and context for the main Agent's own visual review."""
+        agent = _sibling('agent_review')
+        state = self.status(committed=True)
+        request = self._visual_scope(state)
+        revision, pages = state['revision'], state['pages']
+        output, images = self._review_pages(revision, request['fingerprints'])
+        reviews = state.get('aesthetic_reviews') or {}
+        sections = ((state.get('document_check') or {}).get('geometry') or {}).get('section_pages', [])
+        blocks = {block['block_id']: block for block in state['blocks']}
+        items, contexts = [], []
+        for index, page in enumerate(pages):
+            image = str((output / images[index]).resolve())
+            review = reviews.get(str(page['page'])) or {}
+            current = self._current_review(review, revision, page, request['request_id'])
+            items.append(dict(page=page['page'], image=image, status=review.get('status') if current else 'pending'))
+            contexts.append(dict(page=page['page'], image=image, sections=[s for s in sections if page['page'] in s.get('pages', [])],
+                deterministic=page.get('checks'), blocks=[blocks[b] for b in page.get('block_ids', []) if b in blocks][:100],
+                review=dict(status=review.get('status'), summary=review.get('summary'), issues=review.get('issues')) if current else None))
+        sheet = output / 'document-sheet.png'
+        if not sheet.is_file():
+            sheet.write_bytes(agent.contact_sheet([(output / name).read_bytes() for name in images]))
+        overall = state.get('document_review') or {}
+        document_current = (overall.get('revision') == revision and overall.get('request_id') == request['request_id']
+                            and overall.get('fingerprints') == request['fingerprints'])
+        pending = [item['page'] for item in items if item['status'] == 'pending']
+        context_file = output / 'review-context.json'
+        context_file.write_text(json.dumps(dict(document_id=state['document_id'], revision=revision, request_id=request['request_id'],
+            guidance_version=agent.GUIDANCE_VERSION, selected_design=state.get('selected_design'), section_pages=sections, pages=contexts),
+            ensure_ascii=False), encoding='utf-8')
+        return dict(document_id=state['document_id'], revision=revision, request_id=request['request_id'], guidance_version=agent.GUIDANCE_VERSION,
+            guidance=dict(page=agent.PAGE_GUIDANCE, document=agent.DOCUMENT_GUIDANCE, page_checks=agent.PAGE_CHECKS, document_checks=agent.DOCUMENT_CHECKS),
+            context_file=str(context_file.resolve()), pages=items,
+            document=dict(sheet=str(sheet.resolve()), status=overall.get('status') if document_current else 'pending', reviewable=not pending),
+            submit=dict(command='submit-review', request={'revision': revision, 'request_id': request['request_id'],
+                'pages': [{'page': 1, 'review': {'status': 'passed|issues|uncertain', 'summary': '...',
+                    'checks': {'<check>': {'verdict': 'ok|issue|not_applicable|uncertain', 'evidence': '...'}},
+                    'issues': [{'block_id': None, 'observation': '...', 'suggestion': '...', 'category': None, 'severity': None, 'confidence': None}]}}],
+                'document': {'review': 'same shape with document_checks; each issue lists pages:[...]'}},
+                unavailable='Use {"page":N,"unavailable":"reason"} only when you cannot view images.'),
+            next_action=(f'Open pages {pending} with read_file, review each against the guidance and context_file, then submit-review. '
+                         'After every page is reviewed, open the overview sheet and submit the document review. Findings are advice only.') if pending else
+                        'All pages reviewed; open the overview sheet and submit the document review.' if not document_current else
+                        'Visual review of this revision is complete.')
+
+    def submit_review(self, request):
+        """Agent: record the main Agent's own page and whole-document visual review (advice only)."""
+        agent = _sibling('agent_review')
+        if not isinstance(request, dict):
+            raise ValueError('Review request must be a JSON object')
+        entries, overall_input = request.get('pages') or [], request.get('document')
+        if not isinstance(entries, list) or (overall_input is not None and not isinstance(overall_input, dict)) or not (entries or overall_input):
+            raise ValueError('Submit {"revision":N,"pages":[{"page":1,"review":{...}}]} and/or "document":{"review":{...}}')
+        state = self.status(committed=True)
+        if request.get('revision') != state['revision']:
+            raise ValueError('Revision conflict; run review-images for the current revision')
+        visual = self._visual_scope(state)
+        if request.get('request_id') not in (None, visual['request_id']):
+            raise ValueError('request_id does not match the current visual review request; run review-images again')
+        revision, pages = state['revision'], {page['page']: page for page in state['pages']}
+        output, images = self._review_pages(revision, visual['fingerprints'])
+        problems, accepted, seen = [], [], set()
+        for position, item in enumerate(entries):
+            number = item.get('page') if isinstance(item, dict) else None
+            try:
+                if number not in pages:
+                    raise ValueError(f'pages[{position}].page is not a page of revision {revision}')
+                if number in seen:
+                    raise ValueError(f'page {number} is listed twice')
+                seen.add(number)
+                page = pages[number]
+                result = agent.unavailable(item['unavailable']) if 'unavailable' in item else agent.evaluate_page(item.get('review'), set(page.get('block_ids', [])))
+                accepted.append((page, result, (output / images[number - 1]).read_bytes()))
+            except ValueError as exc:
+                problems.append(str(exc) if str(exc).startswith(('pages[', 'page ')) else f'page {number}: {exc}')
+        overall = None
+        if overall_input is not None:
+            try:
+                overall = agent.unavailable(overall_input['unavailable']) if 'unavailable' in overall_input else agent.evaluate_document(overall_input.get('review'), len(pages))
+            except ValueError as exc:
+                problems.append(f'document: {exc}')
+        if problems:
+            raise ValueError('Review rejected, nothing recorded: ' + '; '.join(problems))
+        common = dict(reviewer='main_agent', model_id=None, prompt_version=agent.GUIDANCE_VERSION, advisory_only=True,
+                      document_id=state['document_id'], revision=revision, request_id=visual['request_id'], reviewed_at=time.time())
+        with self.locked() as (c, current):
+            self.assert_current(current, revision)
+            if (current.get('visual_request') or {}).get('request_id') != visual['request_id']:
+                raise ValueError('The visual review request changed; run review-images again')
+            reviews = dict(current.get('aesthetic_reviews') or {})
+            applied = []
+            for page, result, png in accepted:
+                payload = dict(result, page=page['page'], fingerprint=page['fingerprint'], review_id=uuid.uuid4().hex,
+                               render_sha256=hashlib.sha256(png).hexdigest(), pixel_sha256=agent.pixel_sha256(png), **common)
+                reviews[str(page['page'])] = payload
+                applied.append(dict(page=page['page'], status=payload['status'], issues=len(payload['issues']), review_id=payload['review_id']))
+            document_outcome = None
+            if overall is not None:
+                if not all(self._current_review(reviews.get(str(page['page'])), revision, page, visual['request_id']) for page in current['pages']):
+                    raise ValueError('Review every page before submitting the whole-document review')
+                sheet = output / 'document-sheet.png'
+                payload = dict(overall, review_id=uuid.uuid4().hex, fingerprints=visual['fingerprints'], reviewed_pages=len(pages),
+                               render_sha256=hashlib.sha256(sheet.read_bytes()).hexdigest() if sheet.is_file() else None, **common)
+                current['document_review'] = payload
+                document_outcome = dict(status=payload['status'], issues=len(payload['issues']), review_id=payload['review_id'])
+            current['aesthetic_reviews'] = reviews
+            current['delivery'] = _sibling('quality_status').delivery(current)
+            current['delivery_status'] = current['delivery']['status']
+            if current.get('delivery_requested'):
+                current['finalized'] = current['delivery_status'] == 'accepted'
+            self.save_state(c, current)
+            event = dict(type='document_document_review' if overall is not None else 'document_aesthetic_review', document_id=current['document_id'],
+                revision=revision, path=self.path.name, aesthetic_reviews=reviews, document_review=current.get('document_review'),
+                delivery=current['delivery'], delivery_status=current['delivery_status'], finalized=current.get('finalized', False))
+            c.execute('INSERT INTO events(data) VALUES (?)', (json.dumps(event),))
+            c.commit()
+            delivery = current['delivery']
+        done = delivery['page_visual'] != 'pending' and delivery['document_visual'] != 'pending'
+        return dict(revision=revision, request_id=visual['request_id'], pages=applied, document=document_outcome, delivery=delivery,
+            next_action='Visual review recorded. Findings are advice only: report them when you deliver and do not edit the document unless the user asks.' if done else
+                        'Continue: review the remaining pages, then the overview sheet, and submit-review.')
 
     def finalize(self, base_revision):
         with self.locked() as (c, state):

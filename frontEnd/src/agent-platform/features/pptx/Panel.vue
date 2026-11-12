@@ -10,10 +10,10 @@ import ReviewDisclosure from './ReviewDisclosure.vue'
 import ReviewIssueList from '../office/ReviewIssueList.vue'
 import ReviewMetadata from '../office/ReviewMetadata.vue'
 import {pptxReviews,normalizeStatus} from '../office/reviewModel'
-import {delegateOfficeIssue,delegationKey} from '../office/delegate'
+import {delegateOfficeIssue,delegationKey,requestOfficeReview} from '../office/delegate'
 const props=defineProps({session:Object,events:{type:Array,default:()=>[]},active:Boolean,files:{type:Array,default:()=>[]},openRequest:Object})
 const emit=defineEmits(['open','context','error','catalog','select-file'])
-const decks=ref({}),identity=ref(''),opened=ref(false),selectedSlide=ref(''),follow=ref(true),focused=ref(''),busy=ref(false),delegated=ref({})
+const decks=ref({}),identity=ref(''),opened=ref(false),selectedSlide=ref(''),follow=ref(true),focused=ref(''),busy=ref(false),delegated=ref({}),deckRequested=ref(false)
 const deck=computed(()=>decks.value[identity.value]),slides=computed(()=>deck.value?.manifest?.slides||[]),slide=computed(()=>slides.value.find(s=>s.slide_id===selectedSlide.value)||slides.value[0])
 const profile=computed(()=>deck.value?.manifest?.profile||null)
 const base=computed(()=>props.session&&identity.value?`${API_BASE}/agent/sessions/${props.session.id}/presentations/${encodeURIComponent(identity.value)}`:'')
@@ -44,7 +44,14 @@ function show(){opened.value=true;sessionStorage.removeItem(key(identity.value))
 function select(sid){selectedSlide.value=sid;follow.value=false;focused.value=''}
 async function post(path,body){const id=props.session?.id,epoch=deckEpoch;busy.value=true;try{const result=await api(route.value+path,{method:'POST',body});if(props.session?.id===id)receiveSnapshots([result],epoch);return result}catch(e){if(props.session?.id===id)emit('error',e.message)}finally{if(props.session?.id===id)busy.value=false}}
 const dismissIssue=id=>post('/aesthetic-decision',{revision:deck.value.revision,decision:'dismiss_issues',issue_ids:[id],slide_id:slide.value.slide_id})
-const requestDeck=()=>post('/aesthetic-review',{revision:deck.value.revision})
+async function requestDeck(){
+ const session={...props.session},scope=`${session.id}:${identity.value}:${deck.value.revision}`,path=deck.value.path
+ busy.value=true
+ try{
+  await requestOfficeReview(api,{session,artifact:{feature:'pptx',presentation_id:identity.value,slide_id:slide.value?.slide_id,revision:deck.value.revision,path},text:t('pptx.deckReviewRequest',{path})})
+  if(`${props.session?.id}:${identity.value}:${deck.value?.revision}`===scope)deckRequested.value=true
+ }catch(e){if(props.session?.id===session.id)emit('error',e.message)}finally{if(props.session?.id===session.id)busy.value=false}
+}
 watch(()=>props.session?.id,async id=>{decks.value={};identity.value='';opened.value=false;selectedSlide.value='';follow.value=true;cursor=0;emit('open',false);if(!id)return;receive(props.events.filter(e=>e.type.startsWith('presentation_')));cursor=props.events.at(-1)?.seq||0;try{const epoch=deckEpoch,values=await api(`/agent/sessions/${id}/presentations`);if(props.session?.id===id)receiveSnapshots(values,epoch)}catch(e){emit('error',e.message)}},{immediate:true})
 watch(()=>props.events.at(-1)?.seq,()=>{const batch=props.events.filter(e=>e.seq>cursor);cursor=props.events.at(-1)?.seq||cursor;receive(batch.filter(e=>e.type.startsWith('presentation_')))})
 watch(()=>[deck.value?.revision,slide.value?.slide_id,props.active],()=>{emit('context',deck.value&&slide.value?{feature:'pptx',presentation_id:identity.value,slide_id:slide.value.slide_id,revision:deck.value.revision}:null)})
@@ -81,7 +88,7 @@ async function delegate(item,pages){
   if(`${props.session?.id}:${identity.value}:${deck.value?.revision}`===scope)delegated.value={...delegated.value,[key]:true}
  }catch(e){if(props.session?.id===id)emit('error',e.message)}finally{if(props.session?.id===id)busy.value=false}
 }
-watch(()=>`${props.session?.id}:${identity.value}:${deck.value?.revision}`,()=>{delegated.value={};focused.value=''})
+watch(()=>`${props.session?.id}:${identity.value}:${deck.value?.revision}`,()=>{delegated.value={};focused.value='';deckRequested.value=false})
 const deckReview=computed(()=>deck.value?.deck_review||null)
 const highlights=computed(()=>!reviewView.value.visualCurrent?[]:findings.value.filter(item=>!item.dismissed&&(isCritical(item)||item.id===focused.value)).map(item=>({id:item.id,region:item.region,element_ids:item.element_ids,severity:item.severity,active:item.id===focused.value})))
 function pageList(item){return item.slides?.join(', ')}
@@ -111,8 +118,6 @@ function goToPage(item){if(!reviewView.value.wholeCurrent)return;const target=sl
       <span v-if="review.visual_integrity">{{ t('pptx.integrity') }}: <b :class="'pptx-check-'+review.visual_integrity.status">{{ t('pptx.check.'+review.visual_integrity.status) }}</b></span>
      </div>
      <p v-for="(issue,index) in issues" :key="index" :class="'pptx-issue-'+(issue.severity||'ungraded')"><span>{{ issue.severity||t('office.ungraded') }}</span> {{ issue.type }} · {{ issue.element_id||issue.elements?.join(', ') }}<template v-if="issue.message"> — {{ issue.message }}</template></p>
-     <p v-if="review.agent_inspection" class="pptx-meta">{{ t('pptx.agentNote',{notes:review.agent_inspection.notes}) }}</p>
-
      </ReviewDisclosure>
      <ReviewDisclosure :key="reviewScope+':visual'" :title="t('pptx.aesthetic')" :status="visualStatus" :status-label="reviewLabel(visualStatus)" :issues="findings">
      <p v-if="review.revision!==undefined" class="pptx-meta">{{ t('pptx.reviewVersions',{reviewed:aesthetic?.revision??review.revision,current:deck.revision}) }}</p>
@@ -155,7 +160,7 @@ function goToPage(item){if(!reviewView.value.wholeCurrent)return;const target=sl
 
      <p v-if="deckReview?.rejected_issues?.length" class="pptx-meta">{{ t('pptx.rejectedIssues',{count:deckReview.rejected_issues.length}) }}</p>
      <div class="pptx-actions">
-      <button type="button" class="text-button" :disabled="busy||deckReview?.status==='pending'" @click="requestDeck">{{ t('pptx.requestDeck') }}</button>
+      <button type="button" class="text-button" :disabled="busy||deckRequested" @click="requestDeck">{{ deckRequested?t('office.delegated'):t('pptx.requestDeck') }}</button>
      </div>
     </ReviewDisclosure>
    </div>

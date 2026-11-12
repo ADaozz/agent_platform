@@ -1,6 +1,6 @@
 ---
 name: pptx-ooxml-author
-description: Create editable PowerPoint presentations from a style-design Markdown document and reference images, with real native charts and tables. Edit existing PPTX files while preserving unaffected content. Supports standalone CLI use and optional platform versioning, previews and API visual review.
+description: Create editable PowerPoint presentations from a style-design Markdown document and reference images, with real native charts and tables. Edit existing PPTX files while preserving unaffected content. Supports standalone CLI use and optional platform versioning and previews; visual review is done by the main Agent on the formal renders.
 metadata:
   version: "3.4.0"
   compatibility: "python-pptx, lxml, Pillow, PyMuPDF, openpyxl, latex2mathml, LibreOffice Impress and fonts"
@@ -15,7 +15,7 @@ metadata:
 - `files/<名称>.pptx` 是**唯一的工作稿和交付稿**，从第一次保存起就写在这里。平台只对 `files/` 中的 PPT 登记版本、生成预览；放在别处的整稿用户看不到。
 - Python 脚本每次保存都调用 `deck_io.save_deck(prs, 'files/<名称>.pptx')`，它在目标目录内原子写入，平台不会读到半个 ZIP。不要自行 `prs.save` 到 `tmp/` 再复制或替换；`save_deck` 拒绝写入 `tmp/`。原子操作直接作用于 `files/` 中的文件。
 - 不要在 `tmp/` 或其他目录维护整稿副本，也不要“先在别处做完、检查通过再输出”。检查与修复都直接针对 `files/` 中的文件。
-- 不要自行用 LibreOffice 渲染整稿、读截图来检查效果；预览由平台生成，质量检查用下文的 `audit-charts` 与 `check-deck`。
+- 不要自行用 LibreOffice 渲染整稿；预览由平台生成，质量检查用下文的 `audit-charts` 与 `check-deck`，视觉审查只看 `review-images` 给出的正式渲染图。
 
 ## 新建 PPT
 
@@ -58,7 +58,14 @@ ChartEx 高级图表、曲面和量价股票图需要 PowerPoint 核对，LibreO
 
 **修复读取现有 PPT 并局部改动，禁止重新生成整稿。** 优先 `element.update`；脚本用 `Presentation('files/deck.pptx')`，通过稳定 slide_id/element_id 定位修改，再用 `deck_io.save_deck(prs, 'files/deck.pptx')` 写回原路径。保留其它页及未涉及对象的内容、背景、字体、布局和图表数据。不得重跑从空白 Presentation 重建全部页面的脚本。仅用户要求全局修改时才改全局参数。
 
-全部自动检查通过后，check-deck 记录单页和整稿视觉审查请求；接入平台时由后台另外调用模型 API 审查截图，不是 Agent 自身的看图能力。独立 CLI 不会自动获得这个后台服务。**所有视觉结果（包括 critical）只给建议，禁止据此自动修改；用户明确要求修复后才局部修改。** 用 review-status 查询并汇总建议；模型或渲染不可用须说明。手动 check-slide 仅用于指定页面诊断，不是默认生成流程。见 [aesthetic-review.md](references/aesthetic-review.md)。
+全部自动检查通过后，check-deck 记录单页和整稿视觉审查请求，**由你（主 Agent）亲自看图审查**，不调用其他模型或外部 API：
+
+1. 运行 `office_pptx.py review-images files/deck.pptx`，得到每页正式渲染图的绝对路径、整套编号缩略图 `deck.sheet`、审查规则 `guidance` 和上下文文件 `context_file`（元素清单、图表数据、流程连线、设计依据、自动检查结果）。
+2. 用 `read_file` 逐页打开截图，必要时读取 `context_file`；没打开截图不能给结论，也不能凭元素清单或文字推断视觉效果。
+3. 把结果写入 `tmp/visual-review.json`，运行 `office_pptx.py submit-review files/deck.pptx --request tmp/visual-review.json`。请求为 `{"revision":N,"slides":[{"slide_id":"…","review":{status,summary,checks,issues}}],"deck":{"review":{…}}}`，结构见 review-images 返回的 `submit` 和 [aesthetic-review.md](references/aesthetic-review.md)。可分批提交；结构不合规时整份拒绝、不记录，按报错修正后重新提交。整套审查在所有单页提交后，看 `deck.sheet` 再提交。
+4. 当前模型无法读取图片时，对相应页面提交 `{"slide_id":"…","unavailable":"原因"}`，如实说明视觉审查不可用，不得伪造结论。
+
+**所有视觉结果（包括 critical）只给建议，禁止据此自动修改；用户明确要求修复后才局部修改。** 用 review-status 汇总建议并在交付时说明。手动 check-slide 仅用于指定页面诊断，不是默认生成流程。
 
 ## 文件保存与可选平台集成
 
@@ -69,4 +76,4 @@ ChartEx 高级图表、曲面和量价股票图需要 PowerPoint 核对，LibreO
 - 原生图表审计通过后按上述整稿检查流程执行，遮挡修复与视觉建议分开处理。预览成功不等于内容正确或 PowerPoint 实机验收通过；未完成的检查明确说明。
 - 正式渲染调用 PATH 中的 `libreoffice`；按实际系统配置可执行入口，不假设固定路径或 `soffice` 别名。临时渲染文件不放 `files/`，不把 Agent 自己生成的 PDF 图片当作平台已经登记的预览。
 
-独立使用步骤见 [standalone.md](references/standalone.md)；平台快照与后台审查的边界见 [platform-integration.md](references/platform-integration.md)。未配置可用视觉 API 时，该审查未执行或不可用，不阻塞生成和交付，也不能标记为视觉通过。
+独立使用步骤见 [standalone.md](references/standalone.md)；平台快照与审查记录的边界见 [platform-integration.md](references/platform-integration.md)。视觉审查未完成或不可用时，不阻塞生成和交付，也不能标记为视觉通过。

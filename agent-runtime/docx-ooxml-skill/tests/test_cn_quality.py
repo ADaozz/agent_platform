@@ -118,33 +118,46 @@ def test_delivery_has_three_independent_states_and_never_accepts_unknown():
     assert delivery(state)['status']=='draft_pending_check'
 
 
-def test_page_and_document_reviews_execute_separately_and_reject_stale_results(tmp_path):
+def agent_answers(store):
+    review=a._sibling('agent_review')
+    page=dict(status='passed',summary='逐页查看渲染图',checks={k:dict(verdict='ok',evidence='正文清晰，段距正常') for k in review.PAGE_CHECKS},issues=[])
+    document=dict(status='passed',summary='查看整稿缩略图',checks={k:dict(verdict='ok',evidence='各页风格一致') for k in review.DOCUMENT_CHECKS},issues=[])
+    return page,document
+
+
+def test_agent_reviews_every_page_then_the_document_and_stale_results_are_rejected(tmp_path):
     store=make_store(tmp_path,[section('body',['h','p'])])
     store.apply_section(envelope(store,'body',section_id='body',operations=[dict(type='append_paragraph',block_id='h',style='Heading1',text='科研报告'),dict(type='append_paragraph',block_id='p',text='研究方法和实验结果在正文中清晰呈现。')]))
     checked=store.check_document(final=True)
     assert checked['passed'],checked['repair_targets']
-    adapter=load_adapter();calls=[]
-    def model(system,text,images,schema):
-        calls.append(dict(system=system,images=len(images),schema=schema.__name__))
-        assert images[0][1].startswith(b'\x89PNG')
-        return dict(status='passed',summary='Inspected the actual supplied image',issues=[])
-    service=adapter.Documents(store.path.parent,host=dict(private_root=tmp_path/'private',vision=lambda:('fixture-vision',model)))
-    service.reviews.resume(store.path)
-    deadline=time.monotonic()+20
-    while time.monotonic()<deadline:
-        state=store.metadata()
-        if state.get('document_review'):break
-        service.sync();time.sleep(.05)
-    else:pytest.fail('Independent whole-document review did not finish')
-    assert {call['schema'] for call in calls}=={'PageReview','DocumentReview'}
-    assert len(state['aesthetic_reviews'])==len(checked['pages'])
-    assert state['document_review']['reviewed_pages']==len(checked['pages'])
-    assert service.quality_delivery(state)['visual_complete']
-    old=state['document_review']
+    images=store.review_images()
+    assert [p['page'] for p in images['pages']]==[p['page'] for p in checked['pages']]
+    assert all(Path(p['image']).read_bytes().startswith(b'\x89PNG') for p in images['pages'])
+    assert Path(images['document']['sheet']).read_bytes().startswith(b'\x89PNG') and not images['document']['reviewable']
+    context=json.loads(Path(images['context_file']).read_text())
+    assert context['request_id']==images['request_id'] and context['pages'][0]['blocks']
+    page,document=agent_answers(store);revision=images['revision']
+    with pytest.raises(ValueError,match='Review every page'):
+        store.submit_review(dict(revision=revision,document=dict(review=document)))
+    with pytest.raises(ValueError,match='request_id'):
+        store.submit_review(dict(revision=revision,request_id='old',pages=[dict(page=1,review=page)]))
+    with pytest.raises(ValueError,match='nothing recorded'):
+        store.submit_review(dict(revision=revision,pages=[dict(page=1,review=dict(page,checks={}))]))
+    flagged=dict(page,status='issues',issues=[dict(block_id='ghost',observation='页脚略靠下',suggestion='页脚上移',severity='minor')])
+    result=store.submit_review(dict(revision=revision,request_id=images['request_id'],pages=[dict(page=p['page'],review=flagged if p['page']==1 else page) for p in images['pages']]))
+    assert result['delivery']['page_visual']=='issues' and result['delivery']['document_visual']=='pending'
+    state=store.metadata()
+    assert state['aesthetic_reviews']['1']['issues'][0]['block_id'] is None and state['aesthetic_reviews']['1']['reviewer']=='main_agent'
+    assert store.review_images()['document']['reviewable']
+    store.submit_review(dict(revision=revision,pages=[dict(page=1,review=page)]))
+    result=store.submit_review(dict(revision=revision,document=dict(review=document)))
+    state=store.metadata()
+    assert state['document_review']['reviewed_pages']==len(checked['pages']) and result['delivery']['status']=='accepted'
+    assert store.finalize(revision)['publication_status']=='finalized'
     store.apply_one(envelope(store,'edit',operation=dict(type='replace_text',block_id='p',old='清晰',new='完整清晰')))
-    assert not service.reviews.record(store,'report',old['revision'],None,old['fingerprints'],old)
-    assert store.metadata()['document_review'] is None
-    service.close()
+    assert store.metadata()['document_review'] is None and store.metadata()['aesthetic_reviews']=={}
+    with pytest.raises(ValueError,match='Revision conflict'):
+        store.submit_review(dict(revision=revision,pages=[dict(page=1,review=page)]))
 
 
 def load_adapter():
@@ -169,17 +182,16 @@ def test_actual_cross_page_table_without_header_is_repaired(tmp_path):
     assert not any(t['code']=='table_header_missing' for t in repair['remaining'])
 
 
-def test_no_vision_model_produces_page_and_document_unavailable(tmp_path):
+def test_agent_that_cannot_view_images_leaves_an_unavailable_draft(tmp_path):
     store=make_store(tmp_path,[section('body',['p'])]);store.apply_section(envelope(store,'p',section_id='body',operations=[dict(type='append_paragraph',block_id='p',text='科研报告的视觉验收不可伪造通过。')]))
     check=store.check_document(final=True);assert check['passed']
-    adapter=load_adapter();service=adapter.Documents(store.path.parent,host=dict(private_root=tmp_path/'private'))
-    service.reviews.resume(store.path);deadline=time.monotonic()+15
-    while not store.metadata().get('document_review') and time.monotonic()<deadline:service.sync();time.sleep(.05)
+    revision=store.metadata()['revision']
+    store.submit_review(dict(revision=revision,pages=[dict(page=p['page'],unavailable='当前模型不支持图片输入') for p in check['pages']],document=dict(unavailable='当前模型不支持图片输入')))
     state=store.metadata();assert state['document_review']['status']=='unavailable'
-    assert all(r['status']=='unavailable' for r in state['aesthetic_reviews'].values())
+    assert all(r['status']=='unavailable' and r['error']['code']=='agent_cannot_inspect' for r in state['aesthetic_reviews'].values())
     result=store.finalize(state['revision']);assert result['publication_status']=='draft'
     assert result['page_visual']==result['document_visual']=='unavailable'
-    assert not state['finalized'];service.close()
+    assert not store.metadata()['finalized']
 
 
 def test_reflow_invalidates_every_old_page_and_document_review(tmp_path):
@@ -283,21 +295,12 @@ def test_two_column_journal_sizes_default_components_to_column(tmp_path):
     result=store.check_document(final=True);assert result['passed'],result['repair_targets']
 
 
-def test_background_inflight_result_does_not_pollute_new_revision(tmp_path):
-    store=make_store(tmp_path,[section('body',['p'])]);store.apply_section(envelope(store,'p',section_id='body',operations=[dict(type='append_paragraph',block_id='p',text='后台审查期间允许正文继续更新。')]))
-    assert store.check_document(final=True)['passed']
-    started=threading.Event();release=threading.Event()
-    def model(system,text,images,schema):
-        started.set();release.wait(10);return dict(status='passed',summary='Reviewed the supplied old snapshot',issues=[])
-    service=load_adapter().Documents(store.path.parent,host=dict(private_root=tmp_path/'private',vision=lambda:('slow-test',model)))
-    try:
-        service.reviews.resume(store.path);assert started.wait(10)
-        store.apply_one(envelope(store,'edit',operation=dict(type='replace_text',block_id='p',old='继续',new='局部继续')))
-        release.set();deadline=time.monotonic()+15
-        while service.reviews.inflight and time.monotonic()<deadline:time.sleep(.05)
-        state=store.metadata();assert state['aesthetic_reviews']=={} and state['document_review'] is None
-        assert not state['finalized']
-    finally:release.set();service.close()
+def test_review_images_refuses_a_revision_without_a_final_check(tmp_path):
+    store=make_store(tmp_path,[section('body',['p'])]);store.apply_section(envelope(store,'p',section_id='body',operations=[dict(type='append_paragraph',block_id='p',text='审查期间正文可以继续更新。')]))
+    assert store.check_document(final=True)['passed'] and store.review_images()['pages']
+    store.apply_one(envelope(store,'edit',operation=dict(type='replace_text',block_id='p',old='继续',new='局部继续')))
+    with pytest.raises(ValueError,match='check-document --final'):store.review_images()
+    state=store.metadata();assert state['aesthetic_reviews']=={} and state['document_review'] is None and not state['finalized']
 
 
 def test_repeated_final_check_cannot_restart_stopped_automatic_repairs(tmp_path,monkeypatch):

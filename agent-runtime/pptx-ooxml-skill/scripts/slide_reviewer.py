@@ -168,14 +168,14 @@ def check(store,slide_id,content_notes,intent=None,constraints=None,defer_vision
         intent=intent if intent is not None else previous_intent
         constraints=constraints or (old.get('constraints') if old else None) or []
         technical,integrity=split_review(issues,rendered,render_error)
-        aesthetic=dict(status='pending',reason='awaiting_vision_review' if not errors else 'blocked_by_automatic_checks')
+        aesthetic=dict(status='pending',reason='awaiting_agent_review' if not errors else 'blocked_by_automatic_checks')
         if defer_vision and not errors:aesthetic['reason']='deferred_until_deck_checked'
         if preview_limited:
             integrity.update(status='unavailable',reason='native_chart_renderer_unsupported')
             aesthetic=dict(status='unavailable',reason='native_chart_renderer_unsupported',
                 error=dict(code='unsupported_chart_renderer',message='Verify this native chart in PowerPoint; the host renderer is not authoritative for this type.'))
         carried=old.get('aesthetic_review') or {}
-        # Same pixels, same intent: the earlier model verdict still describes this page.
+        # Same pixels, same intent: the earlier visual verdict still describes this page.
         design_sha=(views.get('review_design') or {}).get('sha256')
         if (not errors and not preview_limited and fingerprint and old.get('fingerprint')==fingerprint and carried.get('status') in CARRIED_AESTHETIC
                 and old.get('review_design_sha256')==design_sha
@@ -186,7 +186,6 @@ def check(store,slide_id,content_notes,intent=None,constraints=None,defer_vision
             render_error=render_error,fingerprint=fingerprint,repair_attempts=state['repair_attempts'][slide_id],
             design=design_quality.summary(issues),technical_review=technical,visual_integrity=integrity,aesthetic_review=aesthetic,
             intent=intent,constraints=constraints)
-        if old.get('agent_inspection') and old.get('fingerprint')==fingerprint:review['agent_inspection']=old['agent_inspection']
         review['status']=derive_status(review);review['visual_review']=compat_visual(review)
         if carried.get('review_id') and aesthetic.get('status')=='pending':
             state.setdefault('last_reviews',{})[slide_id]=old

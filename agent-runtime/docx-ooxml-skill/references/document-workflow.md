@@ -67,16 +67,26 @@ or modifies text. Fonts, ambiguous whitespace, complex template layout and seman
 suggestions require user/Agent investigation. Identical rendered page fingerprints
 retain previous manual review evidence; changed pages lose it after real reflow.
 
-## Background visual review
+## Main-Agent visual review
 
-The host shares `platform_app.office_review` queue, image checks, timeout/retry,
-model client and private SQLite review ledger with PPTX. DOCX supplies only its
-page schema, prompt, snapshot rendering and compare-before-apply adapter. Jobs bind
-Document ID, Revision and the actual page fingerprint; stale jobs are recorded as
-unapplied and cannot update current state. Pending pages resume after host restart.
-Model input and ledger remain outside the Agent sandbox. Visual results are
-advisory and cannot change DOCX bytes. API/UI expose the current document_check
-and aesthetic_reviews; a new Revision invalidates those results immediately.
+The main Agent reviews the pages itself; neither the CLI nor the host calls a model.
+`review-images` requires a passed final check for the current Revision and its open
+visual request. It verifies that the cached render still has the checked page
+pixels, then returns the page PNGs, a numbered `document-sheet.png` of every page,
+the guidance (page checks: legibility, spacing, tables, media_balance,
+heading_hierarchy, equations, whitespace, completeness; document checks:
+consistency, structure, rhythm, design_fit) and `review-context.json`.
+
+`submit-review` validates the whole request before writing anything. Every check
+needs a verdict and visible evidence; a page `block_id` that is not on that page is
+cleared. Any issue, or a failed/issues verdict, makes the page or document `issues`;
+an uncertain verdict or check stays `uncertain`; only a clean answer is `passed`.
+The document review is accepted only after every page has a current review. Results
+are written to `aesthetic_reviews` / `document_review` with `reviewer: main_agent`,
+Document ID, Revision, page fingerprint(s), request ID, render and pixel hashes, then
+the delivery state is recomputed. Visual results are advisory and cannot change DOCX
+bytes. API/UI expose the current document_check and aesthetic_reviews; a new
+Revision invalidates those results immediately.
 
 ## Reproducible acceptance
 
@@ -107,9 +117,9 @@ A real local content edit creates a new revision, which must be checked again.
 not bypasses. New CLI init defaults to contract 2; persisted legacy contract 1
 state remains backward compatible.
 
-Host page reviews cover every page; separate `document_review` uses every page
-in a numbered thumbnail sheet and completed page summaries. Both are async and
-version/pixel/request bound, never mutating content. Three UI states are separate:
+Agent page reviews cover every page; the separate `document_review` uses every page
+in a numbered thumbnail sheet and the completed page reviews. Both are
+version/pixel/request bound and never mutate content. Three UI states are separate:
 deterministic passed/failed/pending, page visual passed/issues/pending/unavailable,
 and document visual passed/issues/pending/unavailable. Final output records
 revision/design, repair attempts/unresolved targets, reviewed/issue pages and

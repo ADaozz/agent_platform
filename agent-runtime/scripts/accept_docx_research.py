@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Real-render 20–40 page research acceptance; optional REAL host vision via key prompt.
+"""Real-render 20–40 page research acceptance up to the main-Agent visual review.
 
-No verdicts are injected. Model-unavailable and model issues stay drafts. Secrets
-are read with getpass and never serialized. Work/state is outside distributable files.
+No verdicts are injected: visual review is left pending for the Agent, which
+opens the listed renders and calls submit-review. Work/state is outside
+distributable files.
 """
 import argparse
-import getpass
 import importlib.util
 import json
 import os
@@ -47,7 +47,7 @@ def run(args):
           dict(type='append_paragraph',block_id='cover-title',style='CoverTitle',text='科研文档质量验收报告'),
           dict(type='set_paragraph_format',block_id='cover-title',space_after_twips=14000),
           dict(type='append_paragraph',block_id='cover-date',style='CoverDate',text='2026 年 11 月 11 日')],
-          [dict(type='append_paragraph',block_id='abstract-h',style='AbstractTitle',text='摘要'),dict(type='set_paragraph_format',block_id='abstract-h',page_break_before=True),dict(type='append_paragraph',block_id='abstract-p',style='AbstractBody',text='本报告用于验证可编辑科研文档的章节事务、公式图表、跨页表格、目录与质量检查闭环。报告内容是可复现的软件测试资料，不作为实际科研结论。确定性检查定位问题后仅局部修复，逐页与整稿视觉审查由后台模型独立执行。'),dict(type='append_paragraph',block_id='abstract-keys',text='关键词：可编辑文档；局部修复；质量验收')],
+          [dict(type='append_paragraph',block_id='abstract-h',style='AbstractTitle',text='摘要'),dict(type='set_paragraph_format',block_id='abstract-h',page_break_before=True),dict(type='append_paragraph',block_id='abstract-p',style='AbstractBody',text='本报告用于验证可编辑科研文档的章节事务、公式图表、跨页表格、目录与质量检查闭环。报告内容是可复现的软件测试资料，不作为实际科研结论。确定性检查定位问题后仅局部修复，逐页与整稿视觉审查由主 Agent 查看渲染图后完成。'),dict(type='append_paragraph',block_id='abstract-keys',text='关键词：可编辑文档；局部修复；质量验收')],
           [dict(type='insert_toc',block_id='toc',levels=3)]]+batches+[
           [dict(type='append_paragraph',block_id='matrix-h',style='Heading1',text=f'{args.sections+1}. Verification matrix'),dict(type='append_table',block_id='matrix-table',rows=table_rows,column_widths_twips=[1800,3800,3300],keep_together=False)],
           [dict(type='append_paragraph',block_id='refs-h',style='Heading1',text=f'{args.sections+2}. References'),dict(type='append_paragraph',block_id='refs-p',style='Reference',text='[1] Repository acceptance fixture. Research document quality methodology. 2026. Synthetic test data, not a published research source.')]]
@@ -65,28 +65,11 @@ def run(args):
         check=call('check-document --final',lambda:store.check_document(final=True))
         summary.update(actual_pages=len(check['pages']),deterministic_passed=check['passed'],unresolved=check['repair_targets'],repair_summary=store.metadata().get('repair_summary'))
         if not check['passed']:raise RuntimeError('Deterministic findings remain')
-    host=dict(private_root=args.output/'host-private')
-    if args.live:
-        from platform_app.agent_core.config import ModelProfile
-        from platform_app.agent_core.llm import build_chat_model
-        key=getpass.getpass('DeepSeek visual test key (hidden): ')
-        profile=ModelProfile(id='deepseek/'+args.model,model=args.model,api_key=key,base_url='https://api.deepseek.com/v1',api='chat_completions',input=('text','image'),max_retries=0)
-        chat=build_chat_model(profile,streaming=False,trust_env=True,timeout=90);chat.max_tokens=2200
-        host.update(vision=lambda:(profile.id,chat),vision_timeout=100)
-    service=adapter.Documents(files,host=host)
-    start=time.monotonic()
-    if args.review_existing:service.reviews.request(store.path,store.metadata()['revision'])
-    else:service.reviews.resume(store.path)
-    summary['queue_return_ms']=round((time.monotonic()-start)*1000,3)
-    print('visual queue started',summary['actual_pages'],flush=True)
-    deadline=time.monotonic()+args.timeout;last=-1
-    while time.monotonic()<deadline:
-        state=store.metadata();count=len(state.get('aesthetic_reviews') or {})
-        if count!=last:print('reviewed pages',count,flush=True);last=count
-        if state.get('document_review'):break
-        service.sync();time.sleep(.2)
+    service=adapter.Documents(files,host=dict(private_root=args.output/'host-private'))
+    images=call('review-images',lambda:store.review_images())
+    summary['review_images']=dict(pages=[page['image'] for page in images['pages']],sheet=images['document']['sheet'],context_file=images['context_file'])
     state=store.metadata();delivery=service.quality_delivery(state)
-    summary.update(revision=state['revision'],design_id=state['selected_design']['id'],delivery=delivery,page_reviews=state.get('aesthetic_reviews'),document_review=state.get('document_review'),visual_duration_s=round(time.monotonic()-start,3),live_model=args.model if args.live else None)
+    summary.update(revision=state['revision'],design_id=state['selected_design']['id'],delivery=delivery,page_reviews=state.get('aesthetic_reviews'),document_review=state.get('document_review'))
     if delivery['deterministic']=='passed':summary['finalize']=call('finalize',lambda:store.finalize(state['revision']))
     atomics=sum(event.get('operation_count',0) for event in store.events() if event.get('section_id'))
     summary.update(calls=calls,atomic_operations=atomics,new_tool_calls=len(calls),legacy_protocol_calls=1+atomics+(atomics+2)//3+2,editable=True)
@@ -97,4 +80,4 @@ def run(args):
     print(json.dumps({k:summary[k] for k in ['actual_pages','revision','delivery','call_reduction']},ensure_ascii=False),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--live',action='store_true');p.add_argument('--review-existing',action='store_true');p.add_argument('--model',default='deepseek-flash');p.add_argument('--sections',type=int,default=6);p.add_argument('--paragraphs',type=int,default=8);p.add_argument('--timeout',type=int,default=900);run(p.parse_args())
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--review-existing',action='store_true');p.add_argument('--sections',type=int,default=6);p.add_argument('--paragraphs',type=int,default=8);run(p.parse_args())

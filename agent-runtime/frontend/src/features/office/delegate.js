@@ -7,4 +7,11 @@ export async function delegateOfficeIssue(api,{session,artifact,issue,pages,text
  const running=['running','queued'].includes(session.status)
  return api(`/agent/sessions/${encodeURIComponent(session.id)}/${running?'actions/steer':'messages'}`,{method:'POST',body:running?{text:message,artifact:details}:{text:message}})
 }
+// Visual review is performed by the main Agent; the UI can only ask it to review again.
+export async function requestOfficeReview(api,{session,artifact,text}) {
+ if (!session?.id || !Number.isInteger(artifact?.revision)) throw new Error('Invalid Office review context')
+ const message=`${text}\nOffice context: ${JSON.stringify(artifact,null,2)}`
+ const running=['running','queued'].includes(session.status)
+ return api(`/agent/sessions/${encodeURIComponent(session.id)}/${running?'actions/steer':'messages'}`,{method:'POST',body:running?{text:message,artifact}:{text:message}})
+}
 export function delegationKey({feature,identity,revision,requestId,issueId,pages}) {return JSON.stringify([feature,identity,revision,requestId||null,issueId,pages||[]])}

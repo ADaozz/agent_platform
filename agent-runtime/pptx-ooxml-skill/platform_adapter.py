@@ -1,7 +1,8 @@
-"""Read-only PPTX indexing, preview, host-side vision review and issue dismissal HTTP API.
+"""Read-only PPTX indexing, preview, visual-review audit and issue dismissal HTTP API.
 
-The vision review runs here, in the platform process: the sandbox never sees a
-model key, never supplies the screenshot and cannot mark a review as passed.
+Visual review is done by the main Agent through ``submit-review``; the host
+never calls a model. It keeps a private record of every submitted review and
+only trusts finalized verdicts that appear in that record.
 """
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -10,9 +11,9 @@ import io
 import json
 import logging
 from pathlib import Path
+import sqlite3
 import tempfile
 import threading
-import time
 import subprocess
 import zipfile
 from typing import Literal
@@ -20,162 +21,56 @@ from fastapi import APIRouter,HTTPException
 from fastapi.responses import Response,FileResponse
 from pydantic import BaseModel,Field
 from platform_app.artifact_runtime import validate_embedded_resources
+from platform_app.office_review import BackgroundReviews, ReviewLedger
 
 spec=importlib.util.spec_from_file_location('pptx_feature_engine',Path(__file__).parent/'scripts'/'office_pptx.py')
 engine=importlib.util.module_from_spec(spec); spec.loader.exec_module(engine)
 PresentationStore=engine.PresentationStore
-vision_spec=importlib.util.spec_from_file_location('pptx_vision_review',Path(__file__).parent/'vision_review_service.py')
-vision=importlib.util.module_from_spec(vision_spec); vision_spec.loader.exec_module(vision)
 LOG=logging.getLogger(__name__)
 
 
-def _title(slide):
-    for element in slide.get('elements',[]):
-        if element.get('type')=='text' and element.get('style_token') in ('slide_title','cover_title','section_title','statement'):return element.get('text','')[:80]
-    return next((element.get('text','')[:80] for element in slide.get('elements',[]) if element.get('type')=='text' and element.get('text')),'')
-
-
-from platform_app.office_review import BackgroundReviews
-
-
 class ReviewCoordinator(BackgroundReviews):
-    """Schedules host-rendered, model-reviewed checks; applies only current results."""
+    """Records submitted main-Agent visual reviews and verifies finalized verdicts against that record."""
     def __init__(self,service,host):
         self.service=service;self.host=host or {}
         private=self.host.get('private_root')
         self.private_root=Path(private) if private else Path(service.temporary_root or tempfile.gettempdir())/'pptx-host-review'
         self.private_root.mkdir(parents=True,exist_ok=True,mode=0o700)
-        self.ledger=vision.ReviewLedger(self.private_root/'vision-reviews.sqlite')
-        super().__init__(service, self.host, vision)
+        self.ledger=ReviewLedger(self.private_root/'vision-reviews.sqlite')
+        super().__init__(service, self.host)
     def store(self,path):
-        # Host renders go to the private root; the sandbox cannot swap the screenshot.
         return PresentationStore(path,temporary_root=self.private_root/'renders')
     def observe(self,path,event):
         kind=event.get('type')
-        if kind in ('presentation_review','presentation_review_requested'):
-            review=event.get('review') or {}
-            if review.get('automatic_passed') and review.get('rendered') and (review.get('aesthetic_review') or {}).get('status')=='pending' and (review.get('aesthetic_review') or {}).get('reason')!='deferred_until_deck_checked':
-                self.schedule(('slide',str(path),event['slide_id'],review['revision'],review.get('fingerprint')),self.review_slide,path,event['slide_id'],review['revision'],review.get('fingerprint'))
-        elif kind=='presentation_deck_review_requested':
-            deck=event.get('deck_review') or {}
-            if deck.get('status')=='pending':self.schedule(('deck',str(path),deck['request_id']),self.review_deck,path,deck['request_id'],deck['revision'])
+        if kind=='presentation_aesthetic_review':
+            self.audit(path,event.get('presentation_id'),event.get('slide_id'),(event.get('review') or {}).get('aesthetic_review'),'slide')
+        elif kind=='presentation_deck_review':
+            self.audit(path,event.get('presentation_id'),None,event.get('deck_review'),'deck')
         elif kind=='presentation_finalized':
             self.schedule(('verify',str(path),event.get('revision')),self.verify_finalized,path,event)
     def resume(self,path):
-        """After a restart, pick up reviews that were requested but never answered."""
-        try:store=self.store(path)
-        except ValueError:return
-        with store.locked() as(c,state):
-            if not state:return
-            pending=[(sid,review) for sid,review in state.get('reviews',{}).items() if review.get('automatic_passed') and review.get('rendered') and (review.get('aesthetic_review') or {}).get('status')=='pending' and (review.get('aesthetic_review') or {}).get('reason')!='deferred_until_deck_checked']
-            deck=state.get('deck_review') or {}
-        for sid,review in pending:self.schedule(('slide',str(path),sid,review['revision'],review.get('fingerprint')),self.review_slide,path,sid,review['revision'],review.get('fingerprint'))
-        if deck.get('status')=='pending':self.schedule(('deck',str(path),deck['request_id']),self.review_deck,path,deck['request_id'],deck['revision'])
-    def render(self,store,revision,data):
-        with tempfile.TemporaryDirectory(prefix='pptx-host-check-') as folder:
-            candidate=Path(folder)/'candidate.pptx';candidate.write_bytes(data);validate_embedded_resources(candidate)
-        return engine.reviewer().render_snapshot(store,revision)
-    def snapshot(self,store,revision):
-        with store.locked() as(c,state):
-            data=store.snapshot_unlocked(c,revision)
-            recorded=json.loads(c.execute('SELECT result FROM revisions WHERE revision=?',(revision,)).fetchone()[0]).get('sha256')
-            manifest=store.view(c,state)['manifest'] if revision==state['revision'] else engine.renderer.manifest(engine.Presentation(io.BytesIO(data)),state)
-            return data,recorded,manifest,json.loads(json.dumps(state))
-    def review_slide(self,path,slide_id,check_revision,fingerprint):
-        store=self.store(path)
-        with store.locked() as(c,state):
-            review=(state or {}).get('reviews',{}).get(slide_id)
-            if not review or review.get('revision')!=check_revision or (review.get('aesthetic_review') or {}).get('status')!='pending':return
-        try:data,recorded,manifest,state=self.snapshot(store,check_revision)
-        except ValueError:return  # Retention may expire a queued, superseded check.
-        slides=manifest['slides'];index=next((i for i,s in enumerate(slides) if s['slide_id']==slide_id),None)
-        started=time.time();model_id=None;png=b'';info={};response_hash=None
+        """Reviews are recorded from the event journal only; nothing is pending on the host."""
+    def audit(self,path,presentation_id,slide_id,review,kind):
+        review=review or {}
+        identity=review.get('review_id')
+        if not identity or review.get('reviewer')!='main_agent' or self.ledger.get(identity):return
         try:
-            if index is None:raise vision.VisionUnavailable('image_missing','slide is not part of the checked revision')
-            if any(e.get('native_chart_preview_requires_office') or (e.get('type')=='chart' and engine.native_charts.requires_office(e.get('chart',{}).get('type','bar'))) for e in slides[index]['elements']):
-                raise vision.VisionUnavailable('unsupported_chart_renderer','Native chart requires verification in PowerPoint; host preview is not authoritative')
-            if hashlib.sha256(data).hexdigest()!=recorded:raise vision.VisionUnavailable('snapshot_mismatch','revision bytes do not match their recorded hash')
-            try:directory=self.render(store,check_revision,data)
-            except (OSError,RuntimeError,ValueError) as exc:raise vision.VisionUnavailable('render_failed',type(exc).__name__) from exc
-            image=directory/f'slide-{index+1:03d}.png'
-            png=image.read_bytes() if image.is_file() else b''
-            info=vision.png_info(png)
-            client,reason=self.model()
-            if client is None:raise vision.VisionUnavailable('no_vision_model',reason)
-            model_id=client.model_id
-            context=dict(slide=slides[index],index=index,total=len(slides),profile=manifest.get('review_profile') or manifest.get('profile'),design=manifest.get('review_design'),intent=review.get('intent'),
-                constraints=review.get('constraints'),technical_issues=review.get('layout_issues'))
-            result,text=vision.review_with_retry(client,vision.SLIDE_SYSTEM_PROMPT,vision.slide_request(context),[('image/png',png)],vision.SlideReview,
-                lambda answer:vision.evaluate_slide(answer,slides[index]))
-            response_hash=hashlib.sha256(json.dumps(text.model_dump() if hasattr(text,'model_dump') else text,ensure_ascii=False,default=str).encode()).hexdigest()
-        except vision.VisionUnavailable as exc:
-            result=vision.failure(exc.code,str(exc))
-        for issue in result.get('issues',[]):issue['fingerprint']=vision.issue_fingerprint(issue)
-        render_hash=hashlib.sha256(png).hexdigest() if png else None
-        review_id=self.ledger.record(kind='slide',presentation_id=state.get('presentation_id'),path=str(path),slide_id=slide_id,revision=check_revision,
-            render_sha256=render_hash,pixel_sha256=info.get('pixel_sha256'),snapshot_sha256=recorded,model_id=model_id,prompt_version=vision.PROMPT_VERSION,
-            status=result['status'],summary=result.get('summary'),issues=result.get('issues'),checks=result.get('checks'),flags=result.get('flags'),
-            error=json.dumps(result.get('error')) if result.get('error') else None,applied=0,response_sha256=response_hash)
-        payload=dict(result,review_id=review_id,model_id=model_id,prompt_version=vision.PROMPT_VERSION,render_sha256=render_hash,
-            pixel_sha256=info.get('pixel_sha256'),presentation_id=state.get('presentation_id'),slide_id=slide_id,reviewed_at=time.time(),
-            duration_s=round(time.time()-started,2))
-        applied=store.record_aesthetic_review(slide_id,check_revision,fingerprint,payload)
-        self.ledger.mark_applied(review_id,applied.get('applied'))
-    def review_deck(self,path,request_id,revision):
-        store=self.store(path)
-        data,recorded,manifest,state=self.snapshot(store,revision)
-        deck=state.get('deck_review') or {}
-        if deck.get('request_id')!=request_id or deck.get('status')!='pending':return
-        slides=manifest['slides'];model_id=None;sheet=b'';response_hash=None
-        try:
-            if hashlib.sha256(data).hexdigest()!=recorded:raise vision.VisionUnavailable('snapshot_mismatch','revision bytes do not match their recorded hash')
-            if any(e.get('native_chart_preview_requires_office') or (e.get('type')=='chart' and engine.native_charts.requires_office(e.get('chart',{}).get('type','bar'))) for s in slides for e in s['elements']):
-                raise vision.VisionUnavailable('unsupported_chart_renderer','The deck contains native charts that require verification in PowerPoint')
-            try:directory=self.render(store,revision,data)
-            except (OSError,RuntimeError,ValueError) as exc:raise vision.VisionUnavailable('render_failed',type(exc).__name__) from exc
-            images=[(directory/f'slide-{index+1:03d}.png').read_bytes() for index in range(len(slides))]
-            sheet=vision.contact_sheet(images)
-            client,reason=self.model()
-            if client is None:raise vision.VisionUnavailable('no_vision_model',reason)
-            model_id=client.model_id
-            summary=[dict(page=index+1,slide_id=slide['slide_id'],layout=slide.get('layout'),title=_title(slide),
-                elements={kind:sum(1 for e in slide['elements'] if e.get('type')==kind) for kind in {e.get('type') for e in slide['elements']}},
-                aesthetic=(state.get('reviews',{}).get(slide['slide_id'],{}).get('aesthetic_review') or {}).get('status')) for index,slide in enumerate(slides)]
-            result,text=vision.review_with_retry(client,vision.DECK_SYSTEM_PROMPT,vision.deck_request(dict(slides=summary,profile=manifest.get('review_profile') or manifest.get('profile'),design=manifest.get('review_design'))),
-                [('image/png',sheet)],vision.DeckReview,lambda answer:vision.evaluate_deck(answer,len(slides)))
-            response_hash=hashlib.sha256(json.dumps(text.model_dump() if hasattr(text,'model_dump') else text,ensure_ascii=False,default=str).encode()).hexdigest()
-            for issue in result['issues']+result.get('rejected_issues',[]):
-                issue['slide_ids']=[slides[page-1]['slide_id'] for page in issue['slides'] if 0<page<=len(slides)]
-        except vision.VisionUnavailable as exc:
-            result=vision.failure(exc.code,str(exc))
-        review_id=self.ledger.record(kind='deck',presentation_id=state.get('presentation_id'),path=str(path),slide_id=None,revision=revision,
-            render_sha256=hashlib.sha256(sheet).hexdigest() if sheet else None,snapshot_sha256=recorded,model_id=model_id,
-            prompt_version=vision.DECK_PROMPT_VERSION,status=result['status'],summary=result.get('summary'),issues=result.get('issues'),
-            checks=result.get('checks'),flags=result.get('flags'),error=json.dumps(result.get('error')) if result.get('error') else None,
-            applied=0,response_sha256=response_hash)
-        payload=dict(result,review_id=review_id,model_id=model_id,prompt_version=vision.DECK_PROMPT_VERSION,reviewed_at=time.time())
-        applied=store.record_deck_review(request_id,payload)
-        self.ledger.mark_applied(review_id,applied.get('applied'))
+            self.ledger.record(id=identity,kind=kind,presentation_id=presentation_id,path=str(path),slide_id=slide_id,revision=review.get('revision'),
+                render_sha256=review.get('render_sha256'),pixel_sha256=review.get('pixel_sha256'),model_id=review.get('reviewer'),
+                prompt_version=review.get('prompt_version'),status=review.get('status'),summary=review.get('summary'),issues=review.get('issues'),
+                checks=review.get('checks'),flags=review.get('flags'),error=json.dumps(review.get('error')) if review.get('error') else None,applied=1)
+        except sqlite3.IntegrityError:pass
     def verify_finalized(self,path,event):
-        """Finalization written by the sandbox is only trusted if the host ledger agrees."""
-        store=self.store(path);revision=event.get('revision');problems=[]
-        data,recorded,manifest,state=self.snapshot(store,revision)
-        pixels={}
-        try:
-            directory=self.render(store,revision,data)
-            for index,slide in enumerate(manifest['slides']):
-                image=directory/f'slide-{index+1:03d}.png'
-                if image.is_file():pixels[slide['slide_id']]=vision.png_info(image.read_bytes())['pixel_sha256']
-        except (OSError,RuntimeError,ValueError,vision.VisionUnavailable):problems.append('host render unavailable')
-        # Visual review never gates delivery; this only proves that claimed verdicts were really recorded here.
-        for slide in manifest['slides']:
-            sid=slide['slide_id'];claimed=(event.get('aesthetics') or {}).get(sid) or {}
+        """Finalization written by the sandbox is only trusted for verdicts that went through submit-review."""
+        with self.store(path).locked() as(c,state):identity=(state or {}).get('presentation_id')
+        problems=[]
+        # Visual review never gates delivery; this only proves that claimed verdicts were really submitted.
+        for sid,claimed in (event.get('aesthetics') or {}).items():
             if claimed.get('status') not in ('passed','failed','uncertain'):continue
             record=self.ledger.get(claimed.get('review_id')) if claimed.get('review_id') else None
-            if not record or record['slide_id']!=sid or record['presentation_id']!=state.get('presentation_id') or record['status']!=claimed['status']:
-                problems.append(f'{sid}: claimed visual verdict {claimed.get("status")} is not on record');continue
-            if pixels.get(sid) and record.get('pixel_sha256')!=pixels[sid]:problems.append(f'{sid}: reviewed screenshot differs from the finalized slide')
-        self.service.emit(dict(type='presentation_finalize_verification',presentation_id=state.get('presentation_id'),revision=revision,
+            if not record or record['slide_id']!=sid or record['presentation_id']!=identity or record['status']!=claimed['status']:
+                problems.append(f'{sid}: claimed visual verdict {claimed.get("status")} is not on record')
+        self.service.emit(dict(type='presentation_finalize_verification',presentation_id=identity,revision=event.get('revision'),
             path=Path(path).relative_to(self.service.root).as_posix(),finalize_verified=not problems,verification_problems=problems))
 
 
@@ -360,15 +255,5 @@ def create_router(host):
         service,store=store_for(session_id,presentation_id)
         try:result=service.dismiss_issues(presentation_id,value.revision,value.issue_ids,value.notes,value.slide_id)
         except ValueError as exc:raise HTTPException(409,str(exc))
-        return {**result,'path':store.path.relative_to(service.root).as_posix()}
-    class ReviewRequest(BaseModel):
-        model_config={'extra':'forbid'}
-        revision:int=Field(ge=0)
-    @router.post('/{session_id}/presentations/{presentation_id}/aesthetic-review')
-    def request_review(session_id:str,presentation_id:str,value:ReviewRequest):
-        service,store=store_for(session_id,presentation_id)
-        try:result=store.request_deck_review(value.revision)
-        except ValueError as exc:raise HTTPException(409,str(exc))
-        service.sync()
         return {**result,'path':store.path.relative_to(service.root).as_posix()}
     return router

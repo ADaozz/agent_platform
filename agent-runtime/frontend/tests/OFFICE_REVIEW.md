@@ -16,21 +16,24 @@ Their API adapters retain their own same-origin / authenticated ITAM gateway pat
 - `delegate.js` uses the existing session steering endpoint while running/queued,
   and the existing message endpoint while idle. It carries identity, revision,
   page/slide, block/element, review and request identifiers and the original advice.
-  Clicking Delegate is explicit user direction to the main Agent; the vision worker
-  remains read-only. A sent request is shown as sent, never as resolved.
+  Clicking Delegate is explicit user direction to the main Agent. Visual review
+  itself is done by the main Agent (`review-images` / `submit-review`); "review
+  again" and "review deck consistency" only send it a request through the same
+  channels, and the host never calls a model. A sent request is shown as sent,
+  never as resolved.
 - DOCX page navigation rejects an out-of-date preview. Regions are shown only from
   the bound deterministic check's normalized `block_regions`: exact unique PDF
   paragraph matches or exact image-pixel digests. Repeated/ambiguous text, missing
   coordinates or multiple candidate regions degrade to page navigation with an
   explicit notice. Metadata projection adds coordinates without changing checks,
-  generation, automatic repair or visual-review execution.
+  generation, automatic repair or the Agent's visual review.
 - Async snapshots are fenced against newer events. Same-version DOCX request
   generations retire old request IDs; changing revision clears issue/action scope.
   Review-result objects and delivery/finalized fields are fenced as one request-owned
   payload, including result events that omit the visual_request envelope. Unbound
   or mixed-generation payloads cannot update delivery flags; fresh request creation
   also invalidates previous delivery state.
-  Human page approval stays separate from delegation and visual retry.
+  There is no human page approval; delegation and review requests never approve a page.
 
 Run from repository root:
 

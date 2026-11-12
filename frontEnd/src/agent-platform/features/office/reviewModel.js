@@ -37,7 +37,7 @@ export function docxReviews(document) {
  const checkCurrent=check?.revision===revision&&(check.passed===false||!modern||pixelsKnown&&Array.isArray(check.pages)&&same(check.pages.map(p=>p.fingerprint),pages.map(p=>p.fingerprint)))
  context.regions=checkCurrent?check?.geometry?.block_regions:null
  const deterministic={key:'deterministic',raw:check,status:!check?'pending':!checkCurrent?'stale':check.passed===false?'issues':check.passed===true&&check.final&&(!modern||check.collision_check_executed)?'passed':'pending',issues:[]}
- deterministic.issues=(check?.repair_targets||[]).map((i,n)=>issueView(i,n,{...context,scope:scope+':deterministic',stale:!checkCurrent})).map(i=>({...i,pageFingerprints:pages.map(p=>p.fingerprint)}))
+ deterministic.issues=(check?.repair_targets||[]).map((i,n)=>issueView(i,n,{...context,scope:scope+':deterministic',stale:!checkCurrent})).filter(i=>i.pages.length).map(i=>({...i,pageFingerprints:pages.map(p=>p.fingerprint)}))
  const requestCurrent=pixelsKnown&&(!modern || (request.eligible && (!request.document_id||request.document_id===document.document_id) && request.revision===revision && same(request.fingerprints,pages.map(p=>p.fingerprint))))
  const pageReviews=pages.map(page=>{
   const raw=document.aesthetic_reviews?.[String(page.page)]

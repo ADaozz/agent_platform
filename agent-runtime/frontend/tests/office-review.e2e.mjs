@@ -47,11 +47,8 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
    if(request.method()==='GET')return route.fulfill({json:[]})
    const body=request.postDataJSON();calls.push({name,body})
    if(name.endsWith('/actions/steer')&&failSteer){failSteer=false;return route.fulfill({status:503,json:{detail:'Queue unavailable'}})}
-   if(name.endsWith('/visual-review')){
-    if(failRetry)return route.fulfill({status:409,json:{detail:'Final check is outdated'}})
-    doc={...doc,visual_request:{...doc.visual_request,request_id:'q2'},aesthetic_reviews:{},document_review:null}
-    return route.fulfill({json:{status:'queued',revision:14,request_id:'q2'}})
-   }
+   if(name.endsWith('/actions/steer')&&failRetry){failRetry=false;return route.fulfill({status:503,json:{detail:'Agent is not accepting requests'}})}
+   if(name.endsWith('/visual-review')||name.endsWith('/aesthetic-review'))throw new Error('Visual review must be requested from the Agent, not the host: '+name)
    if(name.endsWith('/aesthetic-decision')){
     deck.manifest.slides[0].review.aesthetic_review.issues[0].dismissed=true
     return route.fulfill({json:deck})
@@ -67,6 +64,9 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   for(const name of ['deterministic','pageVisual','documentVisual'])await page.locator(`[data-office-group="${name}"]>summary`).click()
   assert.equal(await page.locator('.docx-quality .office-review-disclosure[open]').count(),3)
   assert.equal(await page.locator('[data-office-group="deterministic"]').getAttribute('data-status'),'passed')
+  // Page visual review follows the page shown in the stage.
+  await page.locator('.docx-thumbnails>button[data-page="2"]').click()
+  await page.locator('.docx-thumbnails>button.selected[data-page="2"]').waitFor()
   const issue=page.locator('[data-issue-id="fig-issue"]')
   await page.locator('.docx-preview-status>select').selectOption('width')
   await issue.getByRole('button',{name:'Locate issue',exact:true}).click()
@@ -94,7 +94,13 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   assert.deepEqual(calls.at(-1).body.artifact.pages,[1,2]);assert.equal(calls.at(-1).body.artifact.review_id,'document-review')
   assert(!calls.some(call=>call.name.endsWith('/review')),'Delegation must not approve a page')
   await page.screenshot({path:path.join(output,entry.name+'-docx.png')})
-  await page.locator('[data-office-group="pageVisual"]').getByRole('button',{name:'Review all pages and document again'}).click()
+  await page.locator('[data-office-group="pageVisual"]').getByRole('button',{name:'Ask the Agent to review again'}).click()
+  await page.locator('[data-office-group="pageVisual"] .pptx-review-details>button').getByText('Sent to the Agent').waitFor()
+  assert.match(calls.at(-1).name,/actions\/steer$/);assert.equal(calls.at(-1).body.artifact.feature,'docx');assert.equal(calls.at(-1).body.artifact.revision,14)
+  assert.match(calls.at(-1).body.text,/review-images/);assert.match(calls.at(-1).body.text,/submit-review/)
+  // The Agent opens a fresh request for the same revision before submitting new reviews.
+  doc={...doc,visual_request:{...doc.visual_request,request_id:'q2'},aesthetic_reviews:{},document_review:null}
+  await page.evaluate(value=>window.officePush(value),doc)
   await page.waitForFunction(()=>!document.querySelector('[data-issue-id="fig-issue"]'))
   assert.equal(await page.locator('[data-office-group="pageVisual"]').getAttribute('data-status'),'pending')
   const late=document();await page.evaluate(value=>window.officePush(value),late)
@@ -105,12 +111,12 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   await page.evaluate(value=>window.officePush(value),oldAccepted)
   assert.equal(await page.locator('.docx-panel>.docx-gate-note').first().innerText(),pendingHeader)
   assert.equal(await page.locator('[data-office-group="pageVisual"]').getAttribute('data-status'),'pending')
-  const unavail={...doc,aesthetic_reviews:{'1':{revision:14,page:1,request_id:'q2',fingerprint:'p1',status:'unavailable',issues:[],error:{code:'no_vision_model',message:'Provider unavailable'}},'2':{revision:14,page:2,request_id:'q2',fingerprint:'p2',status:'passed',issues:[]}},document_review:{revision:14,request_id:'q2',fingerprints:['p1','p2'],status:'unavailable',error:{code:'provider_timeout'}}}
+  const unavail={...doc,aesthetic_reviews:{'1':{revision:14,page:1,request_id:'q2',fingerprint:'p1',status:'passed',issues:[]},'2':{revision:14,page:2,request_id:'q2',fingerprint:'p2',status:'unavailable',issues:[],error:{code:'agent_cannot_inspect',message:'Current model cannot view images'}}},document_review:{revision:14,request_id:'q2',fingerprints:['p1','p2'],status:'unavailable',error:{code:'provider_timeout'}}}
   await page.evaluate(value=>window.officePush(value),unavail)
   await page.waitForFunction(()=>document.querySelector('[data-office-group="pageVisual"]').dataset.status==='unavailable')
   await page.locator('[data-office-group="pageVisual"]').getByText('View error',{exact:true}).click()
-  await page.getByText(/Provider unavailable/).first().waitFor()
-  failRetry=true;await page.locator('[data-office-group="pageVisual"]').getByRole('button',{name:'Review all pages and document again'}).click();await page.getByRole('alert').getByText('Final check is outdated').waitFor()
+  await page.getByText(/Current model cannot view images/).first().waitFor()
+  failRetry=true;await page.locator('[data-office-group="pageVisual"]').getByRole('button',{name:'Ask the Agent to review again'}).click();await page.getByRole('alert').getByText('Agent is not accepting requests').waitFor()
   await page.evaluate(()=>window.officePush({document_id:'research',revision:15,pages:[]}))
   await page.waitForFunction(()=>document.querySelector('.docx-quality').textContent.includes('R15'))
   assert.equal(await page.locator('.docx-issue-region').count(),0)
@@ -148,6 +154,6 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   assert.equal(calls.at(-1).body.artifact.slide_id,'s2');assert.equal(calls.at(-1).body.artifact.request_id,'whole-request')
   assert.deepEqual(errors,[])
   await writeFile(path.join(output,entry.name+'-results.json'),JSON.stringify({passed:true,browserErrors:errors,actions:calls.map(c=>({path:c.name,artifact:c.body.artifact}))},null,2))
-  console.log(entry.name+': independent panels, provenance, page/region location, running/idle delegation, retry/errors, stale fences, PPTX highlights/dismissal passed')
+  console.log(entry.name+': independent panels, provenance, page/region location, running/idle delegation, agent review requests/errors, stale fences, PPTX highlights/dismissal passed')
  }finally{await page?.close();server?.kill('SIGTERM');await rm(folder,{recursive:true,force:true})}
 }}finally{await browser.close()}

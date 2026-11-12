@@ -163,19 +163,13 @@ def test_invalid_plans_rejected(mutation):
     with pytest.raises(ValueError):a._sibling('document_plan').validate(value)
 
 
-def test_background_record_rejects_stale_document_revision_and_pixels(store,tmp_path):
-    spec=importlib.util.spec_from_file_location('docx_review_test',ROOT/'docx-ooxml-skill/platform_adapter.py')
-    adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
-    service=adapter.Documents(store.path.parent,host=dict(private_root=tmp_path/'private'))
-    store.apply_section(section());state=store.status();page=state['pages'][0]
-    reviews=service.reviews
-    for identity,revision,fingerprint in [('other',2,page['fingerprint']),('report',1,page['fingerprint']),('report',2,'wrong')]:
-        assert not reviews.record(store,identity,revision,1,fingerprint,dict(status='passed'))
-    payload=dict(status='failed',revision=2,fingerprint=page['fingerprint'],advisory_only=True)
-    before=store.path.read_bytes();revision=store.status()['revision'];gate=store.status()['gate']
-    assert reviews.record(store,'report',2,1,page['fingerprint'],payload)
-    assert store.status()['gate']==gate and store.status()['revision']==revision and store.path.read_bytes()==before
-    service.close()
+def test_legacy_documents_keep_page_review_instead_of_agent_submission(store):
+    store.apply_section(section())
+    assert store.metadata()['quality_contract']==1
+    with pytest.raises(ValueError,match='review-page'):store.review_images()
+    with pytest.raises(ValueError,match='review-page'):
+        store.submit_review(dict(revision=store.status()['revision'],pages=[dict(page=1,unavailable='not checked')]))
+    assert not store.metadata().get('aesthetic_reviews')
 
 
 def test_section_publish_crash_recovers_metadata_and_replay(store,monkeypatch):
@@ -192,33 +186,13 @@ def test_section_publish_crash_recovers_metadata_and_replay(store,monkeypatch):
     assert reopened.apply_section(section())['revision']==2
 
 
-def test_background_queue_is_async_and_discards_delayed_old_result(store,tmp_path,monkeypatch):
-    import threading
-    spec=importlib.util.spec_from_file_location('docx_review_async_test',ROOT/'docx-ooxml-skill/platform_adapter.py')
+def test_host_adapter_runs_no_visual_review_worker(store,tmp_path):
+    spec=importlib.util.spec_from_file_location('docx_review_host_test',ROOT/'docx-ooxml-skill/platform_adapter.py')
     adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
-    # The host uses the same deterministic renderer as this storage test.
-    monkeypatch.setattr(adapter.engine.o,'run_render',a.o.run_render)
-    entered=threading.Event();release=threading.Event();done=threading.Event()
-    def model(system,text,images,schema):
-        assert images[0][1].startswith(b'\x89PNG')
-        entered.set();release.wait(30)
-        return dict(status='passed',summary='Page inspected',issues=[])
-    service=adapter.Documents(store.path.parent,host=dict(private_root=tmp_path/'host',vision=lambda:('test/vision',model)))
-    record=service.reviews.record
-    def recording(*args):
-        try:return record(*args)
-        finally:done.set()
-    monkeypatch.setattr(service.reviews,'record',recording)
+    service=adapter.Documents(store.path.parent,host=dict(private_root=tmp_path/'host'))
+    assert not hasattr(service,'reviews')
     store.apply_section(section());service.sync()
-    assert entered.wait(15)
-    # This edit completes while the old image is still under review.
-    store.apply_one(request(2,'newer',operation=dict(type='replace_text',block_id='p1',old='Goal',new='Updated goal')))
-    release.set();assert done.wait(15)
-    state=store.status()
-    assert state['revision']==3 and not state.get('aesthetic_reviews')
-    with service.reviews.ledger.connect() as c:
-        row=c.execute('SELECT revision,applied FROM reviews WHERE kind=?',('docx-page',)).fetchone()
-    assert row['revision']==2 and row['applied']==0
+    assert not store.metadata().get('aesthetic_reviews') and not (tmp_path/'host').exists()
     service.close()
 
 

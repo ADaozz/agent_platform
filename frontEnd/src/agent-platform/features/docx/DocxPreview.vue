@@ -89,7 +89,7 @@ watch(()=>[props.revision,props.renderRevision],()=>{focusedRegion.value=null},{
 function resumeFollow() { follow.value = true; show(changed.value.size ? Math.min(...changed.value) : images.value.length) }
 function onKey(event) {
   const step = { ArrowDown: 1, PageDown: 1, ArrowRight: 1, ArrowUp: -1, PageUp: -1, ArrowLeft: -1 }[event.key]
-  if (!step || !current.value) return
+  if (!step || !current.value || event.target !== event.currentTarget) return
   event.preventDefault(); select(current.value.page + step)
 }
 </script>
@@ -106,6 +106,7 @@ function onKey(event) {
     <div ref="stage" class="docx-stage" tabindex="0" @keydown="onKey">
       <figure v-if="current" class="docx-paper" :style="{ width: paperWidth + 'px' }"><div class="docx-page-image"><img :src="current.url" :alt="t('docx.page', { page: current.page })" decoding="async" draggable="false"><i v-if="focusedRegion" class="docx-issue-region" :aria-label="t('office.highlight')" :style="{left:focusedRegion[0]*100+'%',top:focusedRegion[1]*100+'%',width:focusedRegion[2]*100+'%',height:focusedRegion[3]*100+'%'}"></i></div><figcaption>{{ t('docx.page', { page: current.page }) }} / {{ images.length }}</figcaption></figure>
       <figure v-else class="docx-paper" :style="{ width: paperWidth + 'px' }"><div class="docx-blank-sheet"></div><figcaption>{{ t('docx.page', { page: 1 }) }}</figcaption></figure>
+      <slot :page="current?.page" />
     </div>
   </div>
 </template>

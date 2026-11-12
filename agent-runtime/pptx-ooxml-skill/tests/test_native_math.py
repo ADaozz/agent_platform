@@ -132,10 +132,10 @@ def test_equation_can_use_an_existing_text_layout_anchor(tmp_path):
     assert store.status()['manifest']['slides'][0]['elements'][0]['type']=='equation'
 
 
-def test_vision_context_includes_equation_source_and_stable_locator():
-    spec=importlib.util.spec_from_file_location('math_vision_context',ROOT/'vision_review_service.py')
-    vision=importlib.util.module_from_spec(spec);spec.loader.exec_module(vision)
-    context=vision.element_context(dict(id='eq-1',type='equation',native_equation=True,latex=r'\frac{a}{b}',
+def test_review_context_includes_equation_source_and_stable_locator():
+    spec=importlib.util.spec_from_file_location('math_review_context',ROOT/'scripts'/'agent_review.py')
+    review=importlib.util.module_from_spec(spec);spec.loader.exec_module(review)
+    context=review.element_context(dict(id='eq-1',type='equation',native_equation=True,latex=r'\frac{a}{b}',
         geometry=dict(x=.1,y=.2,w=.5,h=.3)))
     assert context['id']=='eq-1' and context['equation']==dict(format='OMML',latex=r'\frac{a}{b}',source_truncated=False)
 

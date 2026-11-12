@@ -49,7 +49,7 @@ def test_external_local_edit_preserves_other_slide_reviews_and_detects_shared_as
     assert set(store.track_external('deck')['changed_slides'])==set(ids)
 
 
-def test_deferred_batch_vision_is_not_scheduled_by_events_or_restart(tmp_path,monkeypatch):
+def test_host_never_schedules_visual_review_jobs(tmp_path,monkeypatch):
     path=tmp_path/'deck.pptx';path.write_bytes(deck_bytes('Draft'))
     store=engine.PresentationStore(path);store.track_external('deck')
     sid=store.status()['manifest']['slides'][0]['slide_id']
@@ -65,14 +65,16 @@ def test_deferred_batch_vision_is_not_scheduled_by_events_or_restart(tmp_path,mo
     try:
         coordinator.observe(path,event);coordinator.resume(path)
         assert scheduled==[]
-        review['aesthetic_review']['reason']='awaiting_vision_review'
-        coordinator.observe(path,event)
-        assert len(scheduled)==1
+        review['aesthetic_review']['reason']='awaiting_agent_review'
+        for kind in ('presentation_review','presentation_review_requested','presentation_deck_review_requested'):
+            coordinator.observe(path,dict(event,type=kind,deck_review=dict(status='pending',request_id='r',revision=0)))
+        coordinator.resume(path)
+        assert scheduled==[]
     finally:coordinator.close()
 
 
 @pytest.mark.skipif(not shutil.which('libreoffice'),reason='LibreOffice required')
-def test_whole_deck_overlap_repair_defers_vision_and_rechecks_only_changed_page(tmp_path,monkeypatch):
+def test_whole_deck_overlap_repair_defers_visual_review_and_rechecks_only_changed_page(tmp_path,monkeypatch):
     path=tmp_path/'deck.pptx';prs=Presentation()
     for text in ('First','Second'):
         slide=prs.slides.add_slide(prs.slide_layouts[6])
@@ -98,7 +100,7 @@ def test_whole_deck_overlap_repair_defers_vision_and_rechecks_only_changed_page(
     assert checked==[ids[0]]
     assert Presentation(path).slides[1]._element.xml==unchanged
     status=store.status()
-    assert all(s['review']['aesthetic_review']['reason']=='awaiting_vision_review' for s in status['manifest']['slides'])
+    assert all(s['review']['aesthetic_review']['reason']=='awaiting_agent_review' for s in status['manifest']['slides'])
     assert status['deck_review']['status']=='pending'
 
 
