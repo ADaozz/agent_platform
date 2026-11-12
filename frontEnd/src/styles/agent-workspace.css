@@ -1,8 +1,8 @@
 /*
  * Agent 工作区 · 视觉覆盖层
  *
- * src/agent-platform/ 与 agent-runtime 的独立前端保持同源，这里不改它的任何文件，
- * 只在宿主（AgentChatView）里叠加一层：重映射主题变量，并按 DEEP AGENT 设计语言
+ * src/agent-platform/ 的共享组件仅增加可选装饰插槽，不改变工作区行为。
+ * 视觉由宿主（AgentChatView）提供：重映射主题变量，并按 DEEP AGENT 设计语言
  * 协调各组件。布局（对话列宽、输入区位置、面板分栏）保持不变。
  */
 
@@ -71,8 +71,6 @@
 
   font-family: 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background-color: var(--page);
-  background-image: radial-gradient(var(--ws-hatch) 1px, transparent 1px);
-  background-size: 22px 22px;
 
   /* ───────── 基础 ───────── */
   pre,

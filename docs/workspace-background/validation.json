@@ -1,0 +1,131 @@
+{
+  "baseline": "6e50b8b",
+  "implementation": "CSS gradients, masks, equal-axis circles, container units; no images/canvas/background JS",
+  "viewports": [
+    [
+      1440,
+      1000
+    ],
+    [
+      900,
+      900
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      320,
+      740
+    ]
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "states": [
+    "conversation",
+    "sidebar-expanded",
+    "preview",
+    "preview-sidebar",
+    "preview-closed",
+    "home"
+  ],
+  "geometryComparisons": 48,
+  "geometryDifferences": 0,
+  "documentWidthChanges": 0,
+  "interactionChecks": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "visual": {
+        "line": "rgb(154 125 77 / 0.18)",
+        "glow": "rgb(243 107 24 / 0.13)",
+        "circle": [
+          "921.906px",
+          "921.906px"
+        ],
+        "background": "radial-gradient(62% 46% at 94% 0%, rgba(243, 107, 24, 0.13), rgba(0, 0, 0, 0) 76%), radial-gradient(38% 22% at 0% 100%, rgba(223, 169, 60, 0.043), rgba(0, 0, 0, 0) 80%), none"
+      },
+      "resizeMaxError": 0,
+      "scrollPinned": true,
+      "inert": true,
+      "keyboard": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "visual": {
+        "line": "rgb(149 138 120 / 0.13)",
+        "glow": "rgb(178 70 15 / 0.16)",
+        "circle": [
+          "921.906px",
+          "921.906px"
+        ],
+        "background": "radial-gradient(62% 46% at 94% 0%, rgba(178, 70, 15, 0.16), rgba(0, 0, 0, 0) 76%), radial-gradient(38% 22% at 0% 100%, rgba(223, 169, 60, 0.043), rgba(0, 0, 0, 0) 80%), none"
+      },
+      "resizeMaxError": 0,
+      "scrollPinned": true,
+      "inert": true,
+      "keyboard": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "visual": {
+        "line": "rgb(154 125 77 / 0.18)",
+        "glow": "rgb(243 107 24 / 0.13)",
+        "circle": [
+          "248.156px",
+          "248.156px"
+        ],
+        "background": "radial-gradient(62% 46% at 94% 0%, rgba(243, 107, 24, 0.13), rgba(0, 0, 0, 0) 76%), radial-gradient(38% 22% at 0% 100%, rgba(223, 169, 60, 0.043), rgba(0, 0, 0, 0) 80%), none"
+      },
+      "resizeMaxError": 0,
+      "scrollPinned": true,
+      "inert": true,
+      "keyboard": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "visual": {
+        "line": "rgb(149 138 120 / 0.13)",
+        "glow": "rgb(178 70 15 / 0.16)",
+        "circle": [
+          "248.156px",
+          "248.156px"
+        ],
+        "background": "radial-gradient(62% 46% at 94% 0%, rgba(178, 70, 15, 0.16), rgba(0, 0, 0, 0) 76%), radial-gradient(38% 22% at 0% 100%, rgba(223, 169, 60, 0.043), rgba(0, 0, 0, 0) 80%), none"
+      },
+      "resizeMaxError": 0,
+      "scrollPinned": true,
+      "inert": true,
+      "keyboard": true
+    }
+  ],
+  "checks": {
+    "buildAndTypeCheck": "passed",
+    "existingOfficeChromiumTest": "passed",
+    "relatedNodeTests": {
+      "passed": 34,
+      "failed": 0
+    },
+    "browserErrors": 0,
+    "gitDiffCheck": "passed"
+  },
+  "knownBaselineIssue": "At viewport width 320px with the sidebar expanded, the existing application header makes document width 348px. Reproduced identically before and after; decoration is clipped to the conversation bounds. Existing layout was not changed.",
+  "limitations": "Controlled API fixtures; no live backend/model integration"
+}

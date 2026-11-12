@@ -433,6 +433,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
   <div class="shell" :class="{ expanded: sidebar, 'document-open': artifactPanelOpen }">
 
     <main :class="{'session-layout':selected&&mainView==='agents'}">
+      <slot name="backdrop" />
       <header v-if="selected || mainView !== 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ mainView === 'files' ? t('全局文件') : selected ? sessionTitle(selected) : t('All chats') }}</span><button v-if="selected && mainView === 'agents' && latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
 
       <div v-if="loading" class="loading"><Icon name="LoaderCircle" class="spin" /> {{ t("Loading…") }}</div>
