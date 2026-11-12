@@ -1,42 +1,27 @@
-# frontEnd
+# Agent Platform 前端
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 + Vite + Tailwind 的多用户 Agent 工作台。
 
-## Recommended IDE Setup
+## 当前页面
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Agent 对话及文件管理（`src/agent-platform/`），含 DOCX / PPTX 预览与审查
+- 模型配置
+- 用户管理、角色管理、登录设备管理
+- 我的证书、证书管理
+- 登录页及共享导航布局
 
-## Recommended Browser Setup
+路由统一定义在 `src/router/index.ts`，登录和权限仍沿用已有后端接口。
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## 开发
 
 ```sh
-npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
+npm ci
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
-
 ```sh
 npm run build
+npm run test:e2e:office
 ```
+
+旧 ITAM 的虚拟机、应用、定时任务、数据统计和资产 API Token 前端页面已移除。清理仅限前端，不改变后端 API、数据结构或权限逻辑。现有 Agent 工作区及权限/证书页面保留。
