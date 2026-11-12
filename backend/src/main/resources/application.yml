@@ -8,6 +8,11 @@ spring:
     import: optional:classpath:application-local.yml
   main:
     allow-bean-definition-overriding: true
+  # 不在本应用解析 multipart：Agent 文件上传由网关原样转发，若先被解析，转发出去的请求体为空。
+  # 本应用没有直接接收文件的接口；新增时需改为按路径单独处理。
+  servlet:
+    multipart:
+      enabled: false
   datasource:
     type: com.kingbase8.ds.KBPoolingDataSource
     driver-class-name: com.kingbase8.Driver
