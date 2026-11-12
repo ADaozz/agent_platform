@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { listApps, editApp, type AppEditBody } from '@/api/app'
 import { toast } from '@/composables/toast'
@@ -97,10 +98,7 @@ async function saveEdit() {
 
 <template>
   <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-ink">应用服务</h1>
-      <p class="mt-0.5 text-sm text-ink-muted">查看和管理部署在虚拟机上的应用服务</p>
-    </div>
+    <PageHeader title="应用服务" desc="查看和管理部署在虚拟机上的应用服务" />
 
     <!-- 筛选 -->
     <div class="card p-4">

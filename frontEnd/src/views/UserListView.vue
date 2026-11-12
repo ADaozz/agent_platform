@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { listUsers, addUser, editUser, authRole, deleteUser } from '@/api/user'
 import { getRoleOptions } from '@/api/role'
@@ -175,16 +176,12 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">用户管理</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">管理系统登录用户，分配角色权限及账户状态控制</p>
-      </div>
+    <PageHeader title="用户管理" desc="管理系统登录用户，分配角色权限及账户状态控制">
       <button v-if="canAdd" class="btn-primary" @click="openAdd">
         <AppIcon name="person_add" class="!text-[18px]" />
         添加用户
       </button>
-    </div>
+    </PageHeader>
 
     <!-- 筛选 -->
     <div class="card p-4">
@@ -237,7 +234,7 @@ async function confirmDelete() {
             >
               <td class="px-4 py-3">
                 <div class="flex items-center gap-3">
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary">
+                  <div class="flex h-9 w-9 shrink-0 items-center justify-center id-chip">
                     {{ user.userName.charAt(0).toUpperCase() }}
                   </div>
                   <div>

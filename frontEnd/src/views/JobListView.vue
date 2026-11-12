@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { listJobs, editJob, changeJobStatus, runJob } from '@/api/job'
 import { useAuthStore } from '@/stores/auth'
@@ -155,18 +156,12 @@ async function handleRun(job: SysJobVO) {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">定时任务</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">
-          任务由后端代码扫描自动注册，可修改 Cron 表达式、启停调度及手动执行
-        </p>
-      </div>
+    <PageHeader title="定时任务" desc="任务由后端代码扫描自动注册，可修改 Cron 表达式、启停调度及手动执行">
       <button class="btn-ghost" :disabled="loading" @click="load">
         <AppIcon name="refresh" class="!text-[18px]" />
         刷新
       </button>
-    </div>
+    </PageHeader>
 
     <!-- 筛选 -->
     <div class="card p-4">

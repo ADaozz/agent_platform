@@ -4,6 +4,8 @@ import AgentPlatform from '@/agent-platform/AgentPlatform.vue'
 // @ts-ignore
 import { theme } from '@/agent-platform/preferences'
 import '@/agent-platform/style.css'
+// Visual layer on top of the shared workspace styles; keeps src/agent-platform in sync with agent-runtime.
+import '@/styles/agent-workspace.css'
 </script>
 
 <template>

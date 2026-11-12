@@ -31,36 +31,64 @@ function go(p: number) {
 </script>
 
 <template>
-  <div class="flex items-center justify-between px-4 py-3">
-    <span class="text-sm text-ink-muted">
-      共 {{ total }} 条记录
+  <div class="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
+    <span class="font-mono text-[11px] tracking-[0.1em] text-ink-faint">
+      共 <span class="text-ink-secondary tabular-nums">{{ total }}</span> 条记录
     </span>
     <div class="flex items-center gap-1">
-      <button
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="pageNum <= 1"
-        @click="go(pageNum - 1)"
-      >
-        <AppIcon name="chevron_left" class="!text-[18px]" />
+      <button class="page-btn" aria-label="上一页" :disabled="pageNum <= 1" @click="go(pageNum - 1)">
+        <AppIcon name="chevron_left" class="!text-[16px]" />
       </button>
       <template v-for="(p, i) in pages" :key="i">
-        <span v-if="p === '...'" class="px-1.5 text-sm text-ink-faint">…</span>
+        <span v-if="p === '...'" class="px-1.5 font-mono text-xs text-ink-faint">…</span>
         <button
           v-else
-          class="h-8 min-w-8 rounded-md px-2 text-sm transition-colors"
-          :class="p === pageNum ? 'bg-primary font-medium text-white' : 'border border-line text-ink-secondary hover:bg-gray-50'"
+          class="page-btn"
+          :class="{ 'page-btn-on': p === pageNum }"
+          :aria-current="p === pageNum ? 'page' : undefined"
           @click="go(p)"
         >
-          {{ p }}
+          {{ String(p).padStart(2, '0') }}
         </button>
       </template>
-      <button
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="pageNum >= totalPages"
-        @click="go(pageNum + 1)"
-      >
-        <AppIcon name="chevron_right" class="!text-[18px]" />
+      <button class="page-btn" aria-label="下一页" :disabled="pageNum >= totalPages" @click="go(pageNum + 1)">
+        <AppIcon name="chevron_right" class="!text-[16px]" />
       </button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.page-btn {
+  display: inline-flex;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-muted);
+  transition:
+    background-color 0.16s,
+    border-color 0.16s,
+    color 0.16s;
+}
+.page-btn:hover:not(:disabled):not(.page-btn-on) {
+  border-color: var(--color-line);
+  background-color: var(--glass-strong);
+  color: var(--color-ink);
+}
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.page-btn-on {
+  background-color: var(--color-ink);
+  color: var(--color-page);
+  font-weight: 500;
+}
+</style>

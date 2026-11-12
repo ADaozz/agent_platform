@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { listTokens, addToken, deleteToken, getGrantOptions } from '@/api/token'
 import { useAuthStore } from '@/stores/auth'
@@ -160,18 +161,12 @@ async function confirmRevoke() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">API 开放接口</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">
-          管理外部系统调用凭证（AK/SK），按授权资源与操作（查询/新增/修改/删除）访问开放接口
-        </p>
-      </div>
+    <PageHeader title="API 开放接口" desc="管理外部系统调用凭证（AK/SK），按授权资源与操作（查询/新增/修改/删除）访问开放接口">
       <button v-if="canAdd && tab === 'token'" class="btn-primary" @click="openAdd">
         <AppIcon name="add" class="!text-[18px]" />
         新建 Token
       </button>
-    </div>
+    </PageHeader>
 
     <div class="flex gap-1 border-b border-line">
       <button

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, ref } from 'vue'
 import {
   applyCert,
@@ -130,11 +131,7 @@ const hasPending = () => overview.value?.applies?.some((a) => a.status === 'pend
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">我的证书</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">申请客户端签名/加密证书，审批通过后可下载并用于证书登录</p>
-      </div>
+    <PageHeader title="我的证书" desc="申请客户端签名/加密证书，审批通过后可下载并用于证书登录">
       <div class="flex gap-2">
         <button class="btn-ghost" :disabled="loading" @click="load">
           <AppIcon name="refresh" class="!text-[18px]" />
@@ -165,7 +162,7 @@ const hasPending = () => overview.value?.applies?.some((a) => a.status === 'pend
           {{ overview?.signCert ? '申请重发' : '申请证书' }}
         </button>
       </div>
-    </div>
+    </PageHeader>
 
     <div class="grid gap-4 md:grid-cols-2">
       <div class="card p-4">

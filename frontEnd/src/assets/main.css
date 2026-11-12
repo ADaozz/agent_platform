@@ -1,70 +1,189 @@
 @import 'tailwindcss';
 
-@theme {
-  --font-sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+/*
+ * DEEP AGENT · 设计系统
+ * Space Age Retrofuturism / Cassette Futurism
+ * 静态结构像航天工业设备，悬停交互像低调的玻璃界面。
+ *
+ * 两套主题共享同一组语义：
+ *   dark  = 碳黑任务控制台（默认）
+ *   light = 暖白科研档案
+ */
 
-  --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
-  --color-primary-light: #eff6ff;
+/* static：组件 <style> 与工作区覆盖层直接用 var() 引用这些变量，需始终输出 */
+@theme static {
+  --font-sans: 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Noto Sans SC', monospace;
+  --font-display: 'Barlow Condensed', 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
-  --color-page: #f7f8fa;
-  --color-card: #ffffff;
-  --color-line: #e5e7eb;
-  --color-hover: #f9fafb;
+  /* 圆角：太空时代的柔和机壳，而非锐利的方框 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 
-  --color-ink: #111827;
-  --color-ink-secondary: #4b5563;
-  --color-ink-muted: #6b7280;
-  --color-ink-faint: #9ca3af;
+  /* 暖白档案（light） */
+  --color-primary: #b4551f;
+  --color-primary-dark: #8f4116;
+  --color-primary-light: #f0dcc6;
 
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
+  --color-page: #ebe3d1;
+  --color-card: #f7f1e3;
+  --color-line: #d2c8b1;
+  --color-hover: #ece4d1;
+
+  --color-ink: #1c1b18;
+  --color-ink-secondary: #4a463d;
+  --color-ink-muted: #6e6859;
+  --color-ink-faint: #8a8372;
+
+  --color-success: #3c7462;
+  --color-warning: #9a6b0a;
+  --color-danger: #b03a31;
+
+  /* 固定品牌色：不随主题变化 */
+  --color-carbon: #181818;
+  --color-ivory: #f5eddc;
+  --color-signal: #d0713c;
+  --color-signal-bright: #e2854f;
+  --color-mint: #98bcb1;
+  --color-steel: #6e8596;
+  --color-tri-red: #c84940;
+  --color-tri-yellow: #dfa93c;
+  --color-tri-green: #83a695;
+
+  /* 页面中直接使用的 Tailwind 灰阶与状态色，统一收敛到本色板 */
+  --color-gray-50: #efe8d6;
+  --color-gray-100: #e6ddc9;
+  --color-gray-300: #c4b9a0;
+  --color-gray-600: #5a5548;
+  --color-red-50: #f1d9d1;
+  --color-red-200: #dfb1a8;
+  --color-red-700: #a5352c;
+  --color-red-800: #8c2b24;
+  --color-emerald-50: #d9e6dc;
+  --color-emerald-200: #aecabb;
+  --color-emerald-600: #3f7a66;
+  --color-emerald-700: #346a58;
+  --color-emerald-800: #2b5848;
+  --color-amber-50: #f3e3bb;
+  --color-amber-200: #dcc388;
+  --color-amber-700: #855a06;
+  --color-amber-800: #6f4b05;
+  --color-blue-50: #dbe3e5;
+  --color-blue-200: #aebfc8;
+  --color-blue-700: #40607a;
+  --color-blue-800: #344f65;
+  --color-orange-50: #f3dcc8;
+  --color-orange-700: #a34a18;
+  --color-violet-50: #e2deea;
+  --color-violet-700: #5a5286;
 }
 
-/* 黑夜模式（默认）：由 <html data-theme> 切换，覆盖平台色板以及页面里直接使用的 Tailwind 灰阶和状态色 */
+:root {
+  --glass: rgb(24 24 24 / 0.045);
+  --glass-strong: rgb(24 24 24 / 0.075);
+  --glass-edge: rgb(24 24 24 / 0.1);
+  --field: #fcf8ee;
+  --on-signal: #181818;
+  --grid-dot: rgb(24 24 24 / 0.07);
+  --overlay: rgb(24 22 18 / 0.42);
+  --shadow-panel: 0 18px 50px -18px rgb(40 30 10 / 0.35), 0 2px 6px rgb(40 30 10 / 0.08);
+
+  /* 侧栏：跟随主题，比页面底色略深一档 */
+  --chrome-bg: #e2d9c5;
+  --chrome-raised: #f1ead9;
+  --chrome-line: #cfc5ad;
+  --chrome-ink: #1c1b18;
+  --chrome-ink-2: #4a463d;
+  --chrome-ink-3: #7a7362;
+  --chrome-glass: rgb(24 24 24 / 0.07);
+  --chrome-glass-edge: rgb(24 24 24 / 0.12);
+  --chrome-signal: #b4551f;
+
+  /* 红黄绿三等分色条：标题下方的横条与悬停标记共用，三色自左向右并排 */
+  --tricolor-h: linear-gradient(
+    90deg,
+    var(--color-tri-red) 0 33.34%,
+    var(--color-tri-yellow) 33.34% 66.67%,
+    var(--color-tri-green) 66.67%
+  );
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* 碳黑任务控制台（dark，默认）：由 <html data-theme> 切换 */
 :root[data-theme='dark'] {
-  --color-primary: #3b82f6;
-  --color-primary-dark: #2563eb;
-  --color-primary-light: #1d2a44;
-  --color-page: #171819;
-  --color-card: #222426;
-  --color-line: #3b3f42;
-  --color-hover: #2a2d30;
-  --color-ink: #e5e7e9;
-  --color-ink-secondary: #b3b9bf;
-  --color-ink-muted: #a1a9b0;
-  --color-ink-faint: #8a949c;
+  --color-primary: #e2854f;
+  --color-primary-dark: #f09a66;
+  --color-primary-light: #38291e;
+  --color-page: #141413;
+  --color-card: #1c1c1a;
+  --color-line: #33322d;
+  --color-hover: #262622;
+  --color-ink: #f2ead9;
+  --color-ink-secondary: #c4bcab;
+  --color-ink-muted: #999281;
+  --color-ink-faint: #777164;
 
-  --color-gray-50: #26292c;
-  --color-gray-100: #2f3235;
-  --color-gray-300: #4b5055;
-  --color-gray-600: #b3b9bf;
-  --color-red-50: #3a2422;
-  --color-red-200: #6b3b36;
-  --color-red-700: #f0a39b;
-  --color-red-800: #f5b8b1;
-  --color-emerald-50: #1f3329;
-  --color-emerald-200: #2f5a45;
-  --color-emerald-600: #5fd0a0;
-  --color-emerald-700: #7fdcb2;
-  --color-emerald-800: #9be5c3;
-  --color-amber-50: #3a3020;
-  --color-amber-200: #6b5530;
-  --color-amber-700: #f0c06b;
-  --color-amber-800: #f5cf88;
-  --color-blue-50: #1f2b40;
-  --color-blue-200: #34507a;
-  --color-blue-700: #8fb6f0;
-  --color-blue-800: #a9c8f5;
-  --color-orange-50: #3a2a1f;
-  --color-orange-700: #f2b07a;
+  --color-success: #98bcb1;
+  --color-warning: #dfa93c;
+  --color-danger: #e2695f;
+
+  --color-gray-50: #222220;
+  --color-gray-100: #2a2a27;
+  --color-gray-300: #4a4841;
+  --color-gray-600: #b9b1a0;
+  --color-red-50: #35211e;
+  --color-red-200: #63342e;
+  --color-red-700: #ea8d83;
+  --color-red-800: #f0a69d;
+  --color-emerald-50: #1f2b27;
+  --color-emerald-200: #35514a;
+  --color-emerald-600: #98bcb1;
+  --color-emerald-700: #a5c7bc;
+  --color-emerald-800: #b8d4cb;
+  --color-amber-50: #33291a;
+  --color-amber-200: #5a482a;
+  --color-amber-700: #e3b352;
+  --color-amber-800: #ecc573;
+  --color-blue-50: #212b32;
+  --color-blue-200: #3a4d5a;
+  --color-blue-700: #9cb5c6;
+  --color-blue-800: #b3c7d5;
+  --color-orange-50: #38291e;
+  --color-orange-700: #eb9a6b;
+  --color-violet-50: #2a2a38;
+  --color-violet-700: #b0b0da;
+
+  --glass: rgb(245 237 220 / 0.05);
+  --glass-strong: rgb(245 237 220 / 0.085);
+  --glass-edge: rgb(245 237 220 / 0.12);
+  --field: #161615;
+  --grid-dot: rgb(245 237 220 / 0.05);
+  --overlay: rgb(8 8 7 / 0.62);
+
+  --chrome-bg: #161615;
+  --chrome-raised: #1f1f1d;
+  --chrome-line: #302f2a;
+  --chrome-ink: #f2ead9;
+  --chrome-ink-2: #b9b1a0;
+  --chrome-ink-3: #7d776a;
+  --chrome-glass: rgb(245 237 220 / 0.07);
+  --chrome-glass-edge: rgb(245 237 220 / 0.12);
+  --chrome-signal: #e2854f;
+  --shadow-panel: 0 24px 60px -20px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.35);
 }
 
-/* text-white 需保持白色（主色按钮），因此不改 --color-white，只把白色底改成卡片色 */
-:root[data-theme='dark'] .bg-white {
+/* 历史类名：白底统一落到卡片色 */
+.bg-white {
   background-color: var(--color-card);
+}
+/* 橙色实底上的文字用碳黑，保证对比度 */
+.bg-primary.text-white {
+  background-color: var(--color-signal);
+  color: var(--on-signal);
 }
 
 html,
@@ -79,10 +198,25 @@ body {
   font-size: 14px;
   line-height: 22px;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app {
   height: 100%;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-signal) 38%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-300) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .app-icon {
@@ -92,58 +226,251 @@ body {
   vertical-align: -0.125em;
 }
 
-/* JetBrains Mono 默认开启编程连字，会把「星号+斜杠」等组合合并成单个符号（如 Cron 表达式），全部禁用 */
+/* 等宽字默认开启的编程连字会把「星号+斜杠」等组合合并成单个符号（如 Cron 表达式），全部禁用 */
 .font-mono,
 code {
   font-variant-ligatures: none;
   font-feature-settings: 'liga' 0, 'calt' 0;
 }
 
-/* 通用组件样式 */
-.btn-primary {
-  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50;
+/* ───────── 标识元素 ───────── */
+
+/* 三色条：红黄绿三等分的横条，放在标题下方。品牌标识而非状态语义 */
+.tri-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tricolor-h);
 }
 
+/* 悬停玻璃 + 左缘三色标记。给任意可交互行加 .tri-hover 即可 */
+.tri-hover {
+  position: relative;
+  isolation: isolate;
+}
+.tri-hover::before {
+  content: '';
+  position: absolute;
+  inset: 7px auto 7px 2px;
+  width: 6px;
+  background: var(--tricolor-h);
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition:
+    opacity 0.16s var(--ease-out),
+    transform 0.2s var(--ease-out);
+  pointer-events: none;
+  z-index: 1;
+}
+.tri-hover:hover::before,
+.tri-hover:focus-visible::before {
+  opacity: 1;
+  transform: none;
+}
+
+/* 点阵底纹：只用于大面积留白的画布 */
+.dot-grid {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ───────── 通用组件 ───────── */
+
+.btn-primary,
+.btn-ghost,
+.btn-danger {
+  @apply inline-flex h-9 items-center justify-center gap-1.5 px-4 text-sm whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-45;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition:
+    background-color 0.16s,
+    border-color 0.16s,
+    color 0.16s,
+    transform 0.08s;
+}
+.btn-primary:active:not(:disabled),
+.btn-ghost:active:not(:disabled),
+.btn-danger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 主操作：航天橙实底 */
+.btn-primary {
+  background-color: var(--color-signal);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-signal-bright);
+}
+.btn-primary:focus-visible,
+.btn-danger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 次操作：安静的细线键，悬停浮出玻璃 */
 .btn-ghost {
-  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-line bg-card px-4 text-sm font-medium text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50;
+  border: 1px solid var(--color-line);
+  background-color: transparent;
+  color: var(--color-ink);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--color-ink-faint);
+  background-color: var(--glass-strong);
 }
 
 .btn-danger {
-  @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-danger px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50;
+  background-color: var(--color-tri-red);
+  color: #fbf3e4;
+  font-weight: 600;
+}
+.btn-danger:hover:not(:disabled) {
+  background-color: #d8584e;
 }
 
-.input {
-  @apply h-9 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/15;
+.input,
+.select {
+  @apply h-9 w-full px-3 text-sm outline-none;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background-color: var(--field);
+  color: var(--color-ink);
+  transition:
+    border-color 0.16s,
+    box-shadow 0.16s,
+    background-color 0.16s;
+}
+textarea.input {
+  height: auto;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.input::placeholder {
+  color: var(--color-ink-faint);
+}
+.input:hover:not(:focus):not(:disabled),
+.select:hover:not(:focus):not(:disabled) {
+  border-color: var(--color-ink-faint);
+}
+.input:focus,
+.select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 16%, transparent);
+}
+.input:disabled,
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .select {
-  @apply h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15;
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23908a7b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+}
+.select option {
+  background-color: var(--color-card);
+  color: var(--color-ink);
 }
 
 .form-label {
-  @apply mb-1.5 block text-xs font-medium text-ink-secondary;
+  @apply mb-1.5 block;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-ink-muted);
 }
 
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-signal);
+}
+
+/* 面板：圆角细框 */
 .card {
-  @apply rounded-lg border border-line bg-card;
+  position: relative;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background-color: var(--color-card);
+}
+
+/* ───────── 数据表：档案清单 ───────── */
+
+.card table {
+  border-collapse: collapse;
+}
+.card thead tr {
+  background-color: transparent;
+  border-bottom: 1px solid var(--color-line);
+}
+.card thead th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+.card tbody tr {
+  transition: background-color 0.16s;
+}
+.card tbody tr:last-child {
+  border-bottom-width: 0;
+}
+.card tbody td:first-child {
+  position: relative;
+}
+.card tbody tr > td:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 7px auto 7px 2px;
+  width: 6px;
+  background: var(--tricolor-h);
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition:
+    opacity 0.16s var(--ease-out),
+    transform 0.2s var(--ease-out);
+  pointer-events: none;
+}
+.card tbody tr:hover > td:first-child:not([colspan])::before {
+  opacity: 1;
+  transform: none;
+}
+.card tbody tr:hover {
+  background-color: var(--glass);
 }
 
 .session-history-row {
-  background-color: #eef0f3;
+  background-color: var(--color-gray-50);
 }
-
 .session-history-row:hover {
-  background-color: #e5e7eb;
+  background-color: var(--color-gray-100);
 }
-
-:root[data-theme='dark'] .session-history-row {
-  background-color: #1e2022;
-}
-
-:root[data-theme='dark'] .session-history-row:hover {
-  background-color: var(--color-hover);
-}
-
 .session-history-row td {
   background-color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 身份牌：用户首字母 / 角色徽记 */
+.id-chip {
+  border-radius: 10px;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
 }

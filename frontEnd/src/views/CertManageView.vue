@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   approveCertApply,
@@ -263,16 +264,12 @@ async function confirmRevoke() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">证书管理</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">审批证书申请、查询与吊销已签发证书</p>
-      </div>
+    <PageHeader title="证书管理" desc="审批证书申请、查询与吊销已签发证书">
       <button class="btn-ghost" @click="loadActive">
         <AppIcon name="refresh" class="!text-[18px]" />
         刷新
       </button>
-    </div>
+    </PageHeader>
 
     <div class="flex gap-2 border-b border-line">
       <button

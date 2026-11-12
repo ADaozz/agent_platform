@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
@@ -84,15 +85,12 @@ onMounted(load)
 
 <template>
   <div class="mx-auto max-w-4xl space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-lg font-semibold text-ink">模型配置</h1>
-      </div>
+    <PageHeader title="模型配置" desc="管理 Agent 对话可使用的模型来源与模型">
       <div v-if="isAdmin" class="flex gap-2">
         <button :class="personal ? 'btn-primary' : 'btn-ghost'" @click="switchTab('personal')">我的模型</button>
         <button :class="!personal ? 'btn-primary' : 'btn-ghost'" @click="switchTab('global')">全局模型</button>
       </div>
-    </div>
+    </PageHeader>
 
     <div v-if="loading" class="card p-8 text-center text-sm text-ink-muted">正在加载模型配置…</div>
     <template v-else>

@@ -15,7 +15,7 @@ const emit = defineEmits<{ close: [] }>()
       leave-active-class="transition duration-200"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-40 bg-black/30" @click="emit('close')"></div>
+      <div v-if="open" class="drawer-scrim" @click="emit('close')"></div>
     </Transition>
     <Transition
       enter-active-class="transition-transform duration-250"
@@ -23,13 +23,39 @@ const emit = defineEmits<{ close: [] }>()
       leave-active-class="transition-transform duration-250"
       leave-to-class="translate-x-full"
     >
-      <aside
-        v-if="open"
-        class="fixed inset-y-0 right-0 z-50 flex flex-col border-l border-line bg-white shadow-2xl"
-        :style="{ width: width || '440px', maxWidth: '90vw' }"
-      >
+      <aside v-if="open" class="drawer-panel" :style="{ width: width || '440px', maxWidth: '90vw' }">
+        <span class="drawer-tri" aria-hidden="true"></span>
         <slot />
       </aside>
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--overlay);
+  backdrop-filter: blur(4px);
+}
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--color-line);
+  border-radius: 18px 0 0 18px;
+  background-color: var(--color-card);
+  box-shadow: var(--shadow-panel);
+}
+.drawer-tri {
+  flex-shrink: 0;
+  height: 4px;
+  background: var(--tricolor-h);
+}
+</style>

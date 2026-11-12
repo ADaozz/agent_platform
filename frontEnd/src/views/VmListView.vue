@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { listVms, editVm, type VmEditBody } from '@/api/vm'
 import { listApps } from '@/api/app'
@@ -179,10 +180,7 @@ async function saveEdit() {
 
 <template>
   <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-ink">虚拟机列表</h1>
-      <p class="mt-0.5 text-sm text-ink-muted">管理和配置全局虚拟化基础设施资产</p>
-    </div>
+    <PageHeader title="虚拟机列表" desc="管理和配置全局虚拟化基础设施资产" />
 
     <!-- 筛选 -->
     <div class="card p-4">

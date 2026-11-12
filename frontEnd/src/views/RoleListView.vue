@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { listRoles, addRole, editRole, authPerm, deleteRole, getPermTree } from '@/api/role'
 import { useAuthStore } from '@/stores/auth'
@@ -245,16 +246,12 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">角色管理</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">维护系统角色并进行角色—权限绑定（仅管理员可操作）</p>
-      </div>
+    <PageHeader title="角色管理" desc="维护系统角色并进行角色—权限绑定（仅管理员可操作）">
       <button v-if="canAdd" class="btn-primary" @click="openAdd">
         <AppIcon name="add" class="!text-[18px]" />
         添加角色
       </button>
-    </div>
+    </PageHeader>
 
     <!-- 筛选 -->
     <div class="card p-4">
@@ -289,7 +286,7 @@ async function confirmDelete() {
             >
               <td class="px-4 py-3 align-top">
                 <div class="flex items-center gap-3">
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary">
+                  <div class="flex h-9 w-9 shrink-0 items-center justify-center id-chip">
                     <AppIcon name="shield_person" class="!text-[20px]" />
                   </div>
                   <div>

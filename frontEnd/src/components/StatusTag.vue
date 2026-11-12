@@ -14,11 +14,30 @@ const tag = computed<TagStyle>(
 </script>
 
 <template>
-  <span
-    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
-    :class="tag.cls"
-  >
-    <span v-if="dot !== false" class="h-1.5 w-1.5 rounded-full bg-current"></span>
+  <!-- 状态牌：色块 + 标签 -->
+  <span class="status-tag" :class="tag.cls">
+    <span v-if="dot !== false" class="status-tag-lamp"></span>
     {{ tag.label }}
   </span>
 </template>
+
+<style scoped>
+/* 状态牌：不做底色胶囊，只用一枚 2px 色块 + 状态色文字，与三色标识同一套语言 */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: transparent !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.status-tag-lamp {
+  width: 2px;
+  height: 11px;
+  flex-shrink: 0;
+  background-color: currentColor;
+}
+</style>

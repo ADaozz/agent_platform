@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { getDashboardOverview, type DashboardScope } from '@/api/dashboard'
@@ -125,13 +126,7 @@ const physicalHostOption = computed(() => barOption(overview.value?.physicalHost
 <template>
   <div class="space-y-4">
     <!-- 页头 -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">
-          {{ scope === 'all' ? '全局概览' : '我的资源概览' }}
-        </h1>
-        <p class="mt-0.5 text-sm text-ink-muted">系统资源及运行状态汇总</p>
-      </div>
+    <PageHeader :title="scope === 'all' ? '全局概览' : '我的资源概览'" desc="系统资源及运行状态汇总">
       <div class="flex items-center gap-2">
         <div v-if="canViewAll" class="flex rounded-md border border-line bg-white p-0.5">
           <button
@@ -154,7 +149,7 @@ const physicalHostOption = computed(() => barOption(overview.value?.physicalHost
           刷新
         </button>
       </div>
-    </div>
+    </PageHeader>
 
     <template v-if="overview">
       <!-- KPI 卡片 -->

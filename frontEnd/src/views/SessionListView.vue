@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSessions, listSessionHistory, kickSession } from '@/api/session'
@@ -141,18 +142,12 @@ async function confirmKick() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">登录设备管理</h1>
-        <p class="mt-0.5 text-sm text-ink-muted">
-          所有账号仅允许单点登录，新登录会自动下线其他设备；列表按用户汇总，展开可查看历史登录记录
-        </p>
-      </div>
+    <PageHeader title="登录设备管理" desc="所有账号仅允许单点登录，新登录会自动下线其他设备；列表按用户汇总，展开可查看历史登录记录">
       <button class="btn-ghost" :disabled="loading" @click="load">
         <AppIcon name="refresh" class="!text-[18px]" />
         刷新
       </button>
-    </div>
+    </PageHeader>
 
     <div v-if="canManage" class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
