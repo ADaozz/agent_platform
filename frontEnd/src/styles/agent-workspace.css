@@ -71,6 +71,8 @@
 
   font-family: 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background-color: var(--page);
+  background-image: radial-gradient(var(--ws-hatch) 1px, transparent 1px);
+  background-size: 22px 22px;
 
   /* ───────── 基础 ───────── */
   pre,

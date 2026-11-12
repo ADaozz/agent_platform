@@ -7,9 +7,9 @@
 | 文件（相对 frontEnd/src） | 修改 |
 | --- | --- |
 | components/WorkspaceBackdrop.vue | 新增纯装饰组件；只有模板与 CSS，没有 script、Canvas、图片 URL、定时器或绘制代码 |
-| agent-platform/AgentPlatform.vue | 在原 main 内增加一个可选 backdrop 插槽，其余模板和脚本不变 |
+| agent-platform/AgentPlatform.vue | 在原 main 内增加一个仅在 mainView 为 agents 时渲染的可选 backdrop 插槽；历史会话和全局文件不渲染背景，其余模板和脚本不变 |
 | views/AgentChatView.vue | 通过插槽提供背景，复用已有主题；用 CSS 对齐现有内容边界、操作栏及预览面板边界 |
-| styles/agent-workspace.css | 移除旧的全区域点阵背景；保留已有主题、组件尺寸和交互样式 |
+| styles/agent-workspace.css | 保留原有点阵背景供历史会话和全局文件使用；纯 CSS 装饰层仅覆盖 Agent 对话区域 |
 
 现有 Logo、菜单选中橙条、侧栏悬停行为及品牌三色反射代码均未修改。没有修改后端、路由、状态、API、输入框、消息区或文件预览的业务逻辑，没有新增依赖。
 
@@ -37,6 +37,7 @@
 - `npm run test:e2e:office`：通过。
 - `node --test agent-runtime/tests/{conversation,outputFiles,office-review,documents}.test.mjs`：34 项通过，0 失败。
 - `git diff --check`：通过。
+- 后续视图范围检查：Chromium 在明暗主题下验证会话 / 对话首页显示背景、历史会话 / 全局文件不渲染装饰层，后两者保留原点阵底纹；返回新建对话时背景恢复。
 
 ### 已知基线问题与验证范围
 
