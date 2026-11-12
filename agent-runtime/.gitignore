@@ -4,11 +4,7 @@ __pycache__/
 .platform/
 .platform-*/
 .env
-frontend/node_modules/
-platform_app/web/
 *:Zone.Identifier
-
-frontend/test-results/
 
 # User-provided templates have no recorded redistribution grant.
 pptx-ooxml-skill/templates/local-*/

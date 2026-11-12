@@ -1,4 +1,4 @@
-// Real Chromium and real Vue panels for BOTH shipped frontends; Office responses
+// Real Chromium and the platform's real Vue Office panels; Office responses
 // are controlled fixtures, while actual rendered PNGs exercise the preview UI.
 import assert from 'node:assert/strict'
 import {mkdtemp,writeFile,readFile,rm,mkdir} from 'node:fs/promises'
@@ -7,9 +7,9 @@ import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {chromium} from 'playwright'
 const frontend=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')
-const repository=path.resolve(frontend,'../..')
-const source=path.join(frontend,'src')
-const roots=[{name:'runtime',root:frontend,prefix:'/src'},{name:'embedded',root:path.join(repository,'frontEnd'),prefix:'/src/agent-platform'}]
+const repository=path.resolve(frontend,'..')
+const source=path.join(frontend,'src','agent-platform')
+const roots=[{name:'platform',root:frontend,prefix:'/src/agent-platform'}]
 const output=path.join(frontend,'test-results','office-review');await mkdir(output,{recursive:true})
 const png1=await readFile(path.join(repository,'agent-runtime/docx-ooxml-skill/examples/research-quality-acceptance/page-001.png'))
 const png2=await readFile(path.join(repository,'agent-runtime/docx-ooxml-skill/examples/workflow-acceptance/academic-page.png'))

@@ -1,8 +1,8 @@
 # Office quality review UI
 
-Both frontend distributions implement the same Office review view model and
-components under `src/features/office/` (embedded: `src/agent-platform/features/office/`).
-Their API adapters retain their own same-origin / authenticated ITAM gateway paths.
+The platform frontend implements the Office review view model and components
+under `src/agent-platform/features/office/`; requests go through the
+authenticated ITAM gateway.
 
 - `reviewModel.js` preserves backend states and maps them to pending / passed /
   issues / unavailable / stale. Stage status is presentation only; formal acceptance
@@ -39,17 +39,17 @@ Run from repository root:
 
 ```sh
 node --test agent-runtime/tests/office-review.test.mjs agent-runtime/tests/documents.test.mjs
-node agent-runtime/frontend/tests/office-review.e2e.mjs
-npm run build --prefix agent-runtime/frontend
-npm run build --prefix frontEnd
+npm --prefix frontEnd run test:e2e:office
+npm --prefix frontEnd run build
 ```
 
-The Chromium suite mounts the actual Vue panels from **both** distributions and
+The Chromium suite mounts the platform's actual Vue panels and
 uses controlled HTTP Office fixtures with real rendered PNGs. It verifies three
 independent folds, page and verified-region navigation, missing coordinates,
 metadata, running/idle Agent delegation, HTTP errors/retry, revision/request
 staleness, unchanged PPTX highlighting, dismissal and whole-deck navigation.
-It records screenshots and request evidence under `frontend/test-results/office-review/`.
+It records screenshots and request evidence under `frontEnd/test-results/office-review/`.
+Set `CHROMIUM_PATH` when Chromium is not at `/usr/bin/chromium`.
 This is UI protocol regression evidence; it does not claim new live model calls.
 Backend tests separately validate actual PDF coordinates and the real FastAPI
 steering route into the session runner.

@@ -18,7 +18,7 @@ try:
  result=format_plugins.change(args.feature,args.action!='uninstall',args.action=='enable')
  if args.purge:
   shutil.rmtree(meta['directory'])
-  ui=format_plugins.ROOT/'frontend'/'src'/'features'/args.feature
+  ui=format_plugins.ROOT.parent/'frontEnd'/'src'/'agent-platform'/'features'/args.feature
   if ui.exists():shutil.rmtree(ui)
  print(json.dumps(result,ensure_ascii=False,indent=2))
 except Exception as exc:

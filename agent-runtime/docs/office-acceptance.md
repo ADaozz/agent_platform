@@ -20,14 +20,13 @@ pip install -r requirements-features.lock
 pip install pytest httpx
 PATH=/path/to/libreoffice/bin:$PATH python -m pytest -q tests docx-ooxml-skill/tests pptx-ooxml-skill/tests
 node --test tests/*.test.mjs
-npm --prefix frontend run build
+npm --prefix ../frontEnd run build
 
-# 分别在新的数据目录/进程运行两套浏览器验收：
-python tests/docx_e2e_server.py
-npm --prefix frontend run test:e2e:docx
-python tests/pptx_e2e_server.py
-npm --prefix frontend run test:e2e:pptx
+# 平台前端 Office 审查面板的浏览器回归（需要 Chromium，可用 CHROMIUM_PATH 指定）：
+npm --prefix ../frontEnd run test:e2e:office
 ```
+
+上文记录的 DOCX / PPTX 整套浏览器验收基于已移除的独立网页界面，相应脚本已随之删除。
 
 环境需 LibreOffice Writer / Impress、fontconfig、Noto CJK / Liberation 字体以及 Chromium。独立安装/卸载见 [说明](optional-office-features.md)。
 

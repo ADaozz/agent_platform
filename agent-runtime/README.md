@@ -6,8 +6,10 @@
 
 | 模式 | 启用条件 | 说明 |
 | --- | --- | --- |
-| 单用户 | 默认 | 本机服务，自带网页界面，无账号认证 |
+| 单用户 | 默认 | 本机服务，只提供 HTTP 接口，无账号认证，用于开发与自动化测试 |
 | 多用户（ITAM 接入） | 设置 `ITAM_RUNTIME_SHARED_SECRET` | 作为业务系统后端的 Agent 运行时，由后端签名转发用户身份，会话与文件按用户隔离 |
+
+运行时不再自带网页界面，Agent 对话、文件与文档预览界面由平台前端 `../frontEnd/src/agent-platform/` 提供。
 
 ## 环境要求
 
@@ -21,14 +23,10 @@
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.lock
 .venv/bin/pip install -r docx-ooxml-skill/requirements.txt -r pptx-ooxml-skill/requirements.txt
-npm --prefix frontend install
-npm --prefix frontend run build
 PLATFORM_DATA_DIR=.platform .venv/bin/uvicorn platform_app.main:app --host 127.0.0.1 --port 8080
 ```
 
-打开 `http://127.0.0.1:8080`，在设置中添加模型来源、模型 ID、Base URL、API Key、API 协议（Chat Completions 或 Responses）和思考强度后即可对话。
-
-前端开发：先启动后端，再运行 `npm --prefix frontend run dev`，Vite 会把 `/api` 代理到 8080 端口。构建产物输出到 `platform_app/web/`，不提交到仓库。
+服务启动后通过 `/api/` 接口添加模型来源、模型 ID、Base URL、API Key、API 协议（Chat Completions 或 Responses）和思考强度，即可创建会话对话。日常使用请按仓库根目录的说明启动平台前端与后端，以多用户模式访问。
 
 ## 多用户模式（ITAM 接入）
 
@@ -111,7 +109,6 @@ Skill 以标准 `SKILL.md` 目录形式提供，新会话创建时复制为只�
 | `platform_app/models.py` | 全局与私人模型配置、密钥加密 |
 | `platform_app/domain.py` | SQLite 存储与全局配置 |
 | `platform_app/agent_core/` | 内置 Agent 执行引擎（MIT 许可，见目录内 LICENSE） |
-| `frontend/` | 单用户模式的网页界面 |
 | `docx-ooxml-skill/`、`pptx-ooxml-skill/` | 文档生成 Skill、脚本与测试 |
 | `scripts/` | 扩展管理、PPT 风格资料导入与性能测试脚本 |
 | `tests/`、`docs/` | 回归测试与部署、隔离、验收文档 |
@@ -127,7 +124,8 @@ Skill 以标准 `SKILL.md` 目录形式提供，新会话创建时复制为只�
 .venv/bin/python -m pytest -q
 PYTHONPATH=. .venv/bin/python -m pytest -q docx-ooxml-skill/tests pptx-ooxml-skill/tests
 node --test tests/*.test.mjs
-npm --prefix frontend run build
+npm --prefix ../frontEnd run build
+npm --prefix ../frontEnd run test:e2e:office
 ```
 
 测试使用确定性的测试模型驱动真实执行引擎与真实 Bubblewrap，覆盖审批、命令执行、子 Agent、Skill 挂载、checkpoint 恢复、多用户隔离、私人模型与 Office 生成；测试机器需要可用的 Bubblewrap。浏览器端到端测试需要 Chromium，见 [Office 验收](docs/office-acceptance.md)。

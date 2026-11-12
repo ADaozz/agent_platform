@@ -46,15 +46,11 @@ runs cover generation steering, independent output scrolling, folding/reopening,
 cancellation/failure replay, focus, persisted state and cross-session file isolation.
 No model request or live credential is needed for the performance fixture.
 
-Reproduce with two served builds and the same Chromium executable, sequentially:
+The browser performance fixture (`tests/performance.mjs`) lived in the standalone
+runtime frontend and was removed with it; the numbers above are kept as a historical
+record. The session polling benchmark remains reproducible:
 
 ```sh
-cd agent-runtime/frontend
-PERF_BASE_URL=http://127.0.0.1:8084 PERF_OUTPUT=/tmp/before.json node tests/performance.mjs
-PERF_BASE_URL=http://127.0.0.1:8083 PERF_OUTPUT=/tmp/after.json node tests/performance.mjs
-# For the embedded build served on 8087:
-PERF_EMBEDDED=1 PERF_BASE_URL=http://127.0.0.1:8087 node tests/performance.mjs
-cd ..
 python scripts/benchmark_session_polling.py
 ```
 

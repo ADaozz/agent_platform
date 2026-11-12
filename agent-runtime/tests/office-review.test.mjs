@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const roots=['../frontend/src/features','../../frontEnd/src/agent-platform/features']
+const roots=['../../frontEnd/src/agent-platform/features']
 for(const root of roots){
  const {docxReviews,pptxReviews,normalizeStatus}=await import(root+'/office/reviewModel.js')
  const {delegateOfficeIssue,delegationKey}=await import(root+'/office/delegate.js')
@@ -99,11 +99,3 @@ for(const root of roots){
   assert.notEqual(delegationKey({revision:4,issueId:'i'}),delegationKey({revision:5,issueId:'i'}))
  })
 }
-
-test('both shipped frontends keep the shared Office implementation in sync',async()=>{
- const {readFile}=await import('node:fs/promises')
- for(const file of ['office/reviewModel.js','office/delegate.js','office/ReviewDisclosure.vue','office/ReviewIssueList.vue','office/ReviewMetadata.vue','docx/QualityReview.vue','docx/DocxPreview.vue','docx/state.js','pptx/ReviewDisclosure.vue','pptx/SlideCanvas.vue']){
-  const contents=await Promise.all(roots.map(root=>readFile(new URL(root+'/'+file,import.meta.url),'utf8')))
-  assert.equal(contents[0],contents[1],file)
- }
-})

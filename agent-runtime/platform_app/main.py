@@ -1,8 +1,4 @@
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import domain as d
@@ -31,24 +27,6 @@ for feature in format_plugins.enabled():
         plugin=format_plugins.load_plugin(feature['id'])
         if hasattr(plugin,'create_router'):app.include_router(plugin.create_router(artifact_host))
     except (ImportError,LookupError):pass
-
-WEB = Path(__file__).parent / 'web'
-if WEB.exists():
-    app.mount('/assets', StaticFiles(directory=WEB / 'assets'), name='web-assets')
-    app.mount('/fonts', StaticFiles(directory=WEB / 'fonts'), name='web-fonts')
-
-
-@app.get('/favicon.svg')
-def favicon():
-    return FileResponse(WEB / 'favicon.svg')
-
-
-@app.get('/')
-def index():
-    if not (WEB / 'index.html').is_file():
-        raise HTTPException(503, '前端资源未就绪')
-    return FileResponse(WEB / 'index.html')
-
 
 @app.get('/api/status')
 def status():

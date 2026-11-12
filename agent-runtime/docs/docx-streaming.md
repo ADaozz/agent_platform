@@ -45,8 +45,8 @@
 
 ```sh
 .venv/bin/pip install -r requirements-features.lock
-npm --prefix frontend ci
-npm --prefix frontend run build
+npm --prefix ../frontEnd ci
+npm --prefix ../frontEnd run build
 .venv/bin/python -m pytest -q tests docx-ooxml-skill/tests
 node --test tests/*.test.mjs
 ```
@@ -59,14 +59,7 @@ node --test tests/*.test.mjs
 
 基准明确要求 A4、四边 25.4 mm、20 pt 居中标题、16 / 13.5 pt 分级标题、11 pt 短正文与 1.5 倍行距、带表头和明确列宽的表格、12 cm 流程图及居中图注。长报告自然排版，禁止硬分页和填充段落。`results.json`、DOCX、PDF、PNG、版本和检查结果都保留在输出目录。视觉状态默认 pending。
 
-浏览器验收使用确定性测试模型，工具、内核、steering、journal、LibreOffice 和前端均为真实实现，不消耗外部模型服务。先启动独立测试服务器，再运行 Chromium：
-
-```sh
-.venv/bin/python tests/docx_e2e_server.py
-CHROMIUM_PATH=/usr/bin/chromium npm --prefix frontend run test:e2e:docx
-```
-
-每次浏览器验收使用新的测试服务器进程/数据目录。默认测试端口 8081，可通过 `DOCX_E2E_PORT` 和 `DOCX_E2E_BASE_URL` 改变。截图和结果保存在 `frontend/test-results/`。测试输入是带格式的业务建设方案；途中要求第二节改成表格，最终检查至少 10 页、版本恢复、只读状态及页面几何。页面测量记录 `docx-preview-update`；测试结果另记提交到 SSE 和实际分页预览的延迟。
+平台前端的 Office 审查面板由 `npm --prefix ../frontEnd run test:e2e:office` 做浏览器回归。下文的浏览器测量来自已移除的独立网页界面验收，保留作历史记录。
 
 ## 本次测量
 

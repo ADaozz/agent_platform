@@ -4,8 +4,8 @@
 
 | 功能 | 后端与 Skill | 前端 |
 | --- | --- | --- |
-| DOCX | `docx-ooxml-skill/` | `frontend/src/features/docx/` |
-| PPTX | `pptx-ooxml-skill/` | `frontend/src/features/pptx/` |
+| DOCX | `docx-ooxml-skill/` | `../frontEnd/src/agent-platform/features/docx/` |
+| PPTX | `pptx-ooxml-skill/` | `../frontEnd/src/agent-platform/features/pptx/` |
 
 `feature.json` 声明功能身份、适配器、依赖和 Skill。通用注册器 `platform_app/format_plugins.py` 负责发现和接入；`artifact_runtime.py` 仅提供快照、事务、事件、幂等和恢复，不负责规划或 Agent 执行。`runtime.py` / `agent_factory.py` 不导入 Word 或 PowerPoint 的引擎、组件、提示词或业务实现；只接入技能快照、版本事件和预览。DOCX/PPTX 的制作流程由 `SKILL.md` 说明，脚本经原生 execute 运行，不注册文档专属模型工具，也不将制作流程注入系统提示词。
 
@@ -36,7 +36,7 @@ pip install -r pptx-ooxml-skill/requirements.txt
 python scripts/manage_features.py list
 python scripts/manage_features.py uninstall docx --purge
 python scripts/manage_features.py uninstall pptx --purge
-npm --prefix frontend run build
+npm --prefix ../frontEnd run build
 # 重启服务
 ```
 

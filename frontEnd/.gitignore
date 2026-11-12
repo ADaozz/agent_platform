@@ -37,3 +37,8 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Browser test output and local tool caches
+test-results/
+.office-review-ui-*/
+.playwright-cli/
