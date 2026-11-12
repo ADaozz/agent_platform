@@ -74,7 +74,7 @@ function handleLogout() {
       <div class="rail-brand">
         <BrandMark :size="30" class="shrink-0" />
         <div v-if="sidebarOpen" class="rail-wordmark">
-          <div class="rail-wordmark-name">DEEP AGENT</div>
+          <div class="rail-wordmark-name">DEEP <span class="rail-wordmark-accent">AGENT</span></div>
           <span class="tri-bar rail-tri" aria-hidden="true"></span>
         </div>
       </div>
@@ -160,11 +160,6 @@ function handleLogout() {
 <!-- 不加 scoped：.rail-* 同时供侧栏内的 AgentNav 使用 -->
 <style>
 /* ───────── 侧栏 ───────── */
-/* 白天模式下侧栏为浅色，品牌标识反相以保持对比 */
-[data-theme='light'] .rail {
-  --mark-tile: #181818;
-  --mark-ink: #f5eddc;
-}
 .rail {
   display: flex;
   width: 4rem;
@@ -198,6 +193,9 @@ function handleLogout() {
   line-height: 1;
   letter-spacing: 0.07em;
   color: var(--chrome-ink);
+}
+.rail-wordmark-accent {
+  color: var(--color-signal);
 }
 .rail-tri {
   width: 100%;
