@@ -16,7 +16,7 @@ const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undef
 </script>
 
 <template>
-  <!-- 功能卡片式标题栏（参考 LONETRAIL 功能卡片）：同心环徽标 + 标题 + 说明，底边红黄绿色条；右侧为操作位 -->
+  <!-- 功能卡片式标题栏（参考 LONETRAIL 功能卡片）：同心环徽标 + 标题 + 说明，底边信号橙结构线；右侧为操作位 -->
   <header class="page-head">
     <div v-if="emblem" class="page-head-emblem" aria-hidden="true">
       <span class="page-head-rings"></span>
@@ -115,6 +115,6 @@ const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undef
   position: absolute;
   inset: auto 0 0 0;
   height: 4px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
 }
 </style>

@@ -41,21 +41,21 @@ const sparkles = [
   <svg class="space" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
     <defs>
       <linearGradient id="space-trail" gradientUnits="userSpaceOnUse" x1="60" y1="372" x2="604" y2="150">
-        <stop offset="0" stop-color="#D0713C" stop-opacity="0" />
-        <stop offset="0.55" stop-color="#D0713C" stop-opacity="0.55" />
-        <stop offset="1" stop-color="#F08A4B" />
+        <stop offset="0" stop-color="#F36B18" stop-opacity="0" />
+        <stop offset="0.55" stop-color="#F36B18" stop-opacity="0.55" />
+        <stop offset="1" stop-color="#F36B18" />
       </linearGradient>
       <radialGradient id="space-haze" cx="0.78" cy="0.5" r="0.6">
-        <stop offset="0" stop-color="#D0713C" stop-opacity="0.1" />
-        <stop offset="0.55" stop-color="#6E8596" stop-opacity="0.05" />
-        <stop offset="1" stop-color="#6E8596" stop-opacity="0" />
+        <stop offset="0" stop-color="#F36B18" stop-opacity="0.1" />
+        <stop offset="0.55" stop-color="#958A78" stop-opacity="0.05" />
+        <stop offset="1" stop-color="#958A78" stop-opacity="0" />
       </radialGradient>
     </defs>
 
     <rect width="1000" height="800" fill="url(#space-haze)" />
 
     <!-- 赤纬弧：大半径同心弧，暗示天球坐标 -->
-    <g stroke="#F2EAD9" stroke-opacity="0.07">
+    <g stroke="#F5EDDC" stroke-opacity="0.07">
       <circle cx="1040" cy="1180" r="760" />
       <circle cx="1040" cy="1180" r="920" stroke-dasharray="2 10" />
       <circle cx="1040" cy="1180" r="1080" />
@@ -71,7 +71,7 @@ const sparkles = [
           :cx="d.x"
           :cy="d.y"
           :r="d.r"
-          fill="#F2EAD9"
+          fill="#F5EDDC"
           :fill-opacity="d.o"
           :class="{ twinkle: l.name === 'far' && d.twinkle }"
           :style="
@@ -97,7 +97,7 @@ const sparkles = [
     <!-- 周期划过的橙色星迹 -->
     <g class="streak">
       <path class="streak-trail" d="M60 372C190 250 400 168 604 150" stroke="url(#space-trail)" stroke-width="3.5" pathLength="1" />
-      <path class="streak-head" :d="star(10)" transform="translate(604 150)" fill="#F08A4B" />
+      <path class="streak-head" :d="star(10)" transform="translate(604 150)" fill="#F36B18" />
     </g>
   </svg>
 </template>

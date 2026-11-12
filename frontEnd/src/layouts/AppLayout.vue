@@ -203,6 +203,30 @@ function handleLogout() {
   width: 100%;
   height: 3px;
   margin-top: 6px;
+  position: relative;
+  overflow: hidden;
+  background: var(--brand-tricolor);
+}
+/* Local reflection stays inside the original 3px brand strip. No layout or hit area. */
+.rail-tri::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 7px 4px at center, rgb(245 237 220 / 0.32), transparent 100%);
+  background-size: 18px 100%;
+  background-repeat: no-repeat;
+  animation: brand-reflection 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes brand-reflection {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-tri::after {
+    animation: none;
+    background-position: 50% 50%;
+  }
 }
 .rail-scroll {
   padding: 0.5rem 0 0.75rem;
@@ -219,7 +243,7 @@ function handleLogout() {
   margin-right: 0;
 }
 
-/* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起红黄绿标记 */
+/* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起信号橙标记 */
 .rail-item {
   position: relative;
   display: flex;
@@ -242,7 +266,7 @@ function handleLogout() {
   position: absolute;
   inset: 9px auto 9px 2px;
   width: 6px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
   opacity: 0;
   transform: scaleY(0.35);
   transition:

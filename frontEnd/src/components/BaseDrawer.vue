@@ -56,6 +56,6 @@ const emit = defineEmits<{ close: [] }>()
 .drawer-tri {
   flex-shrink: 0;
   height: 4px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
 }
 </style>

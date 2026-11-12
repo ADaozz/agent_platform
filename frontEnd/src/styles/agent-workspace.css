@@ -3,105 +3,68 @@
  *
  * src/agent-platform/ 与 agent-runtime 的独立前端保持同源，这里不改它的任何文件，
  * 只在宿主（AgentChatView）里叠加一层：重映射主题变量，并按 DEEP AGENT 设计语言
- * 重塑各组件。布局（对话列宽、输入区位置、面板分栏）保持不变。
+ * 协调各组件。布局（对话列宽、输入区位置、面板分栏）保持不变。
  */
 
 /* ───────── 主题变量：与平台外壳同一套色板 ───────── */
 .dap-root.agent-host,
 .dap-root.agent-host[data-theme='light'] {
   color-scheme: light;
-  --page: #ebe3d1;
-  --surface: #f7f1e3;
-  --surface-raised: #fbf7ec;
-  --surface-subtle: #f1ead9;
-  --surface-hover: #e1d8c3;
-  --surface-active: #e9e1ce;
-  --border: #d2c8b1;
-  --border-subtle: #ddd4bf;
-  --border-focus: #a59c87;
-  --text-primary: #1f1e1b;
-  --text-strong: #11110f;
-  --text-hover: #3a372f;
-  --text-secondary: #504b42;
-  --text-muted: #736c5d;
-  --text-faint: #8f8876;
-  --warning-bg: #f3e3bb;
-  --warning-text: #855a06;
-  --warning-border: #dcc388;
+  --surface-raised: #fffcf5;
+  --surface-subtle: #f0e7d5;
+  --surface-active: #ece2cf;
+  --border-subtle: #e0d5c0;
   --warning-subtle: #f6efda;
-  --error-bg: #f1d9d1;
-  --error-text: #a5352c;
-  --error-border: #dfb1a8;
-  --purple-bg: #e2deea;
-  --purple-text: #5a5286;
-  --blue-bg: #dbe3e5;
-  --blue-text: #40607a;
-  --success-text: #346a58;
-  --link: #a94f1c;
-  --dot: #b8851a;
-  --done-dot: #5c8f7d;
-  --done-bg: #d9e6dc;
-  --done-text: #346a58;
-  --on-primary: #f7f1e3;
-
-  --signal: #d0713c;
-  --signal-text: #b4551f;
-  --ws-glass: rgb(24 24 24 / 0.045);
-  --ws-glass-strong: rgb(24 24 24 / 0.08);
-  --ws-glass-panel: rgb(251 247 236 / 0.8);
-  --ws-field: #fcf8ee;
-  --ws-hatch: rgb(24 24 24 / 0.055);
-  --ws-shadow: 0 18px 50px -18px rgb(40 30 10 / 0.35), 0 2px 6px rgb(40 30 10 / 0.08);
+  --ws-glass-panel: rgb(251 247 238 / 0.94);
 }
 
 .dap-root.agent-host[data-theme='dark'] {
   color-scheme: dark;
-  --page: #141413;
-  --surface: #1c1c1a;
-  --surface-raised: #21211f;
-  --surface-subtle: #191917;
-  --surface-hover: #2c2b27;
-  --surface-active: #252522;
-  --border: #36352f;
-  --border-subtle: #2a2925;
-  --border-focus: #6b665a;
-  --text-primary: #ece4d3;
-  --text-strong: #f8f1e2;
-  --text-hover: #d8d0bf;
-  --text-secondary: #bdb5a4;
-  --text-muted: #979080;
-  --text-faint: #777164;
-  --warning-bg: #33291a;
-  --warning-text: #e3b352;
-  --warning-border: #5a482a;
-  --warning-subtle: #23201a;
-  --error-bg: #35211e;
-  --error-text: #ea8d83;
-  --error-border: #63342e;
-  --purple-bg: #2a2a38;
-  --purple-text: #b0b0da;
-  --blue-bg: #212b32;
-  --blue-text: #9cb5c6;
-  --success-text: #98bcb1;
-  --link: #e8935f;
-  --dot: #dfa93c;
-  --done-dot: #83a695;
-  --done-bg: #1f2b27;
-  --done-text: #98bcb1;
-  --on-primary: #141413;
-
-  --signal: #d0713c;
-  --signal-text: #e2854f;
-  --ws-glass: rgb(245 237 220 / 0.05);
-  --ws-glass-strong: rgb(245 237 220 / 0.09);
-  --ws-glass-panel: rgb(30 30 28 / 0.78);
-  --ws-field: #161615;
-  --ws-hatch: rgb(245 237 220 / 0.045);
-  --ws-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.35);
+  --surface-raised: #2c2924;
+  --surface-subtle: #201f1c;
+  --surface-active: #302d27;
+  --border-subtle: #34312b;
+  --warning-subtle: #29251d;
+  --ws-glass-panel: rgb(36 35 32 / 0.94);
 }
 
 .dap-root.agent-host {
-  --tri: linear-gradient(90deg, #c84940 0 33.34%, #dfa93c 33.34% 66.67%, #83a695 66.67%);
+  /* Alias the shared workspace contract to the host design tokens. */
+  --page: var(--color-page);
+  --surface: var(--color-card);
+  --surface-hover: var(--color-hover);
+  --border: var(--color-line);
+  --border-focus: var(--color-primary);
+  --text-primary: var(--color-ink);
+  --text-strong: var(--color-ink);
+  --text-hover: var(--color-ink);
+  --text-secondary: var(--color-ink-secondary);
+  --text-muted: var(--color-ink-muted);
+  --text-faint: var(--color-ink-faint);
+  --warning-bg: var(--color-amber-50);
+  --warning-text: var(--color-amber-700);
+  --warning-border: var(--color-amber-200);
+  --error-bg: var(--color-red-50);
+  --error-text: var(--color-red-700);
+  --error-border: var(--color-red-200);
+  --purple-bg: var(--color-gray-50);
+  --purple-text: var(--color-ink-secondary);
+  --blue-bg: var(--color-gray-50);
+  --blue-text: var(--color-ink-secondary);
+  --success-text: var(--color-emerald-700);
+  --link: var(--color-primary);
+  --dot: var(--color-tri-yellow);
+  --done-dot: var(--color-tri-green);
+  --done-bg: var(--color-emerald-50);
+  --done-text: var(--color-emerald-700);
+  --on-primary: var(--color-card);
+  --signal: var(--color-signal);
+  --signal-text: var(--color-primary);
+  --ws-glass: var(--glass);
+  --ws-glass-strong: var(--glass-strong);
+  --ws-field: var(--field);
+  --ws-hatch: var(--grid-dot);
+  --ws-shadow: var(--shadow-panel);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --mono: 'IBM Plex Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Noto Sans SC', monospace;
   --display: 'Barlow Condensed', 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -192,7 +155,7 @@
     font-weight: 600;
   }
   .primary:hover:not(:disabled) {
-    background: #e2854f;
+    background: var(--color-signal-bright);
     color: #181818;
   }
   .primary:focus-visible {
@@ -247,7 +210,7 @@
     padding: 6px 11px;
   }
   .setup-banner > button:not(.icon-button):hover {
-    background: #e2854f;
+    background: var(--color-signal-bright);
     color: #181818;
   }
 
@@ -318,7 +281,7 @@
     color: var(--text-faint);
   }
   .send-button:hover:not(:disabled) {
-    background: #e2854f;
+    background: var(--color-signal-bright);
     color: #181818;
   }
   .composer-caption {
@@ -372,7 +335,7 @@
     position: absolute;
     inset: 8px auto 8px 2px;
     width: 6px;
-    background: var(--tri);
+    background: var(--signal);
     opacity: 0;
     transform: scaleY(0.35);
     transition:
@@ -868,7 +831,7 @@
     display: flex;
     align-items: center;
     padding-left: 30px;
-    background: var(--tri) left center / 22px 3px no-repeat;
+    background: linear-gradient(var(--signal), var(--signal)) left center / 22px 3px no-repeat;
     font-family: var(--mono);
     font-size: 10.5px;
     line-height: 1;
@@ -933,7 +896,7 @@
     height: 4px;
     flex-shrink: 0;
     border-radius: 2px;
-    background: var(--tri);
+    background: var(--signal);
   }
   .modal-header h2 {
     font-weight: 600;

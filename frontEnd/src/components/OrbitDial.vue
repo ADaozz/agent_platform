@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 
 /**
  * 陀螺仪星盘：纯 SVG。所有部件只在固定边界内往复（偏移 → 过冲 → 回正），不做整圈旋转。
- * 固定机架（刻度环 + 红黄绿读数弧）内是三层万向环：
+ * 固定机架（刻度环 + 单色参考弧）内是三层万向环：
  * 外环绕机架枢轴转、内环绕外环上的枢轴转、转子盘绕内环上的转子轴摆动。
  * 每层的姿态是真实的三维旋转 Rx(α)·Ry(β)·Rx(γ)，正投影后写成 SVG matrix。
  * 环被切成若干小段，按各段在三维中的朝向逐段打光（漫反射 + 高光），
@@ -37,7 +37,7 @@ const trail = Array.from({ length: TRAIL_SEGMENTS }, (_, i) => {
   };
 });
 
-// 底部读数弧：绿 / 黄 / 红
+// 装饰参考弧：没有接入真实状态，统一信号橙
 const gauge = [
   { d: arc(190, 122, 157), color: "#83A695", delay: 0.6 },
   { d: arc(190, 162.5, 197.5), color: "#DFA93C", delay: 0.35 },
@@ -213,7 +213,7 @@ onBeforeUnmount(() => cancelAnimationFrame(raf));
       </g>
       <circle r="190" stroke="currentColor" stroke-opacity="0.12" />
 
-      <!-- 红黄绿读数弧 + 往复游标 -->
+      <!-- 单色参考弧 + 往复游标 -->
       <path
         v-for="g in gauge"
         :key="g.color"
@@ -255,7 +255,7 @@ onBeforeUnmount(() => cancelAnimationFrame(raf));
     </g>
 
     <!-- 中心：回波与十字 -->
-    <circle v-if="pingKey" :key="pingKey" class="ping" r="56" stroke="#D0713C" stroke-width="1.5" />
+    <circle v-if="pingKey" :key="pingKey" class="ping" r="56" stroke="#F36B18" stroke-width="1.5" />
     <path d="M-10 0H10M0 -10V10" stroke="#FFFFFF" stroke-width="2" />
 
     <!-- 各环朝向观察者的段画在十字之上：先垫一层底色，掠过中心时把十字遮住 -->
@@ -295,7 +295,7 @@ onBeforeUnmount(() => cancelAnimationFrame(raf));
               stroke-opacity="0"
             />
             <circle :r="RINGS.a.r + RINGS.a.width / 2 + 1.2" stroke="currentColor" stroke-opacity="0.1" stroke-width="0.8" />
-            <path :d="arc(RINGS.a.r, 20, 58)" stroke="#D0713C" :stroke-width="RINGS.a.width" stroke-opacity="0.9" />
+            <path :d="arc(RINGS.a.r, 20, 58)" stroke="#F36B18" :stroke-width="RINGS.a.width" stroke-opacity="0.9" />
           </template>
           <circle v-if="key === 'b'" :r="RINGS.b.r" stroke="currentColor" stroke-opacity="0.35" stroke-width="10" stroke-dasharray="1.4 70.86" />
           <g v-if="key === 'c'" class="spin comet">
@@ -304,12 +304,12 @@ onBeforeUnmount(() => cancelAnimationFrame(raf));
                 v-for="(t, i) in trail"
                 :key="i"
                 :d="t.d"
-                stroke="#D0713C"
+                stroke="#F36B18"
                 :stroke-opacity="t.opacity"
                 :stroke-width="t.width"
               />
             </g>
-            <path :d="star(13)" :transform="`translate(0 ${-ROTOR_R})`" fill="#F08A4B" />
+            <path :d="star(13)" :transform="`translate(0 ${-ROTOR_R})`" fill="#F36B18" />
             <circle :cy="-ROTOR_R" r="2.2" fill="#FFF3E0" />
           </g>
         </g>
@@ -351,6 +351,8 @@ onBeforeUnmount(() => cancelAnimationFrame(raf));
 }
 
 .gauge {
+  /* Preserve the existing keyed segments; these arcs do not encode live state. */
+  stroke: var(--color-signal, #f36b18);
   stroke-dasharray: 1;
   animation: dial-draw 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
