@@ -99,6 +99,12 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   assert.equal(await page.locator('[data-office-group="pageVisual"]').getAttribute('data-status'),'pending')
   const late=document();await page.evaluate(value=>window.officePush(value),late)
   assert.equal(await page.locator('[data-issue-id="fig-issue"]').count(),0)
+  const pendingHeader=await page.locator('.docx-panel>.docx-gate-note').first().innerText()
+  const oldAccepted={document_id:'research',revision:14,type:'document_aesthetic_review',aesthetic_reviews:Object.fromEntries(Object.entries(late.aesthetic_reviews).map(([key,r])=>[key,{...r,status:'passed',issues:[]}])),document_review:{...late.document_review,status:'passed',issues:[]},delivery:{revision:14,status:'accepted',document_review:{...late.document_review,status:'passed',issues:[]}},delivery_status:'accepted',finalized:true}
+  // The accepted q1 event intentionally has NO visual_request envelope.
+  await page.evaluate(value=>window.officePush(value),oldAccepted)
+  assert.equal(await page.locator('.docx-panel>.docx-gate-note').first().innerText(),pendingHeader)
+  assert.equal(await page.locator('[data-office-group="pageVisual"]').getAttribute('data-status'),'pending')
   const unavail={...doc,aesthetic_reviews:{'1':{revision:14,page:1,request_id:'q2',fingerprint:'p1',status:'unavailable',issues:[],error:{code:'no_vision_model',message:'Provider unavailable'}},'2':{revision:14,page:2,request_id:'q2',fingerprint:'p2',status:'passed',issues:[]}},document_review:{revision:14,request_id:'q2',fingerprints:['p1','p2'],status:'unavailable',error:{code:'provider_timeout'}}}
   await page.evaluate(value=>window.officePush(value),unavail)
   await page.waitForFunction(()=>document.querySelector('[data-office-group="pageVisual"]').dataset.status==='unavailable')

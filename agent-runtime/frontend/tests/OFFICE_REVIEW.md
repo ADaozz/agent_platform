@@ -26,6 +26,10 @@ Their API adapters retain their own same-origin / authenticated ITAM gateway pat
   generation, automatic repair or visual-review execution.
 - Async snapshots are fenced against newer events. Same-version DOCX request
   generations retire old request IDs; changing revision clears issue/action scope.
+  Review-result objects and delivery/finalized fields are fenced as one request-owned
+  payload, including result events that omit the visual_request envelope. Unbound
+  or mixed-generation payloads cannot update delivery flags; fresh request creation
+  also invalidates previous delivery state.
   Human page approval stays separate from delegation and visual retry.
 
 Run from repository root:

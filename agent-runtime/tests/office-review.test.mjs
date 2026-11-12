@@ -36,6 +36,32 @@ for(const root of roots){
   doc=mergeDocument(doc,{document_id:'d',revision:4,aesthetic_reviews:source().aesthetic_reviews,document_review:source().document_review})
   assert.deepEqual(doc.aesthetic_reviews,{});assert.equal(doc.document_review,null)
  })
+ test(root+' fences delivery and finalized on late request-less review events',()=>{
+  const first={...source(),delivery:{revision:4,status:'accepted',document_review:source().document_review},delivery_status:'accepted',finalized:true}
+  let doc=mergeDocument(null,first)
+  doc=mergeDocument(doc,{document_id:'d',revision:4,visual_request:{...doc.visual_request,request_id:'new'},aesthetic_reviews:{},document_review:null,delivery:null,delivery_status:'draft_pending_visual',finalized:false})
+  assert.equal(doc.finalized,false);assert.equal(doc.delivery,null);assert.equal(doc.delivery_status,'draft_pending_visual')
+  const pending=doc
+  const late={document_id:'d',revision:4,type:'document_aesthetic_review',aesthetic_reviews:first.aesthetic_reviews,document_review:first.document_review,delivery:first.delivery,delivery_status:'accepted',finalized:true}
+  doc=mergeDocument(doc,late)
+  for(const key of ['aesthetic_reviews','document_review','delivery','delivery_status','finalized'])assert.deepEqual(doc[key],pending[key],key)
+  const current={...late,aesthetic_reviews:Object.fromEntries(Object.entries(first.aesthetic_reviews).map(([key,r])=>[key,{...r,request_id:'new'}])),document_review:{...first.document_review,request_id:'new'},delivery:{...first.delivery,document_review:{...first.document_review,request_id:'new'}}}
+  doc=mergeDocument(doc,current);assert.equal(doc.finalized,true);assert.equal(doc.delivery.status,'accepted')
+  doc=mergeDocument(doc,{...late,finalized:false,delivery_status:'draft_pending_visual',delivery:{status:'draft_pending_visual'}})
+  assert.equal(doc.finalized,true);assert.equal(doc.delivery_status,'accepted')
+ })
+ test(root+' ignores unbound or mixed-generation delivery fields but preserves legacy events',()=>{
+  let doc=mergeDocument(null,source());doc=mergeDocument(doc,{document_id:'d',revision:4,visual_request:{...doc.visual_request,request_id:'new'},aesthetic_reviews:{},document_review:null,delivery:null,delivery_status:'draft_pending_visual',finalized:false})
+  for(const event of [{delivery:{status:'accepted'},delivery_status:'accepted',finalized:true},{request_id:'new',document_review:source().document_review,delivery:{status:'accepted'},finalized:true}]){
+   const next=mergeDocument(doc,{document_id:'d',revision:4,...event});assert.equal(next.finalized,false);assert.equal(next.delivery,null)
+  }
+  assert.equal(mergeDocument(doc,{document_id:'d',revision:4,request_id:'new',delivery:{status:'accepted'},delivery_status:'accepted',finalized:true}).finalized,true)
+  const legacy={document_id:'old',revision:1,finalized:false}
+  assert.equal(mergeDocument(legacy,{document_id:'old',revision:1,finalized:true}).finalized,true)
+  const accepted={...source(),delivery:{status:'accepted'},delivery_status:'accepted',finalized:true}
+  const reset=mergeDocument(accepted,{document_id:'d',revision:4,visual_request:{...accepted.visual_request,request_id:'next'}})
+  assert.equal(reset.delivery,null);assert.equal(reset.delivery_status,'draft_pending_visual');assert.equal(reset.finalized,false)
+ })
  test(root+' PPTX validates bound page/whole results and preserves raw advice',()=>{
   const slide={slide_id:'s',review:{revision:4,fingerprint:'fp',automatic_passed:true,aesthetic_review:{revision:4,status:'failed',issues:[{severity:'major',element_ids:['title']}]}}}
   const deck={revision:4,presentation_id:'p',manifest:{slides:[slide]},deck_review:{revision:4,request_id:'r',slide_fingerprints:{s:'fp'},status:'passed',issues:[]}}
