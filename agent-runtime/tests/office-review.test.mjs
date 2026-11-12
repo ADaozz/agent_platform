@@ -44,6 +44,13 @@ for(const root of roots){
   slide.review.aesthetic_review.revision=3;assert.equal(pptxReviews(deck,slide).visual,'stale')
   assert.deepEqual(slide.review.aesthetic_review.issues[0].element_ids,['title'])
  })
+ test(root+' missing fingerprints and unavailable integrity cannot be shown as passed',()=>{
+  const doc=source();doc.pages.forEach(p=>delete p.fingerprint);doc.document_check.pages.forEach(p=>delete p.fingerprint);doc.visual_request.fingerprints=[null,null]
+  assert.notEqual(docxReviews(doc).deterministic.status,'passed')
+  const slide={review:{revision:4,automatic_passed:true,fingerprint:'fp',visual_integrity:{status:'unavailable'}}}
+  assert.equal(pptxReviews({revision:4,manifest:{slides:[slide]}},slide).automatic,'unavailable')
+  delete slide.review.fingerprint;delete slide.review.visual_integrity;assert.notEqual(pptxReviews({revision:4},slide).automatic,'passed')
+ })
  test(root+' empty page inventories cannot fabricate a passed review',()=>{
   const doc=source();doc.pages=[];doc.document_check.pages=[];doc.visual_request.fingerprints=[];doc.document_review.fingerprints=[]
   const view=docxReviews(doc);assert.notEqual(view.deterministic.status,'passed');assert.notEqual(view.document.status,'passed')

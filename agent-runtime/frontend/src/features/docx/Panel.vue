@@ -77,7 +77,7 @@ async function delegateIssue(item){
  if(!issue){reviewError.value=t('office.staleNote');return}
  reviewBusy.value=true;reviewError.value=''
  try{
-  await delegateOfficeIssue(api,{session,artifact:{feature:'docx',document_id:activeDocumentId.value,revision:activeDocument.value.revision},issue})
+  await delegateOfficeIssue(api,{session,text:t('office.fixRequest',{observation:issue.observation,suggestion:issue.suggestion||t('office.unknown')}),artifact:{feature:'docx',document_id:activeDocumentId.value,revision:activeDocument.value.revision},issue})
   if(currentScope()===scope)delegatedIssues.value={...delegatedIssues.value,[issue.key]:true}
  }catch(error){if(currentScope()===scope)reviewError.value=error.message}
  finally{if(selected.value?.id===session.id&&activeDocumentId.value===identity&&activeDocument.value?.revision===revision)reviewBusy.value=false}

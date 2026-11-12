@@ -2082,5 +2082,9 @@
   "office.rawReview": {
     "zh": "原始审查数据",
     "en": "Raw review data"
+  },
+  "office.fixRequest": {
+    "zh": "请根据审查意见局部修复当前文档：{observation}。建议：{suggestion}。修改前读取最新版本，仅调整相关内容并保留必要内容，修改后重新渲染检查。",
+    "en": "Please locally repair the current document based on this review: {observation}. Suggestion: {suggestion}. Read the latest revision first, preserve necessary and unrelated content, then render and recheck."
   }
 }

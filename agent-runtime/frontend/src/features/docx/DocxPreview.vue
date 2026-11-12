@@ -77,6 +77,9 @@ function locate(request){
  if(!page||!request.fingerprint||page.fingerprint!==request.fingerprint)return false
  select(request.page)
  focusedRegion.value=request.blockId?normalizedRegion(request.region):null
+ if(focusedRegion.value)nextTick(()=>{
+  if(!disposed&&props.revision===request.revision&&selected.value===request.page&&focusedRegion.value)stage.value?.querySelector('.docx-issue-region')?.scrollIntoView({block:'center',inline:'nearest'})
+ })
  stage.value?.focus({preventScroll:true})
  return true
 }

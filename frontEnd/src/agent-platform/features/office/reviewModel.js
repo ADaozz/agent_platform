@@ -32,12 +32,13 @@ export function docxReviews(document) {
  const revision=document.revision,pages=document.pages||[],request=document.visual_request||{},modern=document.quality_contract>=2
  const scope=`docx:${document.document_id}:${revision}:${request.request_id||'legacy'}`
  const context={scope,revision,requestId:request.request_id,totalPages:pages.length}
+ const pixelsKnown=pages.length>0&&pages.every(p=>typeof p.fingerprint==='string'&&p.fingerprint.length>0)
  const check=document.document_check
- const checkCurrent=check?.revision===revision&&(check.passed===false||!modern||pages.length>0&&Array.isArray(check.pages)&&same(check.pages.map(p=>p.fingerprint),pages.map(p=>p.fingerprint)))
+ const checkCurrent=check?.revision===revision&&(check.passed===false||!modern||pixelsKnown&&Array.isArray(check.pages)&&same(check.pages.map(p=>p.fingerprint),pages.map(p=>p.fingerprint)))
  context.regions=checkCurrent?check?.geometry?.block_regions:null
  const deterministic={key:'deterministic',raw:check,status:!check?'pending':!checkCurrent?'stale':check.passed===false?'issues':check.passed===true&&check.final&&(!modern||check.collision_check_executed)?'passed':'pending',issues:[]}
  deterministic.issues=(check?.repair_targets||[]).map((i,n)=>issueView(i,n,{...context,scope:scope+':deterministic',stale:!checkCurrent})).map(i=>({...i,pageFingerprints:pages.map(p=>p.fingerprint)}))
- const requestCurrent=pages.length>0&&(!modern || (request.eligible && (!request.document_id||request.document_id===document.document_id) && request.revision===revision && same(request.fingerprints,pages.map(p=>p.fingerprint))))
+ const requestCurrent=pixelsKnown&&(!modern || (request.eligible && (!request.document_id||request.document_id===document.document_id) && request.revision===revision && same(request.fingerprints,pages.map(p=>p.fingerprint))))
  const pageReviews=pages.map(page=>{
   const raw=document.aesthetic_reviews?.[String(page.page)]
   const valid=!!(requestCurrent&&raw?.revision===revision&&(!raw.document_id||raw.document_id===document.document_id)&&(raw.page===undefined||raw.page===page.page)&&raw.fingerprint===page.fingerprint&&(!modern || (request.request_id && raw.request_id===request.request_id)))
@@ -55,7 +56,7 @@ export function pptxReviews(deck,slide) {
  const review=slide?.review||{},visual=review.aesthetic_review,whole=deck?.deck_review,slides=deck?.manifest?.slides||[]
  const carried=review.revision<deck?.revision&&review.automatic_passed===true&&!!review.fingerprint&&slide?.formal?.revision===review.revision&&(review.review_design_sha256||null)===(deck?.manifest?.review_design?.sha256||null)
  const current=review.revision===deck?.revision||carried
- const visualCurrent=current&&(!review.request_id||review.request_id===visual?.request_id)&&(visual?.revision===undefined||visual.revision===review.revision)&&(!visual?.slide_id||visual.slide_id===slide?.slide_id)&&(!visual?.presentation_id||visual.presentation_id===deck?.presentation_id)&&(!visual?.fingerprint||visual.fingerprint===review.fingerprint)
- const wholeCurrent=slides.length>0&&whole?.revision===deck?.revision&&!!whole.request_id&&(!whole.sha256||whole.sha256===deck.sha256)&&!!whole.slide_fingerprints&&same(Object.keys(whole.slide_fingerprints).sort(),slides.map(s=>s.slide_id).sort())&&slides.every(s=>s.review?.fingerprint===whole.slide_fingerprints[s.slide_id])
- return {automatic:!review.revision&&review.revision!==0?'pending':!current?'stale':review.render_error?'unavailable':review.automatic_passed===true?'passed':review.automatic_passed===false?'issues':'pending',visual:reviewState(visual,visualCurrent),document:reviewState(whole,wholeCurrent),visualCurrent,wholeCurrent,carried}
+ const visualCurrent=current&&!!review.fingerprint&&(!review.request_id||review.request_id===visual?.request_id)&&(visual?.revision===undefined||visual.revision===review.revision)&&(!visual?.slide_id||visual.slide_id===slide?.slide_id)&&(!visual?.presentation_id||visual.presentation_id===deck?.presentation_id)&&(!visual?.fingerprint||visual.fingerprint===review.fingerprint)
+ const wholeCurrent=slides.length>0&&whole?.revision===deck?.revision&&!!whole.request_id&&(!whole.sha256||whole.sha256===deck.sha256)&&!!whole.slide_fingerprints&&same(Object.keys(whole.slide_fingerprints).sort(),slides.map(s=>s.slide_id).sort())&&slides.every(s=>!!s.review?.fingerprint&&s.review.fingerprint===whole.slide_fingerprints[s.slide_id])
+ return {automatic:!review.revision&&review.revision!==0?'pending':!current?'stale':review.render_error||review.visual_integrity?.status==='unavailable'||review.technical_review?.status==='unavailable'?'unavailable':review.automatic_passed===true?(review.fingerprint?'passed':'pending'):review.automatic_passed===false?'issues':'pending',visual:reviewState(visual,visualCurrent),document:reviewState(whole,wholeCurrent),visualCurrent,wholeCurrent,carried}
 }

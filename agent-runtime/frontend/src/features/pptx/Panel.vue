@@ -76,7 +76,7 @@ async function delegate(item,pages){
  const target=slides.value[(pageNumbers?.[0]||1)-1]
  busy.value=true
  try{
-  await delegateOfficeIssue(api,{session:{...props.session},artifact:{feature:'pptx',presentation_id:identity.value,slide_id:target?.slide_id||slide.value.slide_id,revision:deck.value.revision,element_ids:item.element_ids||[]},pages:pageNumbers,issue:{...item,pages:pageNumbers,requestId:pages?deckReview.value?.request_id:null,reviewId:pages?deckReview.value?.review_id:aesthetic.value?.review_id}})
+  await delegateOfficeIssue(api,{session:{...props.session},text:t('office.fixRequest',{observation:item.observation,suggestion:item.suggestion||t('office.unknown')}),artifact:{feature:'pptx',presentation_id:identity.value,slide_id:target?.slide_id||slide.value.slide_id,revision:deck.value.revision,element_ids:item.element_ids||[]},pages:pageNumbers,issue:{...item,pages:pageNumbers,requestId:pages?deckReview.value?.request_id:null,reviewId:pages?deckReview.value?.review_id:aesthetic.value?.review_id}})
   if(`${props.session?.id}:${identity.value}:${deck.value?.revision}`===scope)delegated.value={...delegated.value,[key]:true}
  }catch(e){if(props.session?.id===id)emit('error',e.message)}finally{if(props.session?.id===id)busy.value=false}
 }

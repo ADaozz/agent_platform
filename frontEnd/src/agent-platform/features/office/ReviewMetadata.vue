@@ -9,7 +9,7 @@ function timestamp(value){if(value===undefined||value===null||value==='')return 
  <span>{{ t('office.model') }}: {{ review?.model_id || t('office.unknown') }}</span>
  <span>{{ t('office.prompt') }}: {{ review?.prompt_version || t('office.unknown') }}</span>
  <span>{{ t('office.reviewedAt') }}: {{ timestamp(review?.reviewed_at ?? review?.created_at) }}</span>
- <span>{{ t('office.rawStatus') }}: {{ review?.status || t('office.unknown') }}</span>
+ <span>{{ t('office.rawStatus') }}: {{ review?.status ?? (typeof review?.passed==='boolean'?'passed='+review.passed:t('office.unknown')) }}</span>
  <span v-if="review?.revision !== undefined">R{{ review.revision }}</span>
  <span>Request: {{ review?.request_id || t('office.unknown') }}</span>
  <span>Review: {{ review?.review_id || t('office.unknown') }}</span>

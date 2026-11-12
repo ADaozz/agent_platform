@@ -9,7 +9,7 @@ Verified in each frontend: three independent review folds, bound revision/reques
 fingerprints, raw metadata and unknown severity, page navigation, verified region
 highlight, page-only fallback, running/idle main-Agent delegation, delegate and
 retry HTTP failures, unavailable reviews, obsolete request/revision isolation,
-preview-not-ready protection, PPTX element/region highlight and issue dismissal,
+preview-not-ready protection, scrolling verified regions into view at width zoom, PPTX element/region highlight and issue dismissal,
 and whole-document/whole-deck navigation and delegation. The whole-deck panel
 remains open after navigating to a problem page. Delegation never calls human
 approval endpoints and never marks an issue resolved.
@@ -18,6 +18,6 @@ approval endpoints and never marks an issue resolved.
 The existing real FastAPI steering route is covered separately by test_runtime.py;
 actual unique PDF/block coordinates by test_cn_quality.py.
 
-Validation: 505 Office/platform Python tests passed; 23 frontend adapter/state/
+Validation: 505 Office/platform Python tests passed; 25 frontend adapter/state/
 delegation/parity tests passed; both production builds and both Chromium flows
 passed. Reproduce with the commands in ../../OFFICE_REVIEW.md.
