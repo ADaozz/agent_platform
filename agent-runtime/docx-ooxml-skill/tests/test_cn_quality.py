@@ -336,3 +336,15 @@ def test_progressing_repairs_render_and_recheck_more_than_three_revisions(tmp_pa
     for attempt in state['repair_runs']['progressive-repair']['attempts']:
         assert (store.render_directory(attempt['revision'])/'preview.pdf').is_file()
     assert before=={b['block_id']:b['text'] for b in store.status()['blocks']}
+
+
+def test_review_regions_only_expose_exact_unique_pdf_block_matches(tmp_path):
+    store=make_store(tmp_path,[section('body',['p1','p2','unique'])])
+    store.apply_section(envelope(store,'regions',section_id='body',operations=[dict(type='append_paragraph',block_id='p1',text='重复出现的段落内容不得猜测所属 Block。'),dict(type='append_paragraph',block_id='p2',text='重复出现的段落内容不得猜测所属 Block。'),dict(type='append_paragraph',block_id='unique',text='这段独立说明只出现一次，允许使用实际渲染坐标定位。')]))
+    result=store.check_document(final=True)
+    regions=result['geometry']['block_regions']
+    assert 'p1' not in regions and 'p2' not in regions
+    assert regions['unique'][0]['source']=='pdf_text_exact'
+    x,y,w,h=regions['unique'][0]['bbox']
+    assert 0<=x<x+w<=1 and 0<=y<y+h<=1
+    assert regions['unique'][0]['page']==1

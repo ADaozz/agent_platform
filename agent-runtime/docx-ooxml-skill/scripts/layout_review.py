@@ -30,7 +30,10 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
         return 11
     records=[dict(id=p.get(block_attribute),node=p,text=norm(''.join(t.text or '' for t in p.iter(o.q(o.W,'t')) if next(t.iterancestors(o.q(o.W,'p')),None) is p)),size=font_size(p),table=next((t.get(block_attribute) for t in p.iterancestors(o.q(o.W,'tbl'))),None)) for p in paragraphs]
     records=[r for r in records if r['text']]
-    by_id={r['id']:r for r in records};placements=defaultdict(set);page_spans=[];findings=[]
+    by_id={r['id']:r for r in records};block_regions={}
+    from collections import Counter
+    unique_text=Counter(r['text'] for r in records);pdf_texts=[norm(page.get_text()) for page in pdf]
+    placements=defaultdict(set);page_spans=[];findings=[]
     def add(code,page=None,block=None,detail=None,operation=None,related=None):
         findings.append(dict(code=code,page=page,block_id=block,severity='error',deterministic=operation is not None,repairable=operation is not None,operation=operation,detail=detail,related_blocks=related or []))
     def source(text,size):
@@ -60,7 +63,12 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
         page_spans.append(spans)
         for rec in records:
             text=o.ptext(rec['node']).strip()
-            if len(text)>=3 and page.search_for(text):placements[rec['id']].add(index+1)
+            hits=page.search_for(text) if len(text)>=3 else []
+            if hits:placements[rec['id']].add(index+1)
+            if hits and unique_text[rec['text']]==1 and sum(t.count(rec['text']) for t in pdf_texts)==1:
+                x0,y0=min(b.x0 for b in hits),min(b.y0 for b in hits)
+                x1,y1=max(b.x1 for b in hits),max(b.y1 for b in hits)
+                block_regions.setdefault(rec['id'],[]).append(dict(page=index+1,coordinate_space='normalized',source='pdf_text_exact',bbox=[x0/page.rect.width,y0/page.rect.height,(x1-x0)/page.rect.width,(y1-y0)/page.rect.height]))
     # Parent block placements include tables/content controls, but not entire body.
     for identity,node in nodes.items():
         for child in node.iter():
@@ -123,6 +131,8 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
             rec=matched[0] if len(matched)==1 else images[0] if len(images)==1 else None
             block=rec['block_id'] if rec else None
             if block:placements[block].add(index+1)
+            if len(matched)==1 and block:
+                block_regions.setdefault(block,[]).append(dict(page=index+1,coordinate_space='normalized',source='pdf_image_digest',bbox=[rect.x0/page.rect.width,rect.y0/page.rect.height,rect.width/page.rect.width,rect.height/page.rect.height]))
             if not page.rect.contains(rect):add('image_clipped',index+1,block,dict(bbox=list(rect)))
             elif not area.contains(rect):add('image_outside_margins',index+1,block,dict(bbox=list(rect),content_region=list(area)))
             if design and design.get('components',{}).get('pagination',{}).get('preserve_image_aspect') and rec and not rec['crop']:
@@ -243,4 +253,4 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
         if style.startswith('TOC') and not p.xpath('.//w:fldSimple[contains(@w:instr,"PAGEREF")]|.//w:instrText[contains(text(),"PAGEREF")]',namespaces=ns) and not re.search(r'(?:\d+|[ivxlcdmIVXLCDM]+)\s*$',o.ptext(p)):
             add('toc_page_numbers_missing',min(placements.get(p.get(block_attribute),{0})) or None,p.get(block_attribute),'Leader dots are not page numbers')
     section_map=[dict(id=c['id'],kind=c.get('kind','body'),pages=sorted(set().union(*(placements.get(b,set()) for b in c['block_ids'])))) for c in components]
-    return dict(findings=findings,block_pages={k:sorted(v) for k,v in placements.items()},section_pages=section_map,detectors=['text_image_collision','text_collision','content_regions','cover_pagination','toc_results','section_numbering','image_geometry','table_continuations'])
+    return dict(findings=findings,block_regions=block_regions,block_pages={k:sorted(v) for k,v in placements.items()},section_pages=section_map,detectors=['text_image_collision','text_collision','content_regions','cover_pagination','toc_results','section_numbering','image_geometry','table_continuations'])
