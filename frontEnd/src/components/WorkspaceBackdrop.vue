@@ -2,16 +2,17 @@
   <!-- Zero-height, inert decoration: the workspace keeps all of its existing geometry. -->
   <div class="workspace-backdrop" aria-hidden="true" inert>
     <div class="workspace-backdrop-stage">
+      <span class="workspace-backdrop-glow glow-top"></span>
+      <span class="workspace-backdrop-glow glow-bottom"></span>
       <div class="workspace-backdrop-orbits"></div>
       <span class="workspace-backdrop-cross cross-left"></span>
       <span class="workspace-backdrop-cross cross-right"></span>
       <span class="workspace-backdrop-hatching"></span>
-      <div class="workspace-backdrop-head">
-        <span class="workspace-backdrop-name">DEEP AGENT</span>
-        <span class="workspace-backdrop-rule"></span>
-        <span class="workspace-backdrop-technical">AGENT WORKSPACE / SYSTEM ONLINE</span>
-        <span class="workspace-backdrop-dots"></span>
-      </div>
+    </div>
+  </div>
+  <!-- The footer strip lies above the content, so scrolling content passes beneath it. -->
+  <div class="workspace-backdrop workspace-backdrop-front" aria-hidden="true" inert>
+    <div class="workspace-backdrop-frame">
       <div class="workspace-backdrop-foot">
         <span class="workspace-backdrop-name">DEEP AGENT</span>
         <span class="workspace-backdrop-rule"></span>
@@ -24,6 +25,11 @@
 
 <style scoped>
 .workspace-backdrop {
+  --orbit-line: rgb(154 125 77 / 0.18);
+  --orbit-band: rgb(174 133 79 / 0.2);
+  --orbit-glow: rgb(243 107 24 / 0.13);
+  --orbit-ink: #706553;
+  --orbit-cross: rgb(154 125 77 / 0.55);
   position: sticky;
   top: 0;
   height: 0;
@@ -32,12 +38,11 @@
   pointer-events: none;
   user-select: none;
 }
-.workspace-backdrop-stage {
-  --orbit-line: rgb(154 125 77 / 0.18);
-  --orbit-band: rgb(174 133 79 / 0.2);
-  --orbit-glow: rgb(243 107 24 / 0.13);
-  --orbit-ink: #706553;
-  --orbit-cross: rgb(154 125 77 / 0.55);
+.workspace-backdrop-front {
+  z-index: 1;
+}
+.workspace-backdrop-stage,
+.workspace-backdrop-frame {
   position: absolute;
   inset-inline: 0;
   top: var(--ws-backdrop-top, 0px);
@@ -46,12 +51,34 @@
   overflow: hidden;
   pointer-events: none;
   color: var(--orbit-ink);
-  background:
-    radial-gradient(ellipse 62% 46% at 94% 0%, var(--orbit-glow), transparent 76%),
-    radial-gradient(ellipse 38% 22% at 0% 100%, rgb(223 169 60 / 0.045), transparent 80%),
-    var(--color-page);
 }
-:global(.agent-host[data-theme='dark'] .workspace-backdrop-stage) {
+/* The stage stays transparent: an opaque layer the size of the conversation area is repainted on
+   every frame while the sidebar animates its width. The host's dot grid is hidden instead, and the
+   glows are fixed-size layers that only move when the container resizes. */
+:global(.dap-root.agent-host:has(.workspace-backdrop)) {
+  background-image: none;
+}
+.workspace-backdrop-glow {
+  position: absolute;
+  will-change: transform;
+}
+.glow-top {
+  top: 0;
+  right: 0;
+  width: 100vw;
+  height: 80vh;
+  transform: translate(44%, -50%);
+  background: radial-gradient(closest-side, var(--orbit-glow), transparent 76%);
+}
+.glow-bottom {
+  left: 0;
+  bottom: 0;
+  width: 60vw;
+  height: 38vh;
+  transform: translate(-50%, 50%);
+  background: radial-gradient(closest-side, rgb(223 169 60 / 0.045), transparent 80%);
+}
+:global(.agent-host[data-theme='dark'] .workspace-backdrop) {
   --orbit-line: rgb(149 138 120 / 0.13);
   --orbit-band: rgb(149 138 120 / 0.16);
   --orbit-glow: rgb(178 70 15 / 0.16);
@@ -117,7 +144,6 @@
   height: clamp(10px, 2.5cqi, 28px);
   background: repeating-linear-gradient(-48deg, transparent 0 7px, var(--orbit-band) 7px 20px, transparent 20px 26px);
 }
-.workspace-backdrop-head,
 .workspace-backdrop-foot {
   position: absolute;
   inset-inline: 0;
@@ -128,11 +154,6 @@
   overflow: hidden;
   white-space: nowrap;
   line-height: 1;
-}
-.workspace-backdrop-head {
-  top: 0;
-  height: 24px;
-  font-size: clamp(6px, 0.8cqi, 10px);
 }
 .workspace-backdrop-foot {
   bottom: 0;
@@ -154,15 +175,6 @@
   letter-spacing: 0.09em;
   flex-shrink: 1;
 }
-.workspace-backdrop-head .workspace-backdrop-name::before {
-  content: '';
-  display: inline-block;
-  width: clamp(8px, 2.5cqi, 34px);
-  height: 1em;
-  margin-right: clamp(3px, 1cqi, 12px);
-  vertical-align: -0.1em;
-  background: repeating-linear-gradient(-55deg, transparent 0 3px, var(--color-signal) 3px 7px, transparent 7px 9px);
-}
 .workspace-backdrop-rule {
   flex: 1 1 8%;
   min-width: 0;
@@ -174,12 +186,6 @@
   max-width: 61%;
   font-family: var(--font-mono);
   letter-spacing: 0.1em;
-}
-.workspace-backdrop-dots {
-  flex: 0 0 clamp(6px, 1.3cqi, 14px);
-  aspect-ratio: 1;
-  background: radial-gradient(circle, currentColor 0 35%, transparent 40%) 0 0 / 50% 50%;
-  opacity: 0.6;
 }
 .workspace-backdrop-signals {
   flex: 0 0 clamp(12px, 3.5cqi, 42px);
