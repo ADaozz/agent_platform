@@ -30,10 +30,12 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
 .agent-host[data-theme='dark'] {
   color-scheme: dark;
 }
-/* Conversation navigation lives in the platform sidebar, so the workspace reserves no sidebar column. */
+/* Conversation navigation lives in the platform sidebar, so the workspace reserves no sidebar column.
+   The shared styles reserve one on narrow screens with !important (expanded / document-open states). */
 .agent-host :deep(.shell),
-.agent-host :deep(.shell.expanded) {
-  --sidebar-width: 0px;
+.agent-host :deep(.shell.expanded),
+.agent-host :deep(.shell.document-open) {
+  --sidebar-width: 0px !important;
 }
 /* The standalone app scrolled the document; embedded, its main column scrolls instead. */
 .agent-host :deep(main) {

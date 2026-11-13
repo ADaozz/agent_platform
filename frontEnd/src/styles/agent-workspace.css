@@ -243,6 +243,25 @@
     padding: 5px 10px 9px 12px;
     gap: 10px;
   }
+  /* 工具栏始终保持一行（共享样式在窄屏和文档预览打开时会换行）：空间不够时只压缩模型选择，模型名省略 */
+  .composer-toolbar,
+  .document-open .composer-toolbar {
+    flex-wrap: nowrap;
+  }
+  .composer-toolbar > .model-anchor {
+    min-width: 0;
+    max-width: 280px;
+    flex-shrink: 1;
+  }
+  .composer-toolbar > .model-anchor > .model-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .model-select > .model-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .add-context {
     width: 26px;
     height: 26px;
@@ -1031,5 +1050,13 @@
   }
   to {
     opacity: 0.25;
+  }
+}
+
+/* 窄屏：工具栏间距收紧，把空间留给模型名 */
+@media (max-width: 600px) {
+  .dap-root.agent-host .composer-toolbar {
+    gap: 6px;
+    padding-inline: 10px 8px;
   }
 }
