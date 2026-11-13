@@ -6,11 +6,14 @@ import { theme } from '@/agent-platform/preferences'
 import '@/agent-platform/style.css'
 // Visual layer on top of the shared workspace styles; keeps src/agent-platform in sync with agent-runtime.
 import '@/styles/agent-workspace.css'
+import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
 </script>
 
 <template>
   <div class="dap-root agent-host" :data-theme="theme">
-    <AgentPlatform />
+    <AgentPlatform>
+      <template #backdrop><WorkspaceBackdrop /></template>
+    </AgentPlatform>
   </div>
 </template>
 
@@ -36,5 +39,27 @@ import '@/styles/agent-workspace.css'
 .agent-host :deep(main) {
   height: var(--dap-vh);
   overflow-y: auto;
+  isolation: isolate;
+  --ws-backdrop-gutter: 24px;
+  --ws-backdrop-top: 0px;
+  --ws-backdrop-bottom: 0px;
+}
+/* Match existing content gutters and preview bounds without changing either. */
+.agent-host :deep(main.session-layout),
+.agent-host :deep(.document-open > main) {
+  --ws-backdrop-gutter: 0px;
+}
+.agent-host :deep(main:has(> .page-header)) {
+  --ws-backdrop-top: 52px;
+}
+@media (max-width: 700px) {
+  .agent-host :deep(.document-open > main) {
+    --ws-backdrop-bottom: 44dvh;
+  }
+}
+@media (max-width: 600px) {
+  .agent-host :deep(main) {
+    --ws-backdrop-gutter: 0px;
+  }
 }
 </style>

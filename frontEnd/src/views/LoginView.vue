@@ -175,9 +175,9 @@ function handleCertLogin() {
   justify-content: space-between;
   overflow: hidden;
   padding: 2.5rem 3rem;
-  background-color: #131312;
-  border-right: 1px solid #302f2a;
-  color: #f2ead9;
+  background-color: #181818;
+  border-right: 1px solid #403c35;
+  color: #f5eddc;
 }
 .login-hero-top {
   position: relative;
@@ -193,7 +193,7 @@ function handleCertLogin() {
   width: min(92vh, 78%);
   aspect-ratio: 1;
   transform: translateY(-50%);
-  color: #f2ead9;
+  color: #f5eddc;
   opacity: 0.9;
   /* 录像带的低饱和 + 亮部光渗 */
   filter: saturate(0.82) drop-shadow(0 0 6px rgb(226 133 79 / 0.22));
@@ -252,7 +252,7 @@ function handleCertLogin() {
   position: relative;
   z-index: 1;
   padding-top: 1.25rem;
-  border-top: 1px solid #302f2a;
+  border-top: 1px solid #403c35;
   font-size: 12.5px;
   letter-spacing: 0.04em;
   color: #8f8878;
@@ -260,12 +260,12 @@ function handleCertLogin() {
 .login-credit a {
   margin-left: 0.25em;
   font-weight: 600;
-  color: #f2ead9;
+  color: #f5eddc;
   transition: color 0.16s;
 }
 .login-credit a:hover,
 .login-credit a:focus-visible {
-  color: #e2854f;
+  color: #f36b18;
 }
 
 .login-pane {

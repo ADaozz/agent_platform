@@ -74,7 +74,7 @@ function handleLogout() {
       <div class="rail-brand">
         <BrandMark :size="30" class="shrink-0" />
         <div v-if="sidebarOpen" class="rail-wordmark">
-          <div class="rail-wordmark-name">DEEP AGENT</div>
+          <div class="rail-wordmark-name">DEEP <span class="rail-wordmark-accent">AGENT</span></div>
           <span class="tri-bar rail-tri" aria-hidden="true"></span>
         </div>
       </div>
@@ -160,11 +160,6 @@ function handleLogout() {
 <!-- 不加 scoped：.rail-* 同时供侧栏内的 AgentNav 使用 -->
 <style>
 /* ───────── 侧栏 ───────── */
-/* 白天模式下侧栏为浅色，品牌标识反相以保持对比 */
-[data-theme='light'] .rail {
-  --mark-tile: #181818;
-  --mark-ink: #f5eddc;
-}
 .rail {
   display: flex;
   width: 4rem;
@@ -199,10 +194,37 @@ function handleLogout() {
   letter-spacing: 0.07em;
   color: var(--chrome-ink);
 }
+.rail-wordmark-accent {
+  color: var(--color-signal);
+}
 .rail-tri {
   width: 100%;
   height: 3px;
   margin-top: 6px;
+  position: relative;
+  overflow: hidden;
+  background: var(--brand-tricolor);
+}
+/* Local reflection stays inside the original 3px brand strip. No layout or hit area. */
+.rail-tri::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 7px 4px at center, rgb(245 237 220 / 0.32), transparent 100%);
+  background-size: 18px 100%;
+  background-repeat: no-repeat;
+  animation: brand-reflection 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes brand-reflection {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-tri::after {
+    animation: none;
+    background-position: 50% 50%;
+  }
 }
 .rail-scroll {
   padding: 0.5rem 0 0.75rem;
@@ -219,7 +241,7 @@ function handleLogout() {
   margin-right: 0;
 }
 
-/* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起红黄绿标记 */
+/* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起信号橙标记 */
 .rail-item {
   position: relative;
   display: flex;
@@ -240,9 +262,10 @@ function handleLogout() {
 .rail-item::before {
   content: '';
   position: absolute;
-  inset: 9px auto 9px 2px;
-  width: 6px;
-  background: var(--tricolor-h);
+  inset: 9px auto 9px 0;
+  width: 3px;
+  background: var(--color-signal);
+  pointer-events: none;
   opacity: 0;
   transform: scaleY(0.35);
   transition:
@@ -260,6 +283,11 @@ function handleLogout() {
 }
 .rail-item:hover::before,
 .rail-item:focus-visible::before {
+  opacity: 0.35;
+  transform: none;
+}
+.rail-item.rail-item-active::before,
+.rail-item.recent-row-active::before {
   opacity: 1;
   transform: none;
 }

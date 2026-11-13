@@ -26,6 +26,6 @@ const lonetrail = computed(() => (lonetrailIcons as Record<string, string>)[prop
   >
     <path :d="lonetrail" />
   </svg>
-  <!-- 通用操作图标：lucide 默认的圆头圆角；尺寸跟随 font-size -->
-  <component :is="lucide" v-else class="app-icon inline-block shrink-0" :stroke-width="1.75" aria-hidden="true" />
+  <!-- 通用操作图标：lucide 同样使用方头直角；尺寸跟随 font-size -->
+  <component :is="lucide" v-else class="app-icon inline-block shrink-0" :stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" />
 </template>

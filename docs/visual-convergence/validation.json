@@ -1,0 +1,122 @@
+{
+  "baseline": "2946236",
+  "viewports": {
+    "desktop": [
+      1440,
+      1000
+    ],
+    "officeDesktop": [
+      1600,
+      1000
+    ],
+    "mobile": [
+      390,
+      844
+    ]
+  },
+  "pageGeometryComparisons": 32,
+  "officeGeometryComparisons": 8,
+  "conversationAndPreviewGeometryComparisons": 8,
+  "geometryDifferences": 0,
+  "sidebarExpandedWidths": [
+    248,
+    248,
+    248,
+    248
+  ],
+  "brand": [
+    {
+      "theme": "dark",
+      "mobile": false,
+      "positions": [
+        "0% 50%",
+        "50% 50%",
+        "100% 50%",
+        "50% 50%",
+        "0% 50%"
+      ],
+      "duration": 10000,
+      "overflow": "hidden",
+      "radius": "2px",
+      "height": 3,
+      "background": "linear-gradient(90deg, rgb(200, 73, 64) 0px, rgb(200, 73, 64) 33.34%, rgb(223, 169, 60) 33.34%, rgb(223, 169, 60) 66.67%, rgb(131, 166, 149) 66.67%)",
+      "pointerEvents": "none",
+      "reducedMotion": "none",
+      "collapsedWidth": 64
+    },
+    {
+      "theme": "light",
+      "mobile": false,
+      "positions": [
+        "0% 50%",
+        "50% 50%",
+        "100% 50%",
+        "50% 50%",
+        "0% 50%"
+      ],
+      "duration": 10000,
+      "overflow": "hidden",
+      "radius": "2px",
+      "height": 3,
+      "background": "linear-gradient(90deg, rgb(200, 73, 64) 0px, rgb(200, 73, 64) 33.34%, rgb(223, 169, 60) 33.34%, rgb(223, 169, 60) 66.67%, rgb(131, 166, 149) 66.67%)",
+      "pointerEvents": "none",
+      "reducedMotion": "none",
+      "collapsedWidth": 64
+    },
+    {
+      "theme": "dark",
+      "mobile": true,
+      "positions": [
+        "0% 50%",
+        "50% 50%",
+        "100% 50%",
+        "50% 50%",
+        "0% 50%"
+      ],
+      "duration": 10000,
+      "overflow": "hidden",
+      "radius": "2px",
+      "height": 3,
+      "background": "linear-gradient(90deg, rgb(200, 73, 64) 0px, rgb(200, 73, 64) 33.34%, rgb(223, 169, 60) 33.34%, rgb(223, 169, 60) 66.67%, rgb(131, 166, 149) 66.67%)",
+      "pointerEvents": "none",
+      "reducedMotion": "none",
+      "collapsedWidth": 64
+    },
+    {
+      "theme": "light",
+      "mobile": true,
+      "positions": [
+        "0% 50%",
+        "50% 50%",
+        "100% 50%",
+        "50% 50%",
+        "0% 50%"
+      ],
+      "duration": 10000,
+      "overflow": "hidden",
+      "radius": "2px",
+      "height": 3,
+      "background": "linear-gradient(90deg, rgb(200, 73, 64) 0px, rgb(200, 73, 64) 33.34%, rgb(223, 169, 60) 33.34%, rgb(223, 169, 60) 66.67%, rgb(131, 166, 149) 66.67%)",
+      "pointerEvents": "none",
+      "reducedMotion": "none",
+      "collapsedWidth": 64
+    }
+  ],
+  "checks": {
+    "typeCheck": "passed",
+    "productionBuild": "passed",
+    "existingOfficeE2E": "passed",
+    "hostOfficeThemeViewportCases": 4,
+    "nodeTests": {
+      "passed": 34,
+      "failed": 0
+    },
+    "vueScriptLogicIdentical": 8,
+    "pageErrors": 0
+  },
+  "limitations": [
+    "Controlled API fixtures; no live backend integration",
+    "Administrative lists use empty-state fixtures",
+    "Screenshot reduced motion; reflection checked separately with normal motion"
+  ]
+}

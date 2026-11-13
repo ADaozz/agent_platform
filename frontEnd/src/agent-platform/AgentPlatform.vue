@@ -433,6 +433,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
   <div class="shell" :class="{ expanded: sidebar, 'document-open': artifactPanelOpen }">
 
     <main :class="{'session-layout':selected&&mainView==='agents'}">
+      <slot v-if="mainView === 'agents'" name="backdrop" />
       <header v-if="selected || mainView !== 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ mainView === 'files' ? t('全局文件') : selected ? sessionTitle(selected) : t('All chats') }}</span><button v-if="selected && mainView === 'agents' && latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
 
       <div v-if="loading" class="loading"><Icon name="LoaderCircle" class="spin" /> {{ t("Loading…") }}</div>
@@ -443,7 +444,6 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
       <div v-else class="chat-page" :class="{ 'has-session': selected }">
         <div v-if="!selected" class="home-content">
           <div v-if="!dismissed && !profiles.some(p => p.configured)" class="setup-banner"><Icon name="TriangleAlert" :size="15" /><div><strong>{{ t("Connect a model to get started") }}</strong><span>{{ t("配置模型，即可使用 Deep Agent 的完整能力") }}</span></div><button @click="openModels">{{ t("Set up model") }}</button><button class="icon-button" :aria-label='t("关闭提示")' @click="dismissBanner"><Icon name="X" :size="13" /></button></div>
-          <div v-else-if="!dismissed" class="ready-banner"><span class="status-dot completed"></span><span>{{ t("Ready to start") }}</span><button @click="dismissBanner" class="icon-button" :aria-label='t("关闭提示")'><Icon name="X" :size="13" /></button></div>
         </div>
 
         <div v-if="selected" ref="transcriptEl" class="transcript" @scroll.passive="updateScrollState">

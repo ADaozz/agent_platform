@@ -1,0 +1,30 @@
+{
+  "baseline": "a7f0bbd",
+  "viewportThemeCases": 4,
+  "statesPerCase": 8,
+  "geometryComparisons": 32,
+  "geometryDifferences": 0,
+  "indicator": {
+    "width": "3px",
+    "left": "0px",
+    "color": "#F36B18",
+    "inactiveOpacity": 0,
+    "hoverOpacity": 0.35,
+    "activeOpacity": 1
+  },
+  "checks": [
+    "active remains full brightness on hover",
+    "menu selection persists after pointer leaves",
+    "route and session switching remove previous selection",
+    "history/files do not retain stale session highlight",
+    "collapsed settings selection",
+    "collapsed session selection on Agent entry",
+    "sidebar widths remain 64px and 248px",
+    "browser errors absent",
+    "type check and production build passed",
+    "existing Office Chromium test passed",
+    "34 related Node tests passed"
+  ],
+  "brand": "SVG, wordmark and reflection unchanged from a7f0bbd",
+  "limitations": "Controlled API fixtures; no live backend integration"
+}

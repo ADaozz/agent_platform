@@ -1,0 +1,35 @@
+{
+  "baseline": "98bb1ee",
+  "productFiles": [
+    "frontEnd/src/components/BrandMark.vue",
+    "frontEnd/src/layouts/AppLayout.vue"
+  ],
+  "checks": {
+    "buildAndTypeCheck": "passed",
+    "officeBrowserTest": "passed",
+    "existingRelatedNodeTests": {
+      "passed": 34,
+      "failed": 0
+    },
+    "viewportThemeCases": 4,
+    "geometryComparisons": 12,
+    "geometryDifferences": 0,
+    "sidebarWidths": [
+      64,
+      248
+    ],
+    "sidebarIconSize": 30,
+    "loginIconSizes": [
+      36,
+      40
+    ],
+    "wordmarkSignalColor": "#F36B18",
+    "reflectionDurationMs": 10000,
+    "reflectionCSSIdenticalToPR6": true,
+    "reducedMotion": "animation: none",
+    "AppLayoutScriptUnchanged": true,
+    "browserErrors": 0
+  },
+  "reference": "No screenshot or SVG attachment available; implemented from the written specification",
+  "limitations": "Controlled API fixtures; no live backend integration"
+}

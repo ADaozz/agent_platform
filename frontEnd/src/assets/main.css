@@ -25,31 +25,33 @@
   --radius-2xl: 18px;
 
   /* 暖白档案（light） */
-  --color-primary: #b4551f;
-  --color-primary-dark: #8f4116;
-  --color-primary-light: #f0dcc6;
+  --color-primary: color-mix(in srgb, var(--color-signal) 70%, var(--color-carbon));
+  --color-primary-dark: color-mix(in srgb, var(--color-signal) 58%, var(--color-carbon));
+  --color-primary-light: #f3dfc9;
 
-  --color-page: #ebe3d1;
-  --color-card: #f7f1e3;
-  --color-line: #d2c8b1;
-  --color-hover: #ece4d1;
+  --color-page: var(--color-ivory);
+  --color-card: #fbf7ee;
+  --color-line: #d1c5ae;
+  --color-hover: #ece2cf;
 
-  --color-ink: #1c1b18;
+  --color-ink: #181818;
   --color-ink-secondary: #4a463d;
-  --color-ink-muted: #6e6859;
-  --color-ink-faint: #8a8372;
+  --color-ink-muted: #706553;
+  --color-ink-faint: #786e5d;
 
   --color-success: #3c7462;
   --color-warning: #9a6b0a;
   --color-danger: #b03a31;
 
-  /* 固定品牌色：不随主题变化 */
+  /* 固定品牌色；状态色的浅色文字变体保留必要对比度 */
   --color-carbon: #181818;
+  --color-panel: #242320;
+  --color-warm-gray: #958a78;
   --color-ivory: #f5eddc;
-  --color-signal: #d0713c;
-  --color-signal-bright: #e2854f;
-  --color-mint: #98bcb1;
-  --color-steel: #6e8596;
+  --color-signal: #f36b18;
+  --color-signal-bright: color-mix(in srgb, var(--color-signal) 86%, var(--color-ivory));
+  --color-mint: #83a695;
+  --color-steel: var(--color-warm-gray);
   --color-tri-red: #c84940;
   --color-tri-yellow: #dfa93c;
   --color-tri-green: #83a695;
@@ -72,14 +74,14 @@
   --color-amber-200: #dcc388;
   --color-amber-700: #855a06;
   --color-amber-800: #6f4b05;
-  --color-blue-50: #dbe3e5;
-  --color-blue-200: #aebfc8;
-  --color-blue-700: #40607a;
-  --color-blue-800: #344f65;
+  --color-blue-50: #ece2cf;
+  --color-blue-200: #d1c5ae;
+  --color-blue-700: #706553;
+  --color-blue-800: #4a463d;
   --color-orange-50: #f3dcc8;
   --color-orange-700: #a34a18;
-  --color-violet-50: #e2deea;
-  --color-violet-700: #5a5286;
+  --color-violet-50: #ece2cf;
+  --color-violet-700: #706553;
 }
 
 :root {
@@ -93,18 +95,18 @@
   --shadow-panel: 0 18px 50px -18px rgb(40 30 10 / 0.35), 0 2px 6px rgb(40 30 10 / 0.08);
 
   /* 侧栏：跟随主题，比页面底色略深一档 */
-  --chrome-bg: #e2d9c5;
-  --chrome-raised: #f1ead9;
-  --chrome-line: #cfc5ad;
-  --chrome-ink: #1c1b18;
+  --chrome-bg: #e8deca;
+  --chrome-raised: #f0e7d5;
+  --chrome-line: #cfc2a9;
+  --chrome-ink: #181818;
   --chrome-ink-2: #4a463d;
-  --chrome-ink-3: #7a7362;
+  --chrome-ink-3: #706553;
   --chrome-glass: rgb(24 24 24 / 0.07);
   --chrome-glass-edge: rgb(24 24 24 / 0.12);
-  --chrome-signal: #b4551f;
+  --chrome-signal: color-mix(in srgb, var(--color-signal) 70%, var(--color-carbon));
 
-  /* 红黄绿三等分色条：标题下方的横条与悬停标记共用，三色自左向右并排 */
-  --tricolor-h: linear-gradient(
+  /* 三色仅供 DEEP AGENT 品牌标题；普通结构与交互使用信号橙 */
+  --brand-tricolor: linear-gradient(
     90deg,
     var(--color-tri-red) 0 33.34%,
     var(--color-tri-yellow) 33.34% 66.67%,
@@ -115,21 +117,21 @@
 
 /* 碳黑任务控制台（dark，默认）：由 <html data-theme> 切换 */
 :root[data-theme='dark'] {
-  --color-primary: #e2854f;
-  --color-primary-dark: #f09a66;
+  --color-primary: var(--color-signal);
+  --color-primary-dark: var(--color-signal-bright);
   --color-primary-light: #38291e;
-  --color-page: #141413;
-  --color-card: #1c1c1a;
-  --color-line: #33322d;
-  --color-hover: #262622;
-  --color-ink: #f2ead9;
+  --color-page: var(--color-carbon);
+  --color-card: var(--color-panel);
+  --color-line: #403c35;
+  --color-hover: #302d27;
+  --color-ink: #f5eddc;
   --color-ink-secondary: #c4bcab;
-  --color-ink-muted: #999281;
-  --color-ink-faint: #777164;
+  --color-ink-muted: var(--color-warm-gray);
+  --color-ink-faint: var(--color-warm-gray);
 
-  --color-success: #98bcb1;
+  --color-success: #83a695;
   --color-warning: #dfa93c;
-  --color-danger: #e2695f;
+  --color-danger: #e08b83;
 
   --color-gray-50: #222220;
   --color-gray-100: #2a2a27;
@@ -141,38 +143,38 @@
   --color-red-800: #f0a69d;
   --color-emerald-50: #1f2b27;
   --color-emerald-200: #35514a;
-  --color-emerald-600: #98bcb1;
+  --color-emerald-600: #83a695;
   --color-emerald-700: #a5c7bc;
   --color-emerald-800: #b8d4cb;
   --color-amber-50: #33291a;
   --color-amber-200: #5a482a;
   --color-amber-700: #e3b352;
   --color-amber-800: #ecc573;
-  --color-blue-50: #212b32;
-  --color-blue-200: #3a4d5a;
-  --color-blue-700: #9cb5c6;
-  --color-blue-800: #b3c7d5;
+  --color-blue-50: #302d27;
+  --color-blue-200: #403c35;
+  --color-blue-700: #c4bcab;
+  --color-blue-800: #f5eddc;
   --color-orange-50: #38291e;
   --color-orange-700: #eb9a6b;
-  --color-violet-50: #2a2a38;
-  --color-violet-700: #b0b0da;
+  --color-violet-50: #302d27;
+  --color-violet-700: #c4bcab;
 
   --glass: rgb(245 237 220 / 0.05);
   --glass-strong: rgb(245 237 220 / 0.085);
   --glass-edge: rgb(245 237 220 / 0.12);
-  --field: #161615;
+  --field: #181818;
   --grid-dot: rgb(245 237 220 / 0.05);
   --overlay: rgb(8 8 7 / 0.62);
 
-  --chrome-bg: #161615;
-  --chrome-raised: #1f1f1d;
-  --chrome-line: #302f2a;
-  --chrome-ink: #f2ead9;
+  --chrome-bg: #181818;
+  --chrome-raised: #242320;
+  --chrome-line: #403c35;
+  --chrome-ink: #f5eddc;
   --chrome-ink-2: #b9b1a0;
-  --chrome-ink-3: #7d776a;
+  --chrome-ink-3: #958a78;
   --chrome-glass: rgb(245 237 220 / 0.07);
   --chrome-glass-edge: rgb(245 237 220 / 0.12);
-  --chrome-signal: #e2854f;
+  --chrome-signal: color-mix(in srgb, var(--color-signal) 86%, var(--color-ivory));
   --shadow-panel: 0 24px 60px -20px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.35);
 }
 
@@ -235,15 +237,15 @@ code {
 
 /* ───────── 标识元素 ───────── */
 
-/* 三色条：红黄绿三等分的横条，放在标题下方。品牌标识而非状态语义 */
+/* 历史类名：通用装饰条使用单色，不承担状态语义 */
 .tri-bar {
   display: block;
   height: 4px;
   border-radius: 2px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
 }
 
-/* 悬停玻璃 + 左缘三色标记。给任意可交互行加 .tri-hover 即可 */
+/* 保留原有悬停行为与几何，只收敛左缘标记颜色 */
 .tri-hover {
   position: relative;
   isolation: isolate;
@@ -253,7 +255,7 @@ code {
   position: absolute;
   inset: 7px auto 7px 2px;
   width: 6px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
   opacity: 0;
   transform: scaleY(0.35);
   transition:
@@ -429,7 +431,7 @@ input[type='radio'] {
   position: absolute;
   inset: 7px auto 7px 2px;
   width: 6px;
-  background: var(--tricolor-h);
+  background: var(--color-signal);
   opacity: 0;
   transform: scaleY(0.35);
   transition:

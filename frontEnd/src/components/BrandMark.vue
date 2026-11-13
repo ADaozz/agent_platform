@@ -3,7 +3,7 @@ defineProps<{ size?: number }>()
 </script>
 
 <template>
-  <!-- 标识：切角暖白牌 + 碳黑 D + 橙色指令符 + 三色底条 -->
+  <!-- 工业铭牌：碳黑方形、暖白双框、几何 A 与指令箭头；三色仅用于侧栏字标下方 -->
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 48 48"
@@ -13,11 +13,10 @@ defineProps<{ size?: number }>()
     role="img"
     aria-label="Deep Agent"
   >
-    <path d="M0 0H38L48 10V48H0Z" style="fill: var(--mark-tile, #f5eddc)" />
-    <path d="M15 11H24C32 11 37 16.5 37 23.5C37 30.5 32 36 24 36H15Z" stroke-width="4.5" style="stroke: var(--mark-ink, #181818)" />
-    <path d="M20.5 18.5L25.5 23.5L20.5 28.5" stroke="#D0713C" stroke-width="3.6" stroke-linecap="square" />
-    <path d="M0 43H16V48H0Z" fill="#C84940" />
-    <path d="M16 43H32V48H16Z" fill="#DFA93C" />
-    <path d="M32 43H48V48H32Z" fill="#83A695" />
+    <rect x="1" y="1" width="46" height="46" fill="#181818" stroke="#F5EDDC" stroke-width="2" />
+    <rect x="5" y="5" width="38" height="38" stroke="#F5EDDC" stroke-width="1.5" />
+    <path d="M9 33L17 12H22L30 33H24.5L22.8 28H16.2L14.5 33ZM17.6 24H21.4L19.5 18.5Z" fill="#F36B18" fill-rule="evenodd" />
+    <path d="M29 13L37 21L29 29" stroke="#F36B18" stroke-width="3.2" stroke-linecap="square" stroke-linejoin="miter" />
+    <path d="M32 34H38M27 38H38" stroke="#F5EDDC" stroke-width="2.4" stroke-linecap="butt" />
   </svg>
 </template>
