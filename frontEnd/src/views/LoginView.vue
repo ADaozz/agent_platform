@@ -3,10 +3,10 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
-import type { LoginResult } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import BrandMark from '@/components/BrandMark.vue'
 import OrbitDial from '@/components/OrbitDial.vue'
+import ContourCompass from '@/components/ContourCompass.vue'
 import SpaceField from '@/components/SpaceField.vue'
 import TapeMask from '@/components/TapeMask.vue'
 import TopbarControls from '@/components/TopbarControls.vue'
@@ -25,38 +25,11 @@ const CERT_ERROR_MESSAGES: Record<string, string> = {
   no_client_cert: '未检测到客户端证书，请确认已导入 sign.p12',
 }
 
-function decodeBase64Url(value: string): string {
-  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
-  const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4))
-  const binary = atob(base64 + pad)
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
-  return new TextDecoder().decode(bytes)
-}
-
-function parseLoginPayload(json: string): LoginResult {
-  return JSON.parse(json.replace(/([:[,]\s*)(\d{16,})(\s*[,}\]])/g, '$1"$2"$3'))
-}
-
 onMounted(() => {
   const certError = route.query.certError as string | undefined
   if (certError) {
     toast.error(CERT_ERROR_MESSAGES[certError] ? tr(CERT_ERROR_MESSAGES[certError]) : decodeURIComponent(certError))
     router.replace({ path: '/login' })
-  }
-
-  const match = location.hash.match(/^#certLogin=(.+)$/)
-  if (!match) return
-
-  try {
-    const data = parseLoginPayload(decodeBase64Url(match[1]!))
-    auth.persistLogin(data)
-    history.replaceState(null, '', location.pathname + location.search)
-    toast.success(tr('证书登录成功'))
-    const redirect = (route.query.redirect as string) || '/'
-    router.replace(redirect)
-  } catch {
-    history.replaceState(null, '', location.pathname)
-    toast.error(tr('证书登录失败'))
   }
 })
 
@@ -93,7 +66,11 @@ function handleCertLogin() {
         <BrandMark :size="36" />
       </div>
 
-      <div class="login-dial"><div class="login-dial-tape"><OrbitDial /></div></div>
+      <div class="login-dial">
+        <div class="login-dial-tape">
+          <OrbitDial v-slot="{ angle }"><ContourCompass :angle="angle" /></OrbitDial>
+        </div>
+      </div>
 
       <div class="login-hero-copy">
         <div class="login-wordmark" aria-hidden="true">DEEP<br />AGENT</div>
@@ -176,15 +153,18 @@ function handleCertLogin() {
   overflow: hidden;
   padding: 2.5rem 3rem;
   background-color: #181818;
-  border-right: 1px solid #403c35;
   color: #f5eddc;
 }
+/* 叠在 TapeMask（z-index: 2）之上，避免左上角暗角和扫描线压暗 logo */
 .login-hero-top {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+.login-hero-top :deep(.brand-mark) {
+  filter: brightness(1.15) saturate(1.15);
 }
 .login-dial {
   position: absolute;
@@ -193,10 +173,8 @@ function handleCertLogin() {
   width: min(92vh, 78%);
   aspect-ratio: 1;
   transform: translateY(-50%);
-  color: #f5eddc;
-  opacity: 0.9;
-  /* 录像带的低饱和 + 亮部光渗 */
-  filter: saturate(0.82) drop-shadow(0 0 6px rgb(226 133 79 / 0.22));
+  /* 不对整个星盘加透明度或滤镜：会让其中所有动画层每帧重新合成、重新计算滤镜 */
+  color: #e6dfcf;
 }
 /* 走带干扰条扫过时，星盘随之错位一帧并出现轻微色散 */
 .login-dial-tape {
@@ -274,6 +252,22 @@ function handleCertLogin() {
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.5rem;
+}
+/* 左缘：主视觉的暗色向表单区羽化过渡，分界线半透明并在上下两端淡出 */
+.login-pane::before,
+.login-pane::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  pointer-events: none;
+}
+.login-pane::before {
+  width: 56px;
+  background: linear-gradient(90deg, rgb(19 19 18 / 0.45), transparent);
+}
+.login-pane::after {
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgb(245 237 220 / 0.14) 22%, rgb(245 237 220 / 0.14) 78%, transparent);
 }
 .login-controls {
   position: absolute;

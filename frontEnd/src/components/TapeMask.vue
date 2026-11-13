@@ -2,7 +2,7 @@
 /**
  * 磁带蒙版：叠在主视觉最上层，模拟录像带与胶片的瑕疵——
  * 暖色光渗、颗粒噪点、扫描线、暗角、偶发的走带干扰条与划痕。
- * 只动 transform / opacity；不拦截指针事件。
+ * 只动 transform / opacity，不用混合模式（混合需要每帧读取下层像素重新合成）；不拦截指针事件。
  */
 const grain =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.93 0 0 0 0 0.86 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E\")"
@@ -36,7 +36,6 @@ const grain =
 /* 光渗：亮部周围的暖色晕染，缓慢呼吸 */
 .tape-bleed {
   border-radius: 50%;
-  mix-blend-mode: screen;
   animation: tape-breathe 9s ease-in-out infinite;
 }
 .tape-bleed-a {
@@ -58,9 +57,8 @@ const grain =
 /* 颗粒噪点：比画面大一圈，按帧跳动位置 */
 .tape-grain {
   inset: -60px;
-  opacity: 0.09;
+  opacity: 0.06;
   background-size: 180px 180px;
-  mix-blend-mode: overlay;
   animation: tape-grain 0.9s steps(1) infinite;
 }
 

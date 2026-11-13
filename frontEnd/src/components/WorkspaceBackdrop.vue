@@ -16,7 +16,7 @@
       <div class="workspace-backdrop-foot">
         <span class="workspace-backdrop-name">DEEP AGENT</span>
         <span class="workspace-backdrop-rule"></span>
-        <span class="workspace-backdrop-signals"></span>
+        <span class="workspace-backdrop-signals"><i></i><i></i><i></i></span>
         <span class="workspace-backdrop-technical">INTELLIGENCE / EXECUTION / WORKSPACE</span>
       </div>
     </div>
@@ -187,13 +187,23 @@
   font-family: var(--font-mono);
   letter-spacing: 0.1em;
 }
+/* 三枚指示灯：红 / 琥珀 / 青绿，与登录页罗盘原型一致 */
 .workspace-backdrop-signals {
-  flex: 0 0 clamp(12px, 3.5cqi, 42px);
-  height: clamp(3px, 0.65cqi, 7px);
-  background: linear-gradient(90deg,
-    var(--color-tri-red) 0 23%, transparent 23% 38%,
-    var(--color-tri-yellow) 38% 61%, transparent 61% 76%,
-    var(--color-tri-green) 76%);
+  display: flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.workspace-backdrop-signals i {
+  display: block;
+  width: 8px;
+  height: 7px;
+  background: #e04436;
+}
+.workspace-backdrop-signals i:nth-child(2) {
+  background: #ffbe1e;
+}
+.workspace-backdrop-signals i:nth-child(3) {
+  background: #6bbaa4;
 }
 @container (max-width: 480px) {
   .workspace-backdrop-stage::before { width: 88cqi; }

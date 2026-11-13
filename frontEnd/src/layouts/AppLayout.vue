@@ -6,6 +6,7 @@ import { tr } from '@/composables/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import AgentNav from '@/components/AgentNav.vue'
 import BrandMark from '@/components/BrandMark.vue'
+import BrandGlyph from '@/components/BrandGlyph.vue'
 import TopbarControls from '@/components/TopbarControls.vue'
 import SessionDeleteConfirm from '@/components/SessionDeleteConfirm.vue'
 import type { IconName } from '@/icons'
@@ -72,11 +73,8 @@ function handleLogout() {
     <!-- 侧栏：跟随明暗主题 -->
     <aside class="rail" :class="{ 'rail-open': sidebarOpen }" @mouseenter="openSidebar" @mouseleave="closeSidebar">
       <div class="rail-brand">
-        <BrandMark :size="30" class="shrink-0" />
-        <div v-if="sidebarOpen" class="rail-wordmark">
-          <div class="rail-wordmark-name">DEEP <span class="rail-wordmark-accent">AGENT</span></div>
-          <span class="tri-bar rail-tri" aria-hidden="true"></span>
-        </div>
+        <BrandMark v-if="sidebarOpen" :size="40" class="rail-logo shrink-0" />
+        <BrandGlyph v-else :size="30" />
       </div>
 
       <nav class="flex min-h-0 flex-1 flex-col">
@@ -172,59 +170,20 @@ function handleLogout() {
   transition: width 0.22s var(--ease-out);
 }
 .rail-open {
-  width: 15.5rem;
+  width: 12rem;
 }
 .rail-brand {
   display: flex;
   height: 3.5rem;
   flex-shrink: 0;
   align-items: center;
-  gap: 0.75rem;
   padding: 0 1.0625rem;
 }
-.rail-wordmark {
-  min-width: 0;
-  white-space: nowrap;
+.rail-logo {
+  animation: rail-logo-in 0.22s var(--ease-out);
 }
-.rail-wordmark-name {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.07em;
-  color: var(--chrome-ink);
-}
-.rail-wordmark-accent {
-  color: var(--color-signal);
-}
-.rail-tri {
-  width: 100%;
-  height: 3px;
-  margin-top: 6px;
-  position: relative;
-  overflow: hidden;
-  background: var(--brand-tricolor);
-}
-/* Local reflection stays inside the original 3px brand strip. No layout or hit area. */
-.rail-tri::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse 7px 4px at center, rgb(245 237 220 / 0.32), transparent 100%);
-  background-size: 18px 100%;
-  background-repeat: no-repeat;
-  animation: brand-reflection 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes brand-reflection {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rail-tri::after {
-    animation: none;
-    background-position: 50% 50%;
-  }
+@keyframes rail-logo-in {
+  from { opacity: 0; }
 }
 .rail-scroll {
   padding: 0.5rem 0 0.75rem;

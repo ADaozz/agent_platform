@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
+import { tr } from '@/composables/preferences'
+import { parseCertLoginPayload } from '@/api/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -66,6 +68,17 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  const certPayload = to.hash.match(/^#certLogin=(.+)$/)?.[1]
+  if (certPayload) {
+    try {
+      auth.persistLogin(parseCertLoginPayload(certPayload))
+    } catch {
+      toast.error(tr('证书登录失败'))
+      return { path: '/login' }
+    }
+    toast.success(tr('证书登录成功'))
+    return { path: (to.query.redirect as string) || '/' }
+  }
   if (to.meta.public) {
     if (auth.isLoggedIn && to.name === 'login') return { path: '/' }
     return true

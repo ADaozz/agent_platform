@@ -387,6 +387,36 @@
       var(--surface);
     position: relative;
   }
+  /* 悬停：图标与状态文字上下红青色散常驻，进入时及之后每隔一段时间出现一次轻微错位抖动和干扰条 */
+  .chat-thumbnail::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      transparent 0 38%,
+      color-mix(in srgb, var(--signal) 16%, transparent) 38% 44%,
+      transparent 44% 61%,
+      rgb(65 203 181 / 0.16) 61% 63%,
+      transparent 63%
+    );
+  }
+  .chat-row:hover .chat-thumbnail,
+  .chat-row:focus-visible .chat-thumbnail {
+    animation: ws-thumb-glitch 2.8s steps(1) infinite;
+  }
+  .chat-row:hover .chat-thumbnail::after,
+  .chat-row:focus-visible .chat-thumbnail::after {
+    animation: ws-thumb-band 2.8s steps(1) infinite;
+  }
+  .chat-row:hover .chat-thumbnail > svg,
+  .chat-row:hover .chat-thumbnail > .status-pill,
+  .chat-row:focus-visible .chat-thumbnail > svg,
+  .chat-row:focus-visible .chat-thumbnail > .status-pill {
+    filter: drop-shadow(0 -1px 0 rgb(231 60 42 / 0.6)) drop-shadow(0 1px 0 rgb(65 203 181 / 0.6));
+  }
   /* 分支会话：缩略图右上角的分支标记 */
   .chat-branch {
     position: absolute;
@@ -1041,6 +1071,53 @@
   .dap-root.agent-host .chat-thumbnail {
     width: 76px;
     height: 60px;
+  }
+}
+
+@keyframes ws-thumb-glitch {
+  0%,
+  14%,
+  100% {
+    transform: none;
+  }
+  2% {
+    transform: translateX(2px);
+  }
+  5% {
+    transform: translateX(-1.5px) skewX(-2deg);
+  }
+  8% {
+    transform: translateX(1px);
+  }
+  11% {
+    transform: translateX(-0.5px);
+  }
+}
+
+@keyframes ws-thumb-band {
+  0%,
+  13% {
+    opacity: 0;
+    transform: none;
+  }
+  2% {
+    opacity: 1;
+    transform: translateY(-24%);
+  }
+  6% {
+    opacity: 0.8;
+    transform: translateY(8%);
+  }
+  9% {
+    opacity: 1;
+    transform: translateY(26%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dap-root.agent-host .chat-row .chat-thumbnail,
+  .dap-root.agent-host .chat-row .chat-thumbnail::after {
+    animation: none !important;
   }
 }
 
