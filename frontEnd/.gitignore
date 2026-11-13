@@ -42,3 +42,6 @@ __screenshots__/
 test-results/
 .office-review-ui-*/
 .playwright-cli/
+
+# 设计源文件（.blend、原始模型与原图），网页只加载 src/assets 下优化后的版本
+design/source/

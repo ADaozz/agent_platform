@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
 import AppIcon from '@/components/AppIcon.vue'
 import BrandMark from '@/components/BrandMark.vue'
-import OrbitDial from '@/components/OrbitDial.vue'
-import ContourCompass from '@/components/ContourCompass.vue'
-import SpaceField from '@/components/SpaceField.vue'
 import TapeMask from '@/components/TapeMask.vue'
+import LoginScene from '@/components/LoginScene.vue'
 import TopbarControls from '@/components/TopbarControls.vue'
 import { tr } from '@/composables/preferences'
 
@@ -25,12 +23,24 @@ const CERT_ERROR_MESSAGES: Record<string, string> = {
   no_client_cert: '未检测到客户端证书，请确认已导入 sign.p12',
 }
 
+/** 窄屏下左侧主视觉区隐藏，不加载 3D 场景 */
+const wideQuery = window.matchMedia('(min-width: 901px)')
+const wide = ref(wideQuery.matches)
+function onWideChange(e: MediaQueryListEvent) {
+  wide.value = e.matches
+}
+
 onMounted(() => {
+  wideQuery.addEventListener('change', onWideChange)
   const certError = route.query.certError as string | undefined
   if (certError) {
     toast.error(CERT_ERROR_MESSAGES[certError] ? tr(CERT_ERROR_MESSAGES[certError]) : decodeURIComponent(certError))
     router.replace({ path: '/login' })
   }
+})
+
+onBeforeUnmount(() => {
+  wideQuery.removeEventListener('change', onWideChange)
 })
 
 async function handleLogin() {
@@ -59,17 +69,17 @@ function handleCertLogin() {
 
 <template>
   <div class="login">
-    <!-- 左：任务控制台主视觉（恒定碳黑） -->
+    <!-- 整页背景层：左侧主视觉区完整露出，右侧透过磨砂面板隐约可见 -->
+    <div class="login-backdrop" aria-hidden="true">
+      <LoginScene v-if="wide" />
+      <div class="login-scrim"></div>
+      <TapeMask />
+    </div>
+
+    <!-- 左：任务控制台主视觉 -->
     <section class="login-hero">
-      <SpaceField />
       <div class="login-hero-top">
         <BrandMark :size="36" />
-      </div>
-
-      <div class="login-dial">
-        <div class="login-dial-tape">
-          <OrbitDial v-slot="{ angle }"><ContourCompass :angle="angle" /></OrbitDial>
-        </div>
       </div>
 
       <div class="login-hero-copy">
@@ -81,11 +91,10 @@ function handleCertLogin() {
         Powered by
         <a href="https://github.com/ADaozz" target="_blank" rel="noopener noreferrer">@ADaozz</a>
       </p>
-      <TapeMask />
     </section>
 
     <!-- 右：身份验证表单（跟随主题） -->
-    <section class="login-pane dot-grid">
+    <section class="login-pane">
       <TopbarControls class="login-controls" />
       <div class="login-form-wrap">
         <div class="login-mobile-brand">
@@ -139,10 +148,27 @@ function handleCertLogin() {
 
 <style scoped>
 .login {
+  position: relative;
+  isolation: isolate;
   display: grid;
   min-height: 100%;
   grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr);
-  background-color: var(--color-page);
+}
+.login-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: #181818 url('@/assets/login/login-bg.webp') center / cover no-repeat;
+}
+/* 走廊背景偏亮：压暗左下方大字与标语、左上角 logo 所在的区域，保证奶白文字可读 */
+.login-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, rgb(16 16 15 / 0.86) 0%, rgb(16 16 15 / 0.5) 34%, transparent 62%),
+    linear-gradient(90deg, rgb(16 16 15 / 0.6) 0%, transparent 46%),
+    linear-gradient(180deg, rgb(16 16 15 / 0.5) 0%, transparent 20%);
 }
 
 .login-hero {
@@ -150,15 +176,10 @@ function handleCertLogin() {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  overflow: hidden;
   padding: 2.5rem 3rem;
-  background-color: #181818;
   color: #f5eddc;
 }
-/* 叠在 TapeMask（z-index: 2）之上，避免左上角暗角和扫描线压暗 logo */
 .login-hero-top {
-  position: relative;
-  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -166,47 +187,7 @@ function handleCertLogin() {
 .login-hero-top :deep(.brand-mark) {
   filter: brightness(1.15) saturate(1.15);
 }
-.login-dial {
-  position: absolute;
-  top: 50%;
-  right: -18%;
-  width: min(92vh, 78%);
-  aspect-ratio: 1;
-  transform: translateY(-50%);
-  /* 不对整个星盘加透明度或滤镜：会让其中所有动画层每帧重新合成、重新计算滤镜 */
-  color: #e6dfcf;
-}
-/* 走带干扰条扫过时，星盘随之错位一帧并出现轻微色散 */
-.login-dial-tape {
-  height: 100%;
-  animation: login-tape-jitter 11s steps(1) infinite;
-}
-.login-hero :deep(.space) {
-  filter: saturate(0.8);
-}
-@keyframes login-tape-jitter {
-  0%,
-  52.6%,
-  100% {
-    transform: none;
-    filter: none;
-  }
-  50.4% {
-    transform: translateX(3px);
-    filter: drop-shadow(2px 0 0 rgb(200 73 64 / 0.55)) drop-shadow(-2px 0 0 rgb(152 188 177 / 0.45));
-  }
-  51% {
-    transform: translateX(-2px);
-    filter: drop-shadow(-1.5px 0 0 rgb(200 73 64 / 0.4)) drop-shadow(1.5px 0 0 rgb(152 188 177 / 0.35));
-  }
-  51.8% {
-    transform: translateX(1px);
-    filter: none;
-  }
-}
 .login-hero-copy {
-  position: relative;
-  z-index: 1;
   margin-top: auto;
   padding-bottom: 2.5rem;
 }
@@ -227,8 +208,6 @@ function handleCertLogin() {
 }
 
 .login-credit {
-  position: relative;
-  z-index: 1;
   padding-top: 1.25rem;
   border-top: 1px solid #403c35;
   font-size: 12.5px;
@@ -247,27 +226,31 @@ function handleCertLogin() {
 }
 
 .login-pane {
+  --login-glass: color-mix(in srgb, var(--color-page) 86%, transparent);
   position: relative;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.5rem;
 }
-/* 左缘：主视觉的暗色向表单区羽化过渡，分界线半透明并在上下两端淡出 */
-.login-pane::before,
-.login-pane::after {
+:global(:root[data-theme='dark']) .login-pane {
+  --login-glass: color-mix(in srgb, var(--color-page) 66%, transparent);
+}
+/* 磨砂玻璃：向左伸进主视觉区，用遮罩从全透明渐变到不透明，替代硬分界线 */
+.login-pane::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0 0 0 -8rem;
+  z-index: -1;
   pointer-events: none;
-}
-.login-pane::before {
-  width: 56px;
-  background: linear-gradient(90deg, rgb(19 19 18 / 0.45), transparent);
-}
-.login-pane::after {
-  width: 1px;
-  background: linear-gradient(180deg, transparent, rgb(245 237 220 / 0.14) 22%, rgb(245 237 220 / 0.14) 78%, transparent);
+  background:
+    radial-gradient(var(--grid-dot) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--login-glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10rem);
+  mask-image: linear-gradient(90deg, transparent, #000 10rem);
 }
 .login-controls {
   position: absolute;
@@ -332,17 +315,17 @@ function handleCertLogin() {
   color: var(--color-ink-faint);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .login-dial-tape {
-    animation: none;
-  }
-}
 @media (max-width: 900px) {
   .login {
     grid-template-columns: minmax(0, 1fr);
   }
   .login-hero {
     display: none;
+  }
+  .login-pane::before {
+    left: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
   .login-mobile-brand {
     display: block;
