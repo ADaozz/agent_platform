@@ -433,6 +433,9 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
   <div class="shell" :class="{ expanded: sidebar, 'document-open': artifactPanelOpen }">
 
     <main :class="{'session-layout':selected&&mainView==='agents'}">
+      <!-- 遮罩必须与 .popover 处于同一层叠上下文（主区域有 isolation:isolate），
+           否则会盖住弹层选项，导致模型/权限无法点击 -->
+      <div v-if="popup" class="popover-backdrop" @click="popup = ''"></div>
       <slot v-if="mainView === 'agents'" name="backdrop" />
       <header v-if="selected || mainView !== 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ mainView === 'files' ? t('全局文件') : selected ? sessionTitle(selected) : t('All chats') }}</span><button v-if="selected && mainView === 'agents' && latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
 
@@ -502,7 +505,6 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
       <div v-if="error && mainView === 'history'" class="error-inline">{{ t(error) }}</div>
     </main>
 
-    <div v-if="popup" class="popover-backdrop" @click="popup = ''"></div>
     <Transition name="toast"><div v-if="notice" class="toast" role="status"><Icon name="CircleCheck" :size="16" />{{ t(notice) }}</div></Transition>
 
     <FeaturePanels ref="featurePanels" :session="selected" :events="events" @open="artifactPanelOpen = $event" @context="artifactContext = $event" @error="error = $event" />
