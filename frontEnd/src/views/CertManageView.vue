@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import {
   approveCertApply,
   listCertApplies,
@@ -126,8 +126,19 @@ function loadActive() {
 onMounted(loadActive)
 
 function switchTab(next: 'cert' | 'apply') {
+  if (tab.value === next) return
   tab.value = next
   loadActive()
+}
+
+const certTab = ref<HTMLButtonElement>()
+const applyTab = ref<HTMLButtonElement>()
+
+/** 键盘切换时把焦点移到新选中的页签，保持 roving tabindex 语义 */
+async function focusTab(next: 'cert' | 'apply') {
+  switchTab(next)
+  await nextTick()
+  ;(next === 'cert' ? certTab : applyTab).value?.focus()
 }
 
 function userKey(userId: Id) {
@@ -265,47 +276,71 @@ async function confirmRevoke() {
 <template>
   <div class="space-y-4">
     <PageHeader title="证书管理" desc="审批证书申请、查询与吊销已签发证书">
+      <div class="segmented" role="tablist" aria-label="证书管理范围">
+        <button
+          id="cert-tab-list"
+          ref="certTab"
+          type="button"
+          role="tab"
+          aria-controls="cert-panel-list"
+          :aria-selected="tab === 'cert'"
+          :tabindex="tab === 'cert' ? 0 : -1"
+          @click="switchTab('cert')"
+          @keydown.right.prevent="focusTab('apply')"
+          @keydown.home.prevent="focusTab('cert')"
+        >
+          证书列表
+        </button>
+        <button
+          id="cert-tab-apply"
+          ref="applyTab"
+          type="button"
+          role="tab"
+          aria-controls="cert-panel-apply"
+          :aria-selected="tab === 'apply'"
+          :tabindex="tab === 'apply' ? 0 : -1"
+          @click="switchTab('apply')"
+          @keydown.left.prevent="focusTab('cert')"
+          @keydown.end.prevent="focusTab('apply')"
+        >
+          申请审批
+        </button>
+      </div>
       <button class="btn-ghost" @click="loadActive">
         <AppIcon name="refresh" class="!text-[18px]" />
         刷新
       </button>
     </PageHeader>
 
-    <div class="flex gap-2 border-b border-line">
-      <button
-        class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
-        :class="tab === 'cert' ? 'border-primary text-primary' : 'border-transparent text-ink-muted'"
-        @click="switchTab('cert')"
-      >
-        证书列表
-      </button>
-      <button
-        class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
-        :class="tab === 'apply' ? 'border-primary text-primary' : 'border-transparent text-ink-muted'"
-        @click="switchTab('apply')"
-      >
-        申请审批
-      </button>
-    </div>
-
-    <div v-show="tab === 'cert'" class="space-y-4">
+    <div
+      v-show="tab === 'cert'"
+      id="cert-panel-list"
+      role="tabpanel"
+      aria-labelledby="cert-tab-list"
+      class="space-y-4"
+    >
       <div class="card p-4">
         <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
           <div>
-            <label class="form-label">用户名</label>
-            <input v-model="certFilters.userName" class="input" @keyup.enter="searchCerts" />
+            <label class="form-label" for="cert-filter-name">用户名</label>
+            <input
+              id="cert-filter-name"
+              v-model="certFilters.userName"
+              class="input"
+              @keyup.enter="searchCerts"
+            />
           </div>
           <div>
-            <label class="form-label">类型</label>
-            <select v-model="certFilters.certType" class="select">
+            <label class="form-label" for="cert-filter-type">类型</label>
+            <select id="cert-filter-type" v-model="certFilters.certType" class="select">
               <option value="">全部</option>
               <option value="sign">签名</option>
               <option value="encrypt">加密</option>
             </select>
           </div>
           <div>
-            <label class="form-label">状态</label>
-            <select v-model="certFilters.status" class="select">
+            <label class="form-label" for="cert-filter-status">状态</label>
+            <select id="cert-filter-status" v-model="certFilters.status" class="select">
               <option value="">全部</option>
               <option value="0">有效</option>
               <option value="1">已吊销</option>
@@ -321,7 +356,7 @@ async function confirmRevoke() {
           <table class="w-full text-sm">
             <thead>
               <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-                <th class="w-10 px-2 py-2.5"></th>
+                <th class="w-10 px-2 py-2.5"><span class="sr-only">展开证书详情</span></th>
                 <th class="px-4 py-2.5">用户名</th>
                 <th class="px-4 py-2.5">签名证</th>
                 <th class="px-4 py-2.5">加密证</th>
@@ -433,16 +468,28 @@ async function confirmRevoke() {
       </div>
     </div>
 
-    <div v-show="tab === 'apply'" class="space-y-4">
+    <div
+      v-show="tab === 'apply'"
+      id="cert-panel-apply"
+      role="tabpanel"
+      aria-labelledby="cert-tab-apply"
+      class="space-y-4"
+    >
       <div class="card p-4">
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div>
-            <label class="form-label">用户名</label>
-            <input v-model="applyFilters.userName" class="input" placeholder="搜索…" @keyup.enter="applyPageNum = 1; loadApplies()" />
+            <label class="form-label" for="apply-filter-name">用户名</label>
+            <input
+              id="apply-filter-name"
+              v-model="applyFilters.userName"
+              class="input"
+              placeholder="搜索…"
+              @keyup.enter="applyPageNum = 1; loadApplies()"
+            />
           </div>
           <div>
-            <label class="form-label">状态</label>
-            <select v-model="applyFilters.status" class="select">
+            <label class="form-label" for="apply-filter-status">状态</label>
+            <select id="apply-filter-status" v-model="applyFilters.status" class="select">
               <option value="">全部</option>
               <option value="pending">待审批</option>
               <option value="approved">已通过</option>

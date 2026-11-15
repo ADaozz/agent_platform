@@ -152,8 +152,9 @@ async function confirmKick() {
     <div v-if="canManage" class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <div>
-          <label class="form-label">用户名</label>
+          <label class="form-label" for="session-filter-name">用户名</label>
           <input
+            id="session-filter-name"
             v-model="filters.userName"
             class="input"
             placeholder="搜索用户名…"
@@ -172,7 +173,7 @@ async function confirmKick() {
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-              <th class="w-10 px-2 py-2.5"></th>
+              <th class="w-10 px-2 py-2.5"><span class="sr-only">展开历史记录</span></th>
               <th v-if="canManage" class="px-4 py-2.5">用户名</th>
               <th class="px-4 py-2.5">设备名称</th>
               <th class="px-4 py-2.5">IP</th>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
 import AppIcon from '@/components/AppIcon.vue'
@@ -54,9 +54,19 @@ async function load() {
   }
 }
 
+const personalTab = ref<HTMLButtonElement>()
+const globalTab = ref<HTMLButtonElement>()
+
 function switchTab(next: 'personal' | 'global') {
   tab.value = next
   error.value = ''
+}
+
+/** 键盘切换时把焦点移到新选中的页签，保持 roving tabindex 语义 */
+async function focusTab(next: 'personal' | 'global') {
+  switchTab(next)
+  await nextTick()
+  ;(next === 'personal' ? personalTab : globalTab).value?.focus()
 }
 
 function addSource() {
@@ -86,14 +96,46 @@ onMounted(load)
 <template>
   <div class="mx-auto max-w-4xl space-y-4">
     <PageHeader title="模型配置" desc="管理 Agent 对话可使用的模型来源与模型">
-      <div v-if="isAdmin" class="flex gap-2">
-        <button :class="personal ? 'btn-primary' : 'btn-ghost'" @click="switchTab('personal')">我的模型</button>
-        <button :class="!personal ? 'btn-primary' : 'btn-ghost'" @click="switchTab('global')">全局模型</button>
+      <div v-if="isAdmin" class="segmented" role="tablist" aria-label="模型配置范围">
+        <button
+          id="model-tab-personal"
+          ref="personalTab"
+          type="button"
+          role="tab"
+          aria-controls="model-panel"
+          :aria-selected="personal"
+          :tabindex="personal ? 0 : -1"
+          @click="switchTab('personal')"
+          @keydown.right.prevent="focusTab('global')"
+          @keydown.home.prevent="focusTab('personal')"
+        >
+          我的模型
+        </button>
+        <button
+          id="model-tab-global"
+          ref="globalTab"
+          type="button"
+          role="tab"
+          aria-controls="model-panel"
+          :aria-selected="!personal"
+          :tabindex="!personal ? 0 : -1"
+          @click="switchTab('global')"
+          @keydown.left.prevent="focusTab('personal')"
+          @keydown.end.prevent="focusTab('global')"
+        >
+          全局模型
+        </button>
       </div>
     </PageHeader>
 
     <div v-if="loading" class="card p-8 text-center text-sm text-ink-muted">正在加载模型配置…</div>
     <template v-else>
+      <div
+        id="model-panel"
+        role="tabpanel"
+        :aria-labelledby="personal ? 'model-tab-personal' : 'model-tab-global'"
+        class="space-y-4"
+      >
       <div v-if="personal" class="card p-4">
         <h2 class="text-sm font-medium text-ink">平台提供的模型</h2>
         <div v-if="platformModels.length" class="mt-3 flex flex-wrap gap-2">
@@ -184,6 +226,7 @@ onMounted(load)
           <button class="btn-ghost" :disabled="saving" @click="load">重置</button>
           <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存配置' }}</button>
         </div>
+      </div>
       </div>
     </template>
   </div>

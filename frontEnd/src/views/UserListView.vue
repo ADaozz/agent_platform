@@ -187,20 +187,26 @@ async function confirmDelete() {
     <div class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <div>
-          <label class="form-label">用户名</label>
-          <input v-model="filters.userName" class="input" placeholder="搜索用户名…" @keyup.enter="search" />
+          <label class="form-label" for="user-filter-name">用户名</label>
+          <input
+            id="user-filter-name"
+            v-model="filters.userName"
+            class="input"
+            placeholder="搜索用户名…"
+            @keyup.enter="search"
+          />
         </div>
         <div>
-          <label class="form-label">状态</label>
-          <select v-model="filters.status" class="select">
+          <label class="form-label" for="user-filter-status">状态</label>
+          <select id="user-filter-status" v-model="filters.status" class="select">
             <option value="">全部状态</option>
             <option value="0">已启用</option>
             <option value="1">已停用</option>
           </select>
         </div>
         <div>
-          <label class="form-label">角色</label>
-          <select v-model="filters.roleId" class="select">
+          <label class="form-label" for="user-filter-role">角色</label>
+          <select id="user-filter-role" v-model="filters.roleId" class="select">
             <option value="">全部角色</option>
             <option v-for="r in roleOptions" :key="r.id" :value="r.id">{{ r.label }}</option>
           </select>
@@ -292,14 +298,21 @@ async function confirmDelete() {
     <BaseModal :open="formOpen" :title="isEdit ? '编辑用户' : '添加用户'" width="440px" @close="formOpen = false">
       <div class="space-y-4">
         <div>
-          <label class="form-label">用户名 <span class="text-danger">*</span></label>
-          <input v-model="form.userName" class="input" maxlength="64" placeholder="请输入用户名" />
+          <label class="form-label" for="user-form-name">用户名 <span class="text-danger">*</span></label>
+          <input
+            id="user-form-name"
+            v-model="form.userName"
+            class="input"
+            maxlength="64"
+            placeholder="请输入用户名"
+          />
         </div>
         <div>
-          <label class="form-label">
+          <label class="form-label" for="user-form-password">
             {{ isEdit ? '密码（留空则不修改）' : '密码' }}<span v-if="!isEdit" class="text-danger"> *</span>
           </label>
           <input
+            id="user-form-password"
             v-model="form.passWord"
             class="input"
             type="password"
@@ -309,8 +322,8 @@ async function confirmDelete() {
           />
         </div>
         <div>
-          <label class="form-label">状态</label>
-          <select v-model="form.status" class="select">
+          <label class="form-label" for="user-form-status">状态</label>
+          <select id="user-form-status" v-model="form.status" class="select">
             <option value="0">已启用</option>
             <option value="1">已停用</option>
           </select>
@@ -323,6 +336,7 @@ async function confirmDelete() {
               :key="r.id"
               type="button"
               class="rounded-md border px-3 py-1.5 text-sm transition-colors"
+              :aria-pressed="form.roleIds.includes(r.id)"
               :class="form.roleIds.includes(r.id)
                 ? 'border-primary bg-primary-light font-medium text-primary'
                 : 'border-line text-ink-secondary hover:bg-gray-50'"

@@ -24,9 +24,9 @@
   --radius-xl: 14px;
   --radius-2xl: 18px;
 
-  /* 暖白档案（light） */
-  --color-primary: color-mix(in srgb, var(--color-signal) 70%, var(--color-carbon));
-  --color-primary-dark: color-mix(in srgb, var(--color-signal) 58%, var(--color-carbon));
+  /* 暖白档案（light）；作为文字使用时需满足 4.5:1，故橙与碳黑混色偏深 */
+  --color-primary: color-mix(in srgb, var(--color-signal) 58%, var(--color-carbon));
+  --color-primary-dark: color-mix(in srgb, var(--color-signal) 48%, var(--color-carbon));
   --color-primary-light: #f3dfc9;
 
   --color-page: var(--color-ivory);
@@ -37,7 +37,8 @@
   --color-ink: #181818;
   --color-ink-secondary: #4a463d;
   --color-ink-muted: #706553;
-  --color-ink-faint: #786e5d;
+  /* 暖灰保持原色相，压暗一档以满足 4.5:1（页面底 4.57、卡片底 4.98） */
+  --color-ink-faint: #746a58;
 
   --color-success: #3c7462;
   --color-warning: #9a6b0a;
@@ -332,6 +333,44 @@ code {
   background-color: #d8584e;
 }
 
+/* 分段开关：控制台式范围切换，选中态用信号橙实底，避免橙色文字对比度不足 */
+.segmented {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background-color: var(--glass);
+}
+.segmented button {
+  height: 30px;
+  padding: 0 0.875rem;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-secondary);
+  transition:
+    background-color 0.16s,
+    color 0.16s;
+}
+.segmented button:hover {
+  background-color: var(--glass-strong);
+  color: var(--color-ink);
+}
+.segmented button[aria-selected='true'],
+.segmented button[aria-selected='true']:hover {
+  background-color: var(--color-signal);
+  color: var(--on-signal);
+}
+.segmented button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .input,
 .select {
   @apply h-9 w-full px-3 text-sm outline-none;
@@ -455,6 +494,32 @@ input[type='radio'] {
 }
 .session-history-row td {
   background-color: inherit;
+}
+
+/* 触屏设备：只扩大命中区，不改变桌面端密度 */
+@media (pointer: coarse) {
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger,
+  .input,
+  .select {
+    min-height: 44px;
+  }
+  .card tbody td button {
+    min-height: 40px;
+    padding-inline: 0.5rem;
+  }
+  .segmented button {
+    height: 38px;
+    padding-inline: 1rem;
+  }
+}
+
+/* 窄屏页头同时放了分段开关与操作按钮时，收紧内边距让两者保持同一行 */
+@media (max-width: 420px) {
+  .page-head-actions .segmented button {
+    padding-inline: 0.625rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -356,6 +356,18 @@ function handleLogout() {
   }
 }
 
+/* 触屏：导航项保持控制台密度，但把命中区加到 44px */
+@media (pointer: coarse) {
+  .rail-item,
+  .rail-subitem {
+    height: 2.75rem;
+  }
+  .rail-logout {
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+}
+
 
 .page-canvas {
   padding: 1.75rem 2rem 2.5rem;

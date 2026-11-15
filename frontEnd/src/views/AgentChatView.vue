@@ -11,6 +11,7 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
 
 <template>
   <div class="dap-root agent-host" :data-theme="theme">
+    <h1 class="sr-only">Agent 对话</h1>
     <AgentPlatform>
       <template #backdrop><WorkspaceBackdrop /></template>
     </AgentPlatform>
@@ -38,7 +39,7 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
   --sidebar-width: 0px !important;
 }
 /* The standalone app scrolled the document; embedded, its main column scrolls instead. */
-.agent-host :deep(main) {
+.agent-host :deep(.agent-main) {
   height: var(--dap-vh);
   overflow-y: auto;
   isolation: isolate;
@@ -47,20 +48,20 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
   --ws-backdrop-bottom: 0px;
 }
 /* Match existing content gutters and preview bounds without changing either. */
-.agent-host :deep(main.session-layout),
-.agent-host :deep(.document-open > main) {
+.agent-host :deep(.agent-main.session-layout),
+.agent-host :deep(.document-open > .agent-main) {
   --ws-backdrop-gutter: 0px;
 }
-.agent-host :deep(main:has(> .page-header)) {
+.agent-host :deep(.agent-main:has(> .page-header)) {
   --ws-backdrop-top: 52px;
 }
 @media (max-width: 700px) {
-  .agent-host :deep(.document-open > main) {
+  .agent-host :deep(.document-open > .agent-main) {
     --ws-backdrop-bottom: 44dvh;
   }
 }
 @media (max-width: 600px) {
-  .agent-host :deep(main) {
+  .agent-host :deep(.agent-main) {
     --ws-backdrop-gutter: 0px;
   }
 }

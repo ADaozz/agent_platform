@@ -1137,3 +1137,24 @@
     padding-inline: 10px 8px;
   }
 }
+
+/* 触屏：用透明伪元素把图标按钮命中区扩到约 44px，不改变控制台密度 */
+@media (pointer: coarse) {
+  .dap-root.agent-host .icon-button,
+  .dap-root.agent-host .add-context,
+  .dap-root.agent-host .send-button {
+    position: relative;
+  }
+  .dap-root.agent-host .icon-button::after,
+  .dap-root.agent-host .add-context::after,
+  .dap-root.agent-host .send-button::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: inherit;
+  }
+  .dap-root.agent-host .menu-row,
+  .dap-root.agent-host .text-button {
+    min-height: 40px;
+  }
+}

@@ -8,11 +8,14 @@ const props = defineProps<{
   title: string
   desc?: string
   icon?: IconName
+  /** 标题上方的技术档案代号；默认取路由 meta.eyebrow */
+  eyebrow?: string
 }>()
 
 // 徽标图标默认取当前路由的 meta.icon，与侧栏菜单保持一致
 const route = useRoute()
 const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undefined))
+const eyebrow = computed(() => props.eyebrow ?? (route.meta.eyebrow as string | undefined))
 </script>
 
 <template>
@@ -23,6 +26,7 @@ const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undef
       <span class="page-head-disc"><AppIcon :name="emblem" /></span>
     </div>
     <div class="page-head-text">
+      <span v-if="eyebrow" class="page-head-eyebrow">{{ eyebrow }}</span>
       <h1 class="page-head-title">{{ title }}</h1>
       <p v-if="desc || $slots.desc" class="page-head-desc">
         <slot name="desc">{{ desc }}</slot>
@@ -90,6 +94,17 @@ const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undef
   min-width: 0;
   flex: 1 1 16rem;
 }
+/* 技术档案代号：等宽小字 + 宽字距，强化控制台层级而不抢标题 */
+.page-head-eyebrow {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.18em;
+  color: var(--color-ink-faint);
+}
 .page-head-title {
   font-size: 24px;
   line-height: 1.2;
@@ -103,6 +118,8 @@ const emblem = computed(() => props.icon ?? (route.meta.icon as IconName | undef
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-ink-muted);
+  /* 长说明折行时均衡分配，避免末行只剩两三个字 */
+  text-wrap: balance;
 }
 .page-head-actions {
   position: relative;

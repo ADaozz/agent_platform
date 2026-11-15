@@ -12,7 +12,7 @@ const typeIcon: Record<ToastType, IconName> = {
 
 <template>
   <Teleport to="body">
-    <div class="pointer-events-none fixed top-4 left-1/2 z-[100] flex w-full max-w-md -translate-x-1/2 flex-col items-center gap-2 px-4">
+    <div class="pointer-events-none fixed top-16 left-1/2 z-[100] flex w-full max-w-md -translate-x-1/2 flex-col items-center gap-2 px-4">
       <TransitionGroup
         enter-active-class="transition duration-200"
         enter-from-class="opacity-0 -translate-y-2"
