@@ -1,5 +1,7 @@
 HELP.md
 target/
+# 本地 SQLite 数据文件与证书（勿提交）
+/data/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

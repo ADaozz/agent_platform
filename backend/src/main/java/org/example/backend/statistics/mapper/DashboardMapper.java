@@ -9,7 +9,7 @@ import java.util.List;
 @Mapper
 public interface DashboardMapper {
 
-    @Select("SELECT COUNT(*) FROM public.sys_user")
+    @Select("SELECT COUNT(*) FROM sys_user")
     Long countUsers();
 
     @Select("<script>"
@@ -72,14 +72,14 @@ public interface DashboardMapper {
     Long countVmApp(@Param("ownerUserId") Long ownerUserId);
 
     @Select("<script>"
-            + "SELECT TO_CHAR(create_time, 'YYYY-MM') AS name, COUNT(*) AS value FROM vm_host "
+            + "SELECT strftime('%Y-%m', create_time) AS name, COUNT(*) AS value FROM vm_host "
             + "<if test='ownerUserId != null'>WHERE owner_user_id = #{ownerUserId}</if> "
-            + "GROUP BY TO_CHAR(create_time, 'YYYY-MM') ORDER BY name"
+            + "GROUP BY strftime('%Y-%m', create_time) ORDER BY name"
             + "</script>")
     List<CountGroupRow> countVmCreateTrend(@Param("ownerUserId") Long ownerUserId);
 
     @Select("SELECT u.user_name AS name, COUNT(*) AS value FROM vm_host h "
-            + "INNER JOIN public.sys_user u ON h.owner_user_id = u.user_id "
+            + "INNER JOIN sys_user u ON h.owner_user_id = u.user_id "
             + "GROUP BY u.user_name ORDER BY value DESC LIMIT 10")
     List<CountGroupRow> countVmByOwner();
 

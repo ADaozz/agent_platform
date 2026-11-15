@@ -1,0 +1,49 @@
+# 本地 SQLite 开发：--spring.profiles.active=sqlite,dev
+# 数据文件默认写到 backend/data/agent-platform.db
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    # date_class=TEXT 让 sqlite-jdbc 以文本写入/读取 java.util.Date；
+    # 否则默认写入毫秒整数，MyBatis DateTypeHandler 读取时会报 Error parsing time stamp
+    url: ${DB_URL:jdbc:sqlite:${user.dir}/data/agent-platform.db?date_class=TEXT&date_string_format=yyyy-MM-dd HH:mm:ss}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    # 覆盖 application.yml 中的 Kingbase 连接池类型
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      maximum-pool-size: 1
+      connection-init-sql: PRAGMA foreign_keys = ON
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/sqlite/schema.sql
+      data-locations: classpath:sql/sqlite/data.sql
+      continue-on-error: false
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+
+mybatis-plus:
+  global-config:
+    db-config:
+      # SQLite 无 public schema，清空以免生成 public.xxx
+      schema: ""
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-jwt-secret-change-me-32chars-min}
+  api:
+    secret: ${JWT_API_SECRET:local-dev-api-jwt-secret-change-me-32c}
+
+cert:
+  storage-base-path: ${CERT_STORAGE_BASE:${user.dir}/data/certs}
+  intermediate-cert: ${CERT_INTERMEDIATE_CERT:}
+  intermediate-key: ${CERT_INTERMEDIATE_KEY:}
+  root-cert: ${CERT_ROOT_CERT:}
+
+agent:
+  runtime:
+    url: ${AGENT_RUNTIME_URL:http://127.0.0.1:8090}
+    shared-secret: ${AGENT_RUNTIME_SHARED_SECRET:}
