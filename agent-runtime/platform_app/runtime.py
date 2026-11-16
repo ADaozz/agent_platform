@@ -448,6 +448,7 @@ class Runtime:
         manager.load()
         adapter = d.ToolAdapter(config, self.id)
         self.ensure_artifact_services()
+        runner = None
         try:
             prepared = prepare_agent(settings=settings, model=model, checkpointer=store.checkpointer,
                 instructions=f'当前 Thread 私有目录：{context.workspace_root}。面向用户的文件必须写入 {context.files_root}；校验、渲染、截图等过程文件必须写入临时目录 {context.workspace_root / "tmp"}，不得作为输出文件交付。不得读取其他 Thread 或平台控制数据。\n\n' + '\n\n'.join([config['system_prompt'], '\n'.join(config['rules'])]), skills=['/agent-skills/', '/agent-skills/installed/'],
@@ -475,9 +476,30 @@ class Runtime:
             self.event({'type': 'capabilities', 'tools': list(runner.prepared.model_tool_names), 'mode': runner.prepared.execution_mode.value, 'sandbox_mode': runner.sandbox_mode()})
             return runner
         except BaseException:
-            manager.close()
-            store.close()
+            self.release_partial_runner(runner, store, manager)
             raise
+
+    def release_partial_runner(self, runner, store, manager):
+        """Close a half-built runner without dropping a store another writer still holds."""
+        if runner is not None:
+            try:
+                runner.close()
+            except RuntimeError:
+                # Lease is still required. Leave the runner for a later close retry.
+                self.runner = runner
+                LOG.error('Runner close failed during build; checkpoint store left open: session=%s', self.id)
+                return
+            self.runner = None
+        if manager is not None:
+            try:
+                manager.close()
+            except Exception:  # noqa: BLE001
+                LOG.warning('MCP manager close failed during build: session=%s', self.id)
+        if store is not None:
+            try:
+                store.close()
+            except Exception as exc:  # noqa: BLE001
+                LOG.error('Checkpoint store close failed during build: session=%s error=%s', self.id, type(exc).__name__)
 
     def sync_checkpoint_interrupt(self, snapshot):
         """Align Platform session fields with the real LangGraph interrupt after rebuild."""
@@ -739,17 +761,17 @@ def delete_session(session_id: str):
         # Stop the runner and release leases/resources before deleting durable state.
         # Do not force-kill background OS processes from the delete request.
         if rt.runner is not None:
+            runner = rt.runner
             try:
-                rt.runner.close()
+                runner.close()
             except RuntimeError as exc:
-                raise HTTPException(409, f'会话资源仍在释放中，请稍后重试：{exc}') from exc
-            finally:
-                store = getattr(rt.runner, 'session_store', None)
-                if store is not None:
-                    try:
-                        store.close()
-                    except Exception:  # noqa: BLE001
-                        LOG.warning('Session store close failed during delete: session=%s', session_id)
+                raise HTTPException(409, '会话资源仍在释放中，请稍后重试') from exc
+            store = getattr(runner, 'session_store', None)
+            if store is not None:
+                try:
+                    store.close()
+                except Exception as exc:  # noqa: BLE001
+                    raise HTTPException(409, '会话存储仍在释放中，请稍后重试') from exc
             rt.runner = None
         context = resolve(session_id)
         prefix = f'{session_id}:'
