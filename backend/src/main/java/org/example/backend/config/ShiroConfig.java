@@ -55,6 +55,7 @@ public class ShiroConfig {
         chain.put("/register", "anon");
         chain.put("/register/code", "anon");
         chain.put("/login/cert", "anon");
+        chain.put("/login/cert/availability", "anon");
         chain.put("/login/cert/check", "anon");
         chain.put("/login/cert/debug", "anon");
         chain.put("/**", "jwt");

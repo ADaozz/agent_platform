@@ -142,6 +142,23 @@ def find(session_id):
         raise HTTPException(404, '会话不存在')
 
 
+def background_task_views(session_id, live=()):
+    """Merge in-memory tasks with persisted history; live rows win on the same run_id."""
+    from . import background_store as bg
+    by_id = {item['run_id']: bg.public_task(item) for item in bg.for_session(session_id)}
+    for task in live:
+        by_id[task.run_id] = {
+            'run_id': task.run_id,
+            'tool_call_id': task.tool_call_id,
+            'status': task.status,
+            'description': ' '.join(task.description.split())[:200],
+            'created_at': by_id.get(task.run_id, {}).get('created_at'),
+            'finished_at': by_id.get(task.run_id, {}).get('finished_at'),
+            'result': (getattr(task, 'result', None) or by_id.get(task.run_id, {}).get('result') or '')[:2000],
+        }
+    return sorted(by_id.values(), key=lambda item: item.get('created_at') or item['run_id'])
+
+
 def public(record):
     value = {k: v for k, v in record.items() if k not in ('model_snapshot', 'config')}
     snapshot = record.get('model_snapshot')
@@ -153,9 +170,8 @@ def public(record):
     value['output_files'] = [{'path': path, 'size': size, 'modified_at': mtime / 1e9} for path, (mtime, size) in file_snapshot(context.files_root).items()
         if Path(path).parts[0] != 'uploads']
     rt = RUNTIMES.get(record['id'])
-    tasks = rt.runner.background_tasks() if rt is not None and rt.runner is not None else []
-    value['background_tasks'] = [{'run_id': t.run_id, 'tool_call_id': t.tool_call_id, 'status': t.status,
-        'description': ' '.join(t.description.split())[:200]} for t in tasks]
+    live = rt.runner.background_tasks() if rt is not None and rt.runner is not None else []
+    value['background_tasks'] = background_task_views(record['id'], live)
     root = context.artifacts_root
     value['artifacts'] = [p.name for p in root.iterdir() if p.is_file() and not p.is_symlink()] if root.exists() else []
     return value
@@ -170,6 +186,9 @@ def last_turn_end(session_id):
 
 
 def initialize():
+    from . import background_store as bg
+    # Keep finished background results; unfinished runs become interrupted and are never replayed.
+    bg.interrupt_unfinished()
     for record in d.all_records('session'):
         changed = False
         if record['status'] in ACTIVE:
@@ -273,6 +292,7 @@ class Runtime:
         self.lock = threading.RLock()
         self.previous_snapshot = None
         self.manifest_rows = {}
+        self._pending_cleanup = None
 
     def event(self, event):
         with self.lock:
@@ -355,6 +375,7 @@ class Runtime:
             pass
 
     def build(self):
+        self._retry_pending_cleanup()
         if self.runner is not None:
             return self.runner
         from platform_app.agent_core import AgentRunner
@@ -405,7 +426,14 @@ class Runtime:
             temporary.rename(destination)
         format_plugins.snapshot_skills(skills,config.get('skill_bindings'))
         snapshot = record['model_snapshot']
-        settings = Settings.from_mapping({'llm': m.unseal(snapshot['encrypted'])})
+        llm_config = m.unseal(snapshot['encrypted'])
+        source = record['model_id'].split('/', 1)[0]
+        if source.startswith(m.PERSONAL_PREFIX):
+            group = (llm_config.get('models') or {}).get(source) or {}
+            if isinstance(group.get('base_url'), str):
+                from .url_safety import assert_safe_personal_base_url
+                assert_safe_personal_base_url(group['base_url'])
+        settings = Settings.from_mapping({'llm': llm_config})
         hidden = d.hidden_tools(config)
         settings = replace(settings, trust_env=True, llm_default=record['model_id'],
             subagents=SubAgentConfig(enabled='task' not in hidden, background='start_background_task' not in hidden), hidden_tools=hidden,
@@ -422,6 +450,7 @@ class Runtime:
         manager.load()
         adapter = d.ToolAdapter(config, self.id)
         self.ensure_artifact_services()
+        runner = None
         try:
             prepared = prepare_agent(settings=settings, model=model, checkpointer=store.checkpointer,
                 instructions=f'当前 Thread 私有目录：{context.workspace_root}。面向用户的文件必须写入 {context.files_root}；校验、渲染、截图等过程文件必须写入临时目录 {context.workspace_root / "tmp"}，不得作为输出文件交付。不得读取其他 Thread 或平台控制数据。\n\n' + '\n\n'.join([config['system_prompt'], '\n'.join(config['rules'])]), skills=['/agent-skills/', '/agent-skills/installed/'],
@@ -429,10 +458,16 @@ class Runtime:
             runner = AgentRunner(prepared=prepared, settings=settings, session_store=store,
                 thread_id=self.id, workspace=context.workspace_root, mcp_manager=manager,
                 on_event=self.core_event)
+            # Same path as deep_agent_cli: reload the existing thread through
+            # switch_session → _load_and_commit_switch so RecoveryContext,
+            # interrupt deferral and restore_plan match the CLI.
+            snapshot = runner.switch_session(self.id)
+            self.sync_checkpoint_interrupt(snapshot)
             if record['reasoning_effort']:
                 runner.request_model_change(record['model_id'], reasoning_effort=record['reasoning_effort'])
-            runner.request_permission_change(record.get('pending_permission_mode') or record.get('permission_mode', 'ask'))
-            runner.apply_pending_config_if_idle()
+            if snapshot.interrupt_kind is None:
+                runner.request_permission_change(record.get('pending_permission_mode') or record.get('permission_mode', 'ask'))
+                runner.apply_pending_config_if_idle()
             self.runner = runner
             with self.lock:
                 current = find(self.id)
@@ -443,9 +478,85 @@ class Runtime:
             self.event({'type': 'capabilities', 'tools': list(runner.prepared.model_tool_names), 'mode': runner.prepared.execution_mode.value, 'sandbox_mode': runner.sandbox_mode()})
             return runner
         except BaseException:
-            manager.close()
-            store.close()
+            self.release_partial_runner(runner, store, manager)
             raise
+
+    def _retry_pending_cleanup(self):
+        """Finish a close that previously timed out, then allow a new Runner."""
+        runner = self._pending_cleanup
+        if runner is None:
+            return
+        try:
+            runner.close()
+        except RuntimeError as exc:
+            raise HTTPException(409, '会话资源仍在释放中，请稍后重试') from exc
+        store = getattr(runner, 'session_store', None)
+        if store is not None and not getattr(store, '_closed', False):
+            try:
+                store.close()
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(409, '会话存储仍在释放中，请稍后重试') from exc
+        self._pending_cleanup = None
+
+    def release_partial_runner(self, runner, store, manager):
+        """Close a half-built runner without dropping a store another writer still holds."""
+        if runner is not None:
+            try:
+                runner.close()
+            except RuntimeError:
+                # close() already marked the runner closed and kept the lease.
+                # Do not hand it back to invoke(); retry close before the next build.
+                self.runner = None
+                self._pending_cleanup = runner
+                LOG.error('Runner close failed during build; checkpoint store left open: session=%s', self.id)
+                return
+            self.runner = None
+        if manager is not None:
+            try:
+                manager.close()
+            except Exception:  # noqa: BLE001
+                LOG.warning('MCP manager close failed during build: session=%s', self.id)
+        if store is not None:
+            try:
+                store.close()
+            except Exception as exc:  # noqa: BLE001
+                LOG.error('Checkpoint store close failed during build: session=%s error=%s', self.id, type(exc).__name__)
+
+    def sync_checkpoint_interrupt(self, snapshot):
+        """Align Platform session fields with the real LangGraph interrupt after rebuild."""
+        from platform_app.agent_core.run_events import InterruptKind
+        with self.lock:
+            current = find(self.id)
+            kind = snapshot.interrupt_kind
+            if kind is InterruptKind.WAITING_CONFIRMATION:
+                current.update(
+                    status='waiting_confirmation',
+                    pending_tool_calls=list(snapshot.pending_tool_calls),
+                    human_input={},
+                    error=None,
+                )
+            elif kind is InterruptKind.WAITING_HUMAN:
+                current.update(
+                    status='waiting_human',
+                    human_input=dict(snapshot.human_input or {}),
+                    pending_tool_calls=[],
+                    error=None,
+                )
+            elif kind is InterruptKind.PAUSED:
+                current.update(status='paused', error=None)
+            elif kind is InterruptKind.RUNTIME_CONFIG_BOUNDARY:
+                current.update(status='runtime_config_boundary', error=None)
+            elif current['status'] in (
+                'waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary',
+            ):
+                # Platform still shows a wait, but the checkpoint no longer has one.
+                current.update(
+                    status='interrupted',
+                    pending_tool_calls=[],
+                    human_input={},
+                    error=current.get('error') or '服务重启后未找到对应的中断检查点；可发送新消息继续。',
+                )
+            d.put('session', current)
 
     def execute(self, operation, payload):
         try:
@@ -543,6 +654,9 @@ def runtime(session_id):
 def schedule(session_id, operation, payload):
     rt = runtime(session_id)
     with rt.lock:
+        # Reject the request before recording a message the runner cannot accept.
+        if rt._pending_cleanup is not None:
+            rt._retry_pending_cleanup()
         record = find(session_id)
         if record['status'] in ACTIVE:
             raise HTTPException(409, '当前会话正在执行')
@@ -658,12 +772,32 @@ def session(session_id: str):
 
 @router.delete('/sessions/{session_id}', status_code=204)
 def delete_session(session_id: str):
+    from . import background_store as bg
     rt = runtime(session_id)
     with rt.lock:
+        rt._retry_pending_cleanup()
         record = find(session_id)
         # A queued or running worker would keep writing into the tree being removed.
         if record['status'] in ACTIVE:
             raise HTTPException(409, '会话正在执行，请先停止后再删除')
+        live_running = bool(rt.runner and any(task.status == 'running' for task in rt.runner.background_tasks()))
+        if live_running or bg.running_for_session(session_id):
+            raise HTTPException(409, '后台任务仍在执行，请先停止后再删除')
+        # Stop the runner and release leases/resources before deleting durable state.
+        # Do not force-kill background OS processes from the delete request.
+        if rt.runner is not None:
+            runner = rt.runner
+            try:
+                runner.close()
+            except RuntimeError as exc:
+                raise HTTPException(409, '会话资源仍在释放中，请稍后重试') from exc
+            store = getattr(runner, 'session_store', None)
+            if store is not None:
+                try:
+                    store.close()
+                except Exception as exc:  # noqa: BLE001
+                    raise HTTPException(409, '会话存储仍在释放中，请稍后重试') from exc
+            rt.runner = None
         context = resolve(session_id)
         prefix = f'{session_id}:'
         with d.LOCK, d.db() as connection:
@@ -671,9 +805,11 @@ def delete_session(session_id: str):
             uploads = [json.loads(row[0]) for row in connection.execute('SELECT data FROM records WHERE kind=?', ('upload',))]
             connection.executemany('DELETE FROM records WHERE kind=? AND id=?',
                 [('upload', item['id']) for item in uploads if item.get('thread_id') == session_id])
+            tasks = [json.loads(row[0]) for row in connection.execute('SELECT data FROM records WHERE kind=?', ('background_task',))]
+            connection.executemany('DELETE FROM records WHERE kind=? AND id=?',
+                [('background_task', item['id']) for item in tasks if item.get('session_id') == session_id])
             connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('thread_workspace', session_id))
             connection.execute('DELETE FROM records WHERE kind=? AND id=?', ('session', session_id))
-        rt.runner = None
         for path in (context.workspace_root, context.session_root, context.sandbox_state_root, context.skills_root):
             shutil.rmtree(path, ignore_errors=True)
     with LOCK:

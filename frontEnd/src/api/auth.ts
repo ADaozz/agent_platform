@@ -25,7 +25,7 @@ export function register(data: RegisterPayload) {
 
 /**
  * 整页跳转 8443 触发 mTLS；GET 返回自动 POST 表单，由浏览器在 TLS 层提交客户端证。
- * 8443 只接受 https；origin 仅在后端白名单内时才会跳回当前前端，否则回到 https://host/login。
+ * 8443 只接受 https。回跳 Origin 仅在服务端白名单内生效，否则使用 CERT_LOGIN_PUBLIC_ORIGIN，不使用请求 Host。
  */
 export function loginByCert() {
   const { hostname, origin } = window.location
@@ -44,6 +44,10 @@ function decodeBase64Url(value: string): string {
 export function parseCertLoginPayload(payload: string): LoginResult {
   const json = decodeBase64Url(payload)
   return JSON.parse(json.replace(/([:[,]\s*)(\d{16,})(\s*[,}\]])/g, '$1"$2"$3'))
+}
+
+export function certLoginAvailable() {
+  return request.get<{ enabled: boolean }>('/login/cert/availability')
 }
 
 export function getUserInfo() {

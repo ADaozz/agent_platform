@@ -2,6 +2,8 @@ package org.example.backend.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.backend.agent.AgentRuntimeCookie;
+import org.example.backend.auth.cert.util.CertLoginRedirect;
+import org.example.backend.auth.cert.util.CertTrustedProxy;
 import org.example.backend.auth.dto.LoginDTO;
 import org.example.backend.auth.service.AuthService;
 import org.example.backend.auth.vo.LoginVO;
@@ -30,7 +32,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -43,9 +44,18 @@ public class AuthController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /** 证书登录后允许跳回的前端 Origin（如 Vite 开发地址）；登录令牌在 URL 中，禁止放开任意地址 */
+    /** 逗号分隔的精确 HTTPS Origin；登录令牌只回到这里或 public-origin */
     @Value("${cert.login.allowed-origins:}")
-    private List<String> allowedOrigins;
+    private String allowedOriginsCsv;
+
+    @Value("${cert.login.public-origin:}")
+    private String publicOrigin;
+
+    @Value("${cert.login.enabled:false}")
+    private boolean certLoginEnabled;
+
+    @Value("${cert.login.trusted-proxies:127.0.0.1,::1}")
+    private String trustedProxiesCsv;
 
     @Log(title = "认证", businessType = BusinessType.OTHER, operatorType = OperatorType.OTHER,
             excludeParamNames = {"passWord"})
@@ -85,56 +95,64 @@ public class AuthController {
         try {
             LoginVO vo = authService.loginByCert(request);
             if (browserRedirect) {
-                redirectCertLoginSuccess(request, response, vo, origin);
+                redirectCertLoginSuccess(response, vo, origin);
                 return null;
             }
             return AjaxResult.success("登录成功", vo);
         } catch (BusinessException e) {
             if (browserRedirect) {
-                redirectCertLoginError(request, response, e.getMessage(), origin);
+                redirectCertLoginError(response, "证书登录失败", origin);
                 return null;
             }
             throw e;
+        } catch (IllegalStateException e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "证书登录回跳地址未配置");
+            return null;
         }
     }
 
-    private void redirectCertLoginSuccess(HttpServletRequest request, HttpServletResponse response, LoginVO vo,
-                                          String origin) throws IOException {
+    private void redirectCertLoginSuccess(HttpServletResponse response, LoginVO vo, String origin) throws IOException {
         String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(vo));
-        response.sendRedirect(buildLoginUrl(request, origin) + "#certLogin=" + payload);
+        response.sendRedirect(buildLoginUrl(origin) + "#certLogin=" + payload);
     }
 
-    private void redirectCertLoginError(HttpServletRequest request, HttpServletResponse response, String message,
-                                        String origin) throws IOException {
-        response.sendRedirect(buildLoginUrl(request, origin) + "?certError="
+    private void redirectCertLoginError(HttpServletResponse response, String message, String origin) throws IOException {
+        response.sendRedirect(buildLoginUrl(origin) + "?certError="
                 + URLEncoder.encode(message, StandardCharsets.UTF_8.name()));
     }
 
     private boolean isAllowedOrigin(String origin) {
-        return StringUtils.hasText(origin) && allowedOrigins.contains(origin);
+        return CertLoginRedirect.isExactHttpsOrigin(origin)
+                && CertLoginRedirect.parseOrigins(allowedOriginsCsv).contains(origin.trim());
     }
 
-    private String buildLoginUrl(HttpServletRequest request, String origin) {
-        if (isAllowedOrigin(origin)) {
-            return origin + "/login";
-        }
-        String host = request.getHeader("Host");
-        if (StringUtils.hasText(host) && host.contains(":")) {
-            host = host.substring(0, host.indexOf(':'));
-        }
-        if (!StringUtils.hasText(host)) {
-            host = "localhost";
-        }
-        return "https://" + host + "/login";
+    private String buildLoginUrl(String origin) {
+        return CertLoginRedirect.loginUrl(origin, publicOrigin, CertLoginRedirect.parseOrigins(allowedOriginsCsv));
+    }
+
+    /** 登录页据此决定是否展示证书登录；未启用时不提供不可用入口。 */
+    @GetMapping("/login/cert/availability")
+    public AjaxResult certAvailability() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        boolean ready = certLoginEnabled && CertLoginRedirect.isExactHttpsOrigin(publicOrigin)
+                && !CertTrustedProxy.parseProxies(trustedProxiesCsv).isEmpty();
+        data.put("enabled", ready);
+        return AjaxResult.success("ok", data);
     }
 
     /** 8443 mTLS 诊断（纯文本）：https://host:8443/debug-cert */
     @GetMapping(value = "/login/cert/debug", produces = "text/plain;charset=UTF-8")
     public String certDebugPlain(HttpServletRequest request) {
         String verify = request.getHeader("X-Client-Verify");
+        boolean trusted = CertTrustedProxy.isTrusted(
+                certLoginEnabled,
+                CertTrustedProxy.parseProxies(trustedProxiesCsv),
+                request);
         return "verify=" + (StringUtils.hasText(verify) ? verify : "NONE") + "\n"
                 + "dn=" + nullToEmpty(request.getHeader("X-Client-DN")) + "\n"
-                + "hasCert=" + StringUtils.hasText(request.getHeader("X-Client-Cert")) + "\n";
+                + "hasCert=" + StringUtils.hasText(request.getHeader("X-Client-Cert")) + "\n"
+                + "proxyTrusted=" + trusted + "\n"
+                + "certLoginEnabled=" + certLoginEnabled + "\n";
     }
 
     private static String nullToEmpty(String value) {
@@ -146,10 +164,17 @@ public class AuthController {
     public AjaxResult certCheck(HttpServletRequest request) {
         Map<String, Object> data = new LinkedHashMap<>();
         String verify = request.getHeader("X-Client-Verify");
+        boolean trusted = CertTrustedProxy.isTrusted(
+                certLoginEnabled,
+                CertTrustedProxy.parseProxies(trustedProxiesCsv),
+                request);
         data.put("verify", StringUtils.hasText(verify) ? verify : "NONE");
         data.put("dn", request.getHeader("X-Client-DN"));
         data.put("hasCert", StringUtils.hasText(request.getHeader("X-Client-Cert")));
-        data.put("ok", "SUCCESS".equalsIgnoreCase(verify));
+        data.put("proxyTrusted", trusted);
+        data.put("certLoginEnabled", certLoginEnabled);
+        // ok only when proxy boundary holds and Nginx reported SUCCESS
+        data.put("ok", trusted && "SUCCESS".equalsIgnoreCase(verify));
         return AjaxResult.success("ok", data);
     }
 

@@ -1,3 +1,6 @@
 # 生产 / jar 部署（systemd 等）
+# 与 Nginx 同机时绑定回环，禁止公网直连伪造 X-Client-* / 绕过网关。
+# 跨主机部署改为内部网卡地址，并由防火墙仅放行 Nginx。
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: 8080

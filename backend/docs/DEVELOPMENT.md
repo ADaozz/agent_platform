@@ -1597,6 +1597,7 @@ server {
 
     location = /debug-cert {
         proxy_pass http://personal_demo_backend/login/cert/check;
+        # 必须覆盖而非透传：客户端同名 Header 不得进入后端
         proxy_set_header X-Client-Verify $ssl_client_verify;
         proxy_set_header X-Client-DN     $ssl_client_s_dn;
         proxy_set_header X-Client-Cert   $ssl_client_escaped_cert;
@@ -1619,6 +1620,13 @@ server {
 | `client-ca-bundle.crt` | `intermediate-ca.crt` + `root-ca.crt` 拼接，供 Nginx 验链并下发 Acceptable CA 列表 |
 | `ssl_verify_client optional_no_ca` | 请求客户端证；缺失或验链失败仍转发后端，避免停留在 Nginx 400 页面 |
 | `verify=SUCCESS` | 后端唯一接受的正常值；`NONE`/`FAILED` 均作为证书登录失败处理并重定向 |
+
+**Trusted Proxy Boundary（fail-closed）：**
+
+- 生产默认 `server.address=127.0.0.1`（见 `application-prod.yml`），禁止公网直连 8080。
+- Nginx 所有转发路径必须用 `proxy_set_header` **覆盖** `X-Client-Verify` / `X-Client-DN` / `X-Client-Cert`。
+- 后端默认 `cert.login.enabled=false`；仅当代理边界验收通过后设置 `CERT_LOGIN_ENABLED=true`，并配置 `CERT_LOGIN_TRUSTED_PROXIES`。
+- 未启用或非可信代理时，即使携带伪造的 `X-Client-Verify=SUCCESS` 也不得获得身份。
 
 改配置后：`sudo nginx -t && sudo nginx -s reload`
 
