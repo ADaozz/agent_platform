@@ -186,13 +186,14 @@ def test_delete_rejects_running_background_task(client):
 
 def test_background_result_redacts_secrets_and_hides_failures():
     from platform_app import background_store as bg
-    assert 'sk-supersecretvalue' not in bg.redact_secrets('token sk-supersecretvalue tail')
+    secret = 'vendor-token-not-a-prefix'
+    assert secret not in bg.redact_secrets(f'token {secret} tail', secrets=(secret,))
     session_id = 's'
-    bg.mark_started(run_id='r1', session_id=session_id, tool_call_id='t', description='use sk-supersecretvalue', created_at='t0')
-    assert 'sk-supersecretvalue' not in bg.get('r1')['description']
-    bg.mark_finished(run_id='r1', session_id=session_id, status='failed', result='boom sk-supersecretvalue', finished_at='t1')
+    bg.mark_started(run_id='r1', session_id=session_id, tool_call_id='t', description=f'use {secret}', created_at='t0', secrets=(secret,))
+    assert secret not in bg.get('r1')['description']
+    bg.mark_finished(run_id='r1', session_id=session_id, status='failed', result=f'boom {secret}', finished_at='t1', secrets=(secret,))
     assert bg.get('r1')['result'] == '后台任务失败'
-    assert 'sk-supersecretvalue' not in json.dumps(bg.get('r1'))
+    assert secret not in json.dumps(bg.get('r1'))
 
 
 def test_delete_keeps_store_when_runner_close_times_out(client):
@@ -211,6 +212,34 @@ def test_delete_keeps_store_when_runner_close_times_out(client):
     assert not store._closed
     assert checkpoint.is_file()
     assert client.get(f'/api/agent/sessions/{session_id}').status_code == 200
+
+
+def test_failed_build_retries_close_before_creating_a_new_runner(client):
+    session_id = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()['id']
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'hello'}).status_code == 202
+    runtime = rt.RUNTIMES[session_id]
+    runner = runtime.runner
+    real_close = runner.close
+    attempts = {'n': 0}
+
+    def flaky_close():
+        attempts['n'] += 1
+        runner._closed = True
+        if attempts['n'] == 1:
+            raise RuntimeError('model stream still open')
+        return real_close()
+
+    runner.close = flaky_close
+    runtime.release_partial_runner(runner, runner.session_store, None)
+    assert runtime.runner is None
+    assert runtime._pending_cleanup is runner
+    rebuilt = runtime.build()
+    assert attempts['n'] == 2
+    assert rebuilt is not runner
+    assert runtime._pending_cleanup is None
+    assert not getattr(rebuilt, '_closed', False)
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'continue after cleanup'}).status_code == 202
+    assert client.get(f'/api/agent/sessions/{session_id}').json()['output'] == 'ok'
 
 
 def test_build_checkpoint_read_failure_does_not_delete_workspace(client, monkeypatch):

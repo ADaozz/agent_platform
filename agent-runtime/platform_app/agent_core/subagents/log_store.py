@@ -15,6 +15,14 @@ MAX_EVENT_BYTES = 24_000
 MAX_PAGE_BYTES = 64_000
 
 
+def redact_known_secrets(text: str, secrets: tuple[str, ...] = ()) -> str:
+    """Replace known secret values. Same rule as subagent logs; no second pattern list."""
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text
+
+
 class SubAgentLogStore:
     def __init__(self, root: Path, secrets: tuple[str, ...] = ()) -> None:
         self.root = root
@@ -26,10 +34,7 @@ class SubAgentLogStore:
         return self.root / hashlib.sha256(parent.encode()).hexdigest()
 
     def _redact(self, text: str) -> str:
-        for secret in self.secrets:
-            if secret:
-                text = text.replace(secret, "[REDACTED]")
-        return text
+        return redact_known_secrets(text, self.secrets)
 
     def _sanitize(self, value: Any) -> Any:
         if isinstance(value, str):

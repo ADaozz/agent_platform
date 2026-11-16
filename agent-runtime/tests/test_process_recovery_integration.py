@@ -53,7 +53,7 @@ def test_kill_after_file_write_does_not_replay_tool(tmp_path):
     continued = _run_worker('continue', data)
     assert continued.returncode == 0, continued.stderr
     body = json.loads(continued.stdout.strip().splitlines()[-1])
-    assert body['marker'] == 'marker-once'
+    assert body['marker'] == 'x'
     assert '不要重写标记文件' in body['output']
 
 

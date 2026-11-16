@@ -171,6 +171,7 @@ class SubAgentRuntime(Runnable):
             bg.mark_started(
                 run_id=run_id, session_id=parent, tool_call_id=tool_call_id,
                 description=description, created_at=started_at,
+                secrets=tuple(getattr(self.store, 'secrets', ()) or ()),
             )
         except Exception as exc:
             self.manager.release(run_id)
@@ -199,6 +200,7 @@ class SubAgentRuntime(Runnable):
                         run_id=run_id, session_id=parent, status=status, result=content,
                         finished_at=finished_at, tool_call_id=tool_call_id,
                         description=description, created_at=started_at,
+                        secrets=tuple(getattr(self.store, 'secrets', ()) or ()),
                     )
                 except Exception:
                     logging.getLogger(__name__).error(

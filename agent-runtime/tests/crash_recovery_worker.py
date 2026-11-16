@@ -1,6 +1,7 @@
 """Child process for crash-recovery checks. SIGKILL avoids a clean shutdown."""
 import json
 import os
+import shlex
 import signal
 import sys
 from pathlib import Path
@@ -32,9 +33,10 @@ def main():
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
             user = next((item.content for item in reversed(messages) if item.type == 'human'), '')
             if mode == 'write-kill' and not any(isinstance(item, ToolMessage) for item in messages):
+                command = 'printf x >> ' + shlex.quote(TARGET['path'])
                 return ChatResult(generations=[ChatGeneration(message=AIMessage(
                     content='',
-                    tool_calls=[{'name': 'write_file', 'args': {'file_path': TARGET['path'], 'content': 'marker-once'}, 'id': 'w1', 'type': 'tool_call'}],
+                    tool_calls=[{'name': 'execute', 'args': {'command': command}, 'id': 'w1', 'type': 'tool_call'}],
                 ))])
             if mode == 'write-kill':
                 os.kill(os.getpid(), signal.SIGKILL)

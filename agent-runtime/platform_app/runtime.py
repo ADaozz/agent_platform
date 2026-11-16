@@ -292,6 +292,7 @@ class Runtime:
         self.lock = threading.RLock()
         self.previous_snapshot = None
         self.manifest_rows = {}
+        self._pending_cleanup = None
 
     def event(self, event):
         with self.lock:
@@ -374,6 +375,7 @@ class Runtime:
             pass
 
     def build(self):
+        self._retry_pending_cleanup()
         if self.runner is not None:
             return self.runner
         from platform_app.agent_core import AgentRunner
@@ -479,14 +481,33 @@ class Runtime:
             self.release_partial_runner(runner, store, manager)
             raise
 
+    def _retry_pending_cleanup(self):
+        """Finish a close that previously timed out, then allow a new Runner."""
+        runner = self._pending_cleanup
+        if runner is None:
+            return
+        try:
+            runner.close()
+        except RuntimeError as exc:
+            raise HTTPException(409, '会话资源仍在释放中，请稍后重试') from exc
+        store = getattr(runner, 'session_store', None)
+        if store is not None and not getattr(store, '_closed', False):
+            try:
+                store.close()
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(409, '会话存储仍在释放中，请稍后重试') from exc
+        self._pending_cleanup = None
+
     def release_partial_runner(self, runner, store, manager):
         """Close a half-built runner without dropping a store another writer still holds."""
         if runner is not None:
             try:
                 runner.close()
             except RuntimeError:
-                # Lease is still required. Leave the runner for a later close retry.
-                self.runner = runner
+                # close() already marked the runner closed and kept the lease.
+                # Do not hand it back to invoke(); retry close before the next build.
+                self.runner = None
+                self._pending_cleanup = runner
                 LOG.error('Runner close failed during build; checkpoint store left open: session=%s', self.id)
                 return
             self.runner = None
@@ -751,6 +772,7 @@ def delete_session(session_id: str):
     from . import background_store as bg
     rt = runtime(session_id)
     with rt.lock:
+        rt._retry_pending_cleanup()
         record = find(session_id)
         # A queued or running worker would keep writing into the tree being removed.
         if record['status'] in ACTIVE:
