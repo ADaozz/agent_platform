@@ -31,6 +31,12 @@ const router = createRouter({
           meta: { title: '模型配置', icon: 'memory', group: '平台设置', eyebrow: 'MODEL REGISTRY' },
         },
         {
+          path: 'settings/usage',
+          name: 'settings-usage',
+          component: () => import('@/views/UsageDashboardView.vue'),
+          meta: { title: '用量仪表盘', icon: 'telemetry', group: '平台设置', eyebrow: 'USAGE TELEMETRY' },
+        },
+        {
           path: 'system/user',
           name: 'system-user',
           component: () => import('@/views/UserListView.vue'),

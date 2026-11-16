@@ -17,12 +17,12 @@
 
 当前方案：
 
-1. `createCorridorEnvironment`：深色腔体、顶/侧冷白 emissive 灯带、底部弱红 + 少量 PointLight，仅用于烘焙 PMREM，不进入主场景。
+1. `createCorridorEnvironment`：更深腔体 + 暗地板 + **细亮灯带**（中性偏暖白）+ 底部弱红；仅烘焙 PMREM，拉高表面反射对比（暗部类似 AO）。
 2. `scene.background` 仍为走廊 WebP（cover 裁切）。
-3. 主场景本地光：冷白 Directional（顶光）、冷色 rim、右下弱红 PointLight。
-4. 模块下方极淡软边圆形接触阴影（CanvasTexture plane），不做 shadowMap。
+3. 主场景本地光略收，让 IBL 表面反射更占主导；另加掠射 Directional + 跟随模块的 Spot，给古铜包边高光。
+4. 模块下方极淡软边圆形接触阴影（CanvasTexture plane），不做 shadowMap / SSAO。
 
-模型基础偏航约 `+0.5` rad，正面朝右面向用户。
+模型基础偏航约 `+0.28` rad，更正对镜头以便正面字清晰。
 
 ## 交互
 
@@ -36,9 +36,13 @@
 | --- | --- |
 | 无后处理 | 去掉 EffectComposer / Bokeh（原 DOF 几乎不可见） |
 | 原生 MSAA | `antialias: true` |
-| DPR | 默认 ≤1.25；弱设备 ≤1 |
+| DPR | 默认 ≤2；弱设备 ≤1.5（保证正面文字/磁带可读） |
+| 贴图 | 模型贴图各向异性 ≤16，减轻斜视发糊 |
+| 观察窗 | 关掉 KHR transmission，改半透明玻璃，避免透射 RT 抹糊窗后字/磁带 |
+| 磁带摩尔纹 | 同心层隔层隐藏；磁带材质压法线/高光/env，贴图各向异性≤2 |
+| 尺寸 | 模块约占视口宽 30%（几何字需要足够像素） |
 | 帧率 | 约 30fps |
-| 灯光 | 主场景 3 盏 |
+| 灯光 | 主场景 Directional / Spot / Point（含包边掠射高光） |
 | 弱设备 | `hardwareConcurrency` / `deviceMemory` / Save-Data 时降低 env 强度与浮动 |
 | 分块 | three 与 GLTF/meshopt 动态 `import`，画布淡入前由 CSS 背景顶替 |
 | 生命周期 | 标签页隐藏停帧；卸载 dispose 几何/材质/纹理/renderer |

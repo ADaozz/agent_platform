@@ -951,6 +951,10 @@
     "zh": "缓存命中率",
     "en": "Cache hit"
   },
+  "usage.cacheHitShort": {
+    "zh": "缓存命中",
+    "en": "Cache hit"
+  },
   "usage.cacheUnavailable": {
     "zh": "最近一次模型请求未返回可用的缓存统计",
     "en": "No cache usage was reported for the latest model request."
@@ -1679,6 +1683,10 @@
     "zh": "请填写你的回复…",
     "en": "Enter your answer…"
   },
+  "usage.activity": {
+    "zh": "{turns} 轮 {steps} 步",
+    "en": "{turns} turns · {steps} steps"
+  },
   "usage.context": {
     "zh": "上下文 {used} / {limit} Token",
     "en": "Context {used} / {limit} tokens"
@@ -1686,6 +1694,38 @@
   "usage.output": {
     "zh": "输出 {count} Token",
     "en": "Output {count} tokens"
+  },
+  "usage.cost": {
+    "zh": "费用",
+    "en": "Cost"
+  },
+  "usage.costEstimate": {
+    "zh": "按 DeepSeek 刊例估算的本会话累计费用（含峰谷），非账单",
+    "en": "Session cost estimated from DeepSeek list prices (peak/off-peak); not an invoice"
+  },
+  "usage.sessionCacheDetails": {
+    "zh": "本会话累计：缓存命中 {cached} / 输入 {total} Token",
+    "en": "Session total: {cached} cached / {total} input tokens"
+  },
+  "usage.sessionStats": {
+    "zh": "会话统计",
+    "en": "Session stats"
+  },
+  "usage.modelTime": {
+    "zh": "模型用时",
+    "en": "Model time"
+  },
+  "usage.toolTime": {
+    "zh": "工具调用用时",
+    "en": "Tool time"
+  },
+  "usage.ttft": {
+    "zh": "首 token 平均（TTFT）",
+    "en": "Avg. TTFT"
+  },
+  "usage.tps": {
+    "zh": "输出速度（TPS）",
+    "en": "Output speed (TPS)"
   },
   "usage.latestRequest": {
     "zh": "最近一次模型请求的输入用量 / 模型上下文窗口",

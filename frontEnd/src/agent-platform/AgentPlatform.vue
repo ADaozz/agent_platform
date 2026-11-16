@@ -43,23 +43,95 @@ const visibleSessions = computed(() => sessions.value.filter(s => !search.value 
 const busy = computed(() => ['queued', 'running'].includes(selected.value?.status))
 const waiting = computed(() => ['waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'].includes(selected.value?.status))
 const modelLabel = computed(() => profile.value?.model || t('Select model'))
-const contextWindow = computed(() => selected.value?.context_window || profile.value?.context_window || 0)
-const contextUsageLabel = computed(() => {
-  const used = selected.value?.usage?.input_tokens
-  const limit = contextWindow.value
-  return t('usage.context', { used: used == null ? '—' : used.toLocaleString(), limit: limit ? limit.toLocaleString() : '—' }) +
-    (used != null && limit ? ` (${(used / limit * 100).toFixed(1)}%)` : '')
+function modelRates(model, peak = false) {
+  const key = String(model || '')
+  const band = peak ? 'peak' : 'off'
+  if (/v4-pro/i.test(key)) {
+    return band === 'peak' ? { hit: 0.3, miss: 9.0, out: 27.0 } : { hit: 0.15, miss: 4.5, out: 13.5 }
+  }
+  if (/deepseek|flash/i.test(key)) {
+    return band === 'peak' ? { hit: 0.04, miss: 2.0, out: 8.0 } : { hit: 0.02, miss: 1.0, out: 4.0 }
+  }
+  return { hit: 1.0, miss: 1.0, out: 4.0 }
+}
+function isPeakBj(iso) {
+  if (!iso) return false
+  const ms = Date.parse(String(iso).replace('Z', '+00:00'))
+  if (!Number.isFinite(ms)) return false
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai', weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(new Date(ms))
+  const weekday = parts.find(p => p.type === 'weekday')?.value
+  if (weekday === 'Sat' || weekday === 'Sun') return false
+  const hour = Number(parts.find(p => p.type === 'hour')?.value)
+  const minute = Number(parts.find(p => p.type === 'minute')?.value)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false
+  const mins = hour * 60 + minute
+  return (9 * 60 <= mins && mins < 12 * 60) || (14 * 60 <= mins && mins < 18 * 60)
+}
+/** 整场会话累计：从 journal 的 model_metrics + 配对 usage 汇总 tokens / 缓存 / 费用 */
+const sessionUsageTotals = computed(() => {
+  let input = 0, output = 0, cache = 0, cost = 0, calls = 0
+  let lastUsage = null
+  const fallbackModel = selected.value?.model_id || modelId.value || ''
+  for (const event of events.value) {
+    const result = event.result || {}
+    if (event.type === 'usage') {
+      if (result.input_tokens != null || result.output_tokens != null) lastUsage = result
+      continue
+    }
+    if (event.type !== 'model_metrics') continue
+    if (result.input_tokens == null && result.output_tokens == null) continue
+    const inn = Math.max(0, Number(result.input_tokens) || 0)
+    const out = Math.max(0, Number(result.output_tokens) || 0)
+    let hit = 0
+    if (lastUsage && lastUsage.input_tokens === result.input_tokens) {
+      hit = Math.min(inn, Math.max(0, Number(lastUsage.cache_read_input_tokens) || 0))
+    }
+    const miss = Math.max(0, inn - hit)
+    const rates = modelRates(result.model || fallbackModel, isPeakBj(event.occurred_at))
+    input += inn
+    output += out
+    cache += hit
+    cost += (hit * rates.hit + miss * rates.miss + out * rates.out) / 1_000_000
+    calls++
+  }
+  const total = input + output
+  const rate = input > 0 ? cache / input : null
+  return { input, output, cache, total, cost, calls, rate }
 })
 const cacheHitLabel = computed(() => {
-  const rate = selected.value?.usage?.cache_hit_rate
-  return typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && rate <= 1
+  const rate = sessionUsageTotals.value.rate
+  return typeof rate === 'number' && Number.isFinite(rate)
     ? new Intl.NumberFormat(locale.value === 'zh' ? 'zh-CN' : 'en-US', { style: 'percent', maximumFractionDigits: 1 }).format(rate)
     : '—'
 })
 const cacheHitTitle = computed(() => {
-  const usage = selected.value?.usage
-  return cacheHitLabel.value === '—' ? t('usage.cacheUnavailable') : t('usage.cacheDetails', { cached: usage.cache_read_input_tokens.toLocaleString(), total: usage.input_tokens.toLocaleString() })
+  const totals = sessionUsageTotals.value
+  if (totals.rate == null) return t('usage.cacheUnavailable')
+  return t('usage.sessionCacheDetails', {
+    cached: totals.cache.toLocaleString(),
+    total: totals.input.toLocaleString(),
+  })
 })
+const tokenCacheLabel = computed(() => {
+  const totals = sessionUsageTotals.value
+  const hit = `${t('usage.cacheHitShort')} ${cacheHitLabel.value}`
+  return totals.calls ? `${totals.total.toLocaleString()} tok · ${hit}` : hit
+})
+const costLabel = computed(() => {
+  const totals = sessionUsageTotals.value
+  if (!totals.calls) return '—'
+  const cost = totals.cost
+  return `¥ ${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`
+})
+function formatLongDuration(ms) {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return '—'
+  const totalSec = Math.round(ms / 1000)
+  const minutes = Math.floor(totalSec / 60)
+  const seconds = totalSec % 60
+  return t('process.minutesSeconds', { minutes, seconds })
+}
 const reasoningProfile = computed(() => profiles.value.find(p => p.id === reasoningModelId.value))
 const reasoningChoice = computed(() => reasoningModelId.value === modelId.value ? effort.value : reasoningProfile.value?.default_reasoning_effort || '')
 const effectivePermission = computed(() => selected.value?.permission_mode || draftPermission.value)
@@ -69,6 +141,43 @@ const toolLabels = computed(() => ({ ls: t('列出文件'), read_file: t('读取
 const statusLabels = computed(() => ({ idle: t('新会话'), queued: t('排队中'), running: t('执行中'), completed: t('已完成'), failed: t('执行失败'), waiting_confirmation: t('等待审批'), waiting_human: t('等待回复'), paused: t('已暂停'), runtime_config_boundary: t('等待继续'), cancelled: t('已取消'), interrupted: t('已中断') }))
 
 const timeline = computed(() => conversationTimeline(events.value, selected.value?.status))
+const sessionStats = computed(() => {
+  let modelSec = 0, ttftSum = 0, ttftN = 0, tpsSum = 0, tpsN = 0
+  for (const event of events.value) {
+    if (event.type !== 'model_metrics') continue
+    const m = event.result || {}
+    const ttft = typeof m.ttft === 'number' && m.ttft >= 0 ? m.ttft : 0
+    const outDur = typeof m.output_duration === 'number' && m.output_duration > 0 ? m.output_duration : 0
+    modelSec += ttft + outDur
+    if (typeof m.ttft === 'number' && m.ttft >= 0) { ttftSum += m.ttft; ttftN++ }
+    if (typeof m.tps === 'number' && Number.isFinite(m.tps) && m.tps >= 0) { tpsSum += m.tps; tpsN++ }
+  }
+  let toolMs = 0
+  for (const block of timeline.value) {
+    if (block.kind !== 'process') continue
+    for (const step of block.steps || []) {
+      if (step.kind === 'tool' && typeof step.durationMs === 'number' && step.durationMs > 0) toolMs += step.durationMs
+    }
+  }
+  const avgTtft = ttftN ? ttftSum / ttftN : null
+  const avgTps = tpsN ? tpsSum / tpsN : null
+  return {
+    modelTime: formatLongDuration(modelSec * 1000),
+    toolTime: formatLongDuration(toolMs),
+    ttft: avgTtft == null ? '—' : t('process.seconds', { seconds: Math.max(1, Math.round(avgTtft)) }),
+    tps: avgTps == null ? '—' : `${Math.max(1, Math.round(avgTps))} tok/s`,
+    tpsRaw: avgTps,
+  }
+})
+const activityLabel = computed(() => {
+  const blocks = timeline.value
+  const turns = blocks.filter(b => b.kind === 'user').length
+  const steps = blocks.filter(b => b.kind === 'process').reduce((n, b) => n + (b.stepCount || 0), 0)
+  const base = t('usage.activity', { turns, steps })
+  const tps = sessionStats.value.tpsRaw
+  if (tps == null) return base
+  return `${base} · ${Math.max(1, Math.round(tps))} tok/s`
+})
 const outputFiles = computed(() => sessionOutputFiles(selected.value))
 // Files are listed under the turn that wrote them; only files no turn claims (older sessions,
 // artifacts) stay in the closing list. Deleted files drop out because the index is the current library.
@@ -496,7 +605,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
             </div>
           </form>
           <input ref="fileInput" type="file" multiple hidden @change="upload">
-          <div v-if="selected" class="composer-caption"><span>{{ busy ? t('Enter to steer · Queue for a follow-up') : t('Enter to send · Shift+Enter for a new line') }}</span><span class="composer-usage"><span class="context-usage" :title="t('usage.latestRequest')">{{ contextUsageLabel }}</span><span v-if="selected.usage?.output_tokens != null" class="output-usage">{{ t('usage.output', { count: selected.usage.output_tokens.toLocaleString() }) }}</span><span class="cache-hit-rate" :title="cacheHitTitle">{{ t('usage.cacheHit') }} {{ cacheHitLabel }}</span></span></div>
+          <div v-if="selected" class="composer-caption"><span>{{ busy ? t('Enter to steer · Queue for a follow-up') : t('Enter to send · Shift+Enter for a new line') }}</span><div class="agent-stats"><div class="stat-wrapper" tabindex="0"><div class="stat-trigger"><Icon name="Gauge" :size="16" :stroke-width="1.8" /><span>{{ activityLabel }}</span></div><div class="stat-popover" role="tooltip"><div class="stat-popover-title">{{ t('usage.sessionStats') }}</div><div class="stat-row"><span>{{ t('usage.modelTime') }}</span><strong>{{ sessionStats.modelTime }}</strong></div><div class="stat-row"><span>{{ t('usage.toolTime') }}</span><strong>{{ sessionStats.toolTime }}</strong></div><div class="stat-row"><span>{{ t('usage.ttft') }}</span><strong>{{ sessionStats.ttft }}</strong></div><div class="stat-row"><span>{{ t('usage.tps') }}</span><strong>{{ sessionStats.tps }}</strong></div><div class="stat-row" :title="t('usage.costEstimate')"><span>{{ t('usage.cost') }}</span><strong>{{ costLabel }}</strong></div></div></div><div class="stat-item" :title="cacheHitTitle"><Icon name="Database" :size="16" :stroke-width="1.8" /><span>{{ tokenCacheLabel }}</span></div></div></div>
           <div v-if="error && !modal" role="alert" class="error-inline"><Icon name="CircleAlert" :size="14" />{{ t(error) }}<button @click="error = ''" class="icon-button" :aria-label='t("关闭错误")'><Icon name="X" :size="13" /></button></div>
         </div>
 

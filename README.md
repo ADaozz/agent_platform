@@ -1,116 +1,44 @@
-# Agent Platform
+# Deep Agent
 
-多用户 Agent 平台：Spring Boot 负责用户认证、自助注册、角色权限、证书登录与登录设备管理，Vue 3 提供统一网页界面，Python Agent Runtime（FastAPI + LangGraph / deepagents）负责 Agent 执行、沙箱隔离与 DOCX / PPTX 文档生成和预览。
+智能体工作平台：对话、执行与交付在同一座控制台完成。
 
-## 架构
+面向需要可靠多用户协作的团队——用自然语言把任务交给 Agent，在隔离环境中执行，并把可交付的 Word / PPT 文档直接带回工作台预览与下载。
 
-```text
-浏览器（Vue 3，frontEnd/）
-  │  JWT（Authorization: Bearer）；预览图片与下载使用只读 HttpOnly Cookie
-  ▼
-Spring Boot（backend/，:8080）
-  │  Shiro + JWT + Redis 会话校验，RBAC（admin / user）
-  │  /agent-runtime/api/** → 附加 HMAC 签名身份后反向代理
-  ▼
-Agent Runtime（agent-runtime/，FastAPI，:8090，仅本机或内网）
-  │  校验签名，会话按用户隔离
-  ▼
-Agent 执行引擎：Bubblewrap 沙箱、checkpoint、SSE 事件流、DOCX / PPTX Skill
-```
+## 能做什么
 
-浏览器不直接访问 Python 服务。Spring Boot 校验登录状态后，用共享密钥对用户 ID、角色、时间戳、HTTP 方法、路径和查询串签名，Python 端验证通过才处理请求。
+**进入工作台**  
+邮箱验证码自助注册，或使用账号密码、客户端证书登录。管理员可管理用户与角色，查看并踢下线登录设备；个人可申请与管理自己的证书。
 
-## 目录
+**与 Agent 协作**  
+多轮对话、实时执行时间线、工具调用审批，以及暂停、继续、取消或运行中追加指令。历史会话可回看、可删除；每位用户的会话彼此隔离。输入区旁可查看本会话轮次、步数与输出速度；悬停可展开模型用时、工具用时、TTFT、TPS 与估算费用。
 
-| 路径 | 内容 |
+**文件与成果**  
+上传附件作为上下文，下载会话产出文件，在全局文件库中按类型浏览。生成的 DOCX / PPTX 支持按页预览：Word 含公式、图表、目录与复杂排版；演示文稿支持风格化生成与逐页查看。
+
+**模型与用量**  
+管理员维护团队可用的全局模型；普通用户也可配置仅自己可见的私人模型。工具与 Skill 由平台统一提供，无需每人单独部署。用量仪表盘按天汇总 Tokens 与估算费用（DeepSeek 刊例，含缓存命中与峰谷），便于团队对照消耗。
+
+**使用体验**  
+中英文界面、明暗主题（默认深色）、可折叠侧栏。登录页宽屏呈现工业走廊主视觉与悬浮数据卡带模块（金属高光、正面文字清晰）；窄屏自动简化，不加载立体场景。
+
+## 谁适合用
+
+- 需要把调研、写作、排版交给 Agent，并直接拿到可打开的办公文档的人  
+- 同一平台上多人各自工作、互不窥探会话与文件的小团队  
+- 希望用证书或统一账号体系接入、由管理员管控权限与设备的组织
+
+## 安全承诺（产品侧）
+
+- 用户会话、文件与执行环境按账号隔离，他人无法打开你的对话或产物  
+- 证书登录与设备管理用于收紧入口；管理员可吊销异常会话  
+- Agent 在受限环境中执行，不开放「完全接管本机」一类高危模式给多用户部署
+
+## 了解更多
+
+| 文档 | 内容 |
 | --- | --- |
-| `backend/` | Spring Boot 2.6 后台：Shiro + JWT、KingbaseES（本地可用 SQLite）、Redis、用户/角色/证书/登录设备/自助注册、Agent Runtime 签名代理 |
-| `frontEnd/` | Vue 3 + Vite + Tailwind 前端；`src/agent-platform/` 为 Agent 对话、文件与文档预览界面 |
-| `agent-runtime/` | Python Agent Runtime、内置执行引擎、DOCX / PPTX Skill 与测试，说明见 [agent-runtime/README.md](agent-runtime/README.md) |
-| `docs/` | 架构、部署与验收说明，见 [AGENT_WORKSPACE.md](docs/AGENT_WORKSPACE.md)；登录页 3D 场景见 [login-scene](docs/login-scene/README.md) |
-| `ca/`、`ca_test/` | 证书登录使用的 CA 与服务端证书（仅公开证书，私钥不入库） |
-
-## 功能
-
-- **账号与权限**：账号密码登录、邮箱验证码自助注册、客户端证书登录；用户、角色、登录设备（可踢下线）、证书签发与管理。
-- **Agent 对话**：多轮会话、流式执行时间线、工具审批、暂停/继续/取消、运行中追加指令；历史对话可删除。
-- **文件**：附件上传，会话产出文件下载与预览，跨会话的全局文件列表（按类型显示图标）。
-- **文档生成**：DOCX 支持公式、原生图表、题注与交叉引用、目录、复杂表格、图文排版、页眉页脚，预览按页浏览、只更新变化的页面；PPTX 提供风格化生成、原生图表与公式和逐页预览。
-- **模型配置**：管理员维护全局模型；普通用户使用全局模型，并可配置加密保存的私人模型。Agent 工具与 Skill 由服务端统一管理。
-- **界面**：中英文切换、白天/黑夜模式（默认黑夜）、可折叠侧栏；登录页为工业走廊背景 + 悬浮 3D 数据模块（宽屏）。
-
-## 快速开始
-
-### 1. 共享签名密钥
-
-两个服务使用同一个随机密钥（至少 32 字节），不要提交到仓库：
-
-```bash
-export AGENT_RUNTIME_SHARED_SECRET="$(openssl rand -base64 48)"
-export ITAM_RUNTIME_SHARED_SECRET="$AGENT_RUNTIME_SHARED_SECRET"
-```
-
-### 2. Agent Runtime
-
-需要 Linux / WSL2、Python 3.12+、Bubblewrap；正式渲染 DOCX / PPTX 预览还需 LibreOffice 与中文字体。
-
-```bash
-cd agent-runtime
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.lock
-.venv/bin/pip install -r docx-ooxml-skill/requirements.txt -r pptx-ooxml-skill/requirements.txt
-PLATFORM_DATA_DIR=.platform-itam .venv/bin/uvicorn platform_app.main:app --host 127.0.0.1 --port 8090
-```
-
-### 3. Spring Boot 后台
-
-需要 JDK 8+、Maven、Redis。生产/联调使用 KingbaseES；本地可无金仓，改用 SQLite profile。
-
-**Kingbase（默认）**
-
-1. 按 [backend/README.md](backend/README.md) 初始化数据库（含 `23-user-email.sql`、`24-register-user-role.sql` 等增量脚本）。
-2. 复制 `backend/src/main/resources/application-local.example.yml` 为 `application-local.yml`（已被忽略，不入库），填写数据源、JWT 密钥，以及注册发信邮箱（`spring.mail` / `MAIL_USERNAME`、`MAIL_PASSWORD`）。
-3. 设置 `AGENT_RUNTIME_URL`（默认 `http://127.0.0.1:8090`）和上面的 `AGENT_RUNTIME_SHARED_SECRET`，然后启动 `BackendApplication`。
-
-**本地 SQLite（无需 KingbaseES）**
-
-```bash
-cd backend
-# IDE 或命令行激活：sqlite,dev（详见 backend/README.md）
-mvn spring-boot:run -Dspring-boot.run.profiles=sqlite,dev
-```
-
-数据文件默认写到 `backend/data/agent-platform.db`；仍需本机 Redis。自助注册发信需配置 SMTP。
-
-### 4. 前端
-
-```bash
-cd frontEnd
-npm install
-npm run dev
-```
-
-开发服务器把 `/api` 代理到后台，目标地址可用环境变量 `VITE_PROXY_TARGET` 指定。生产构建使用 `npm run build`，由 nginx 等代理 `/api`。
-
-前端说明见 [frontEnd/README.md](frontEnd/README.md)。
-
-## 安全说明
-
-- Python Agent Runtime 只能监听本机或仅后台可访问的私有网络，不要暴露到公网。
-- 数据库密码、JWT 密钥、签名密钥、邮件授权码、私钥与证书包均不入库，相应文件已在 `.gitignore` 中忽略。
-- 多用户模式下禁止 `full-access` 沙箱，每个会话的文件、命令与 Skill 快照相互隔离。
-
-## 测试
-
-```bash
-# Agent Runtime
-cd agent-runtime
-.venv/bin/pip install pytest httpx
-.venv/bin/python -m pytest -q
-PYTHONPATH=. .venv/bin/python -m pytest -q docx-ooxml-skill/tests pptx-ooxml-skill/tests
-
-# 前端类型检查与构建
-cd frontEnd && npm run build
-```
-
-后台接口测试脚本与数据库说明见 [backend/README.md](backend/README.md)。
+| [架构与部署](docs/AGENT_WORKSPACE.md) | 系统组成、部署与验收要点 |
+| [后台说明](backend/README.md) | 认证、注册、权限与接口 |
+| [网页端说明](frontEnd/README.md) | 登录与工作台界面 |
+| [Agent Runtime](agent-runtime/README.md) | 执行引擎与文档 Skill |
+| [登录页视觉](docs/login-scene/README.md) | 登录主视觉设计说明 |

@@ -48,9 +48,72 @@ async function runtimeJson<T>(path: string, init: RequestInit = {}): Promise<T> 
   return data as T
 }
 
+export interface UsageRateBand {
+  cache_hit: number
+  cache_miss: number
+  output: number
+}
+
+export interface UsageDayRow {
+  date: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens: number
+  total_tokens: number
+  calls: number
+  peak_calls: number
+  off_peak_calls: number
+  cost_cny: number
+}
+
+export interface UsageSessionRow {
+  session_id: string
+  title: string
+  model_id: string | null
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens: number
+  total_tokens: number
+  calls: number
+  peak_calls: number
+  off_peak_calls: number
+  cost_cny: number
+  last_at: string | null
+  updated_at: string | null
+}
+
+export interface UsageOverview {
+  days: number
+  currency: string
+  cost_note: string
+  pricing_source?: string
+  rates_cny_per_m: Record<string, { off_peak: UsageRateBand; peak: UsageRateBand }>
+  peak_windows?: {
+    timezone: string
+    weekdays: string
+    hours: string[]
+    note: string
+  }
+  totals: {
+    input_tokens: number
+    output_tokens: number
+    cache_read_input_tokens: number
+    total_tokens: number
+    calls: number
+    peak_calls: number
+    off_peak_calls: number
+    cost_cny: number
+    sessions: number
+  }
+  daily: UsageDayRow[]
+  sessions: UsageSessionRow[]
+}
+
 export const getModelOptions = () => runtimeJson<ModelOptions>('/models/options')
 export const getPersonalModels = () => runtimeJson<ModelConfigResult>('/models/personal')
 export const getGlobalModels = () => runtimeJson<ModelConfigResult>('/models')
+export const getUsageOverview = (days = 30) =>
+  runtimeJson<UsageOverview>(`/agent/usage/overview?days=${encodeURIComponent(String(days))}`)
 
 export function savePersonalModels(llm: LlmConfig, revision: number) {
   return runtimeJson<ModelConfigResult>('/models/personal', { method: 'PUT', body: JSON.stringify({ llm, revision }) })

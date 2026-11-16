@@ -21,6 +21,7 @@ from . import domain as d, models as m
 from .usage import runner_usage
 from . import format_plugins
 from . import itam_bridge
+from . import usage_stats
 from .workspace import resolve, SandboxPolicyBuilder
 
 router = APIRouter(prefix='/api/agent')
@@ -558,6 +559,12 @@ def capabilities():
         'tools': list(d.CORE_TOOLS), 'streaming': True, 'sessions': True, 'approvals': True,
         'workspace_isolation': 'thread', 'sandbox_default': 'restricted',
         'subagents': True, 'images': True, 'mcp': False, 'mcp_requires_scoped_adapter': True}
+
+
+@router.get('/usage/overview')
+def usage_overview(days: int = 30):
+    """Token / estimated-cost rollups by day and session for the current owner."""
+    return usage_stats.overview(days=days)
 
 
 @router.get('/sessions')

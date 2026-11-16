@@ -25,6 +25,7 @@ interface MenuItem {
 const SETTINGS_GROUP = '平台设置'
 const settingsMenus: MenuItem[] = [
   { path: '/settings/models', title: '模型配置', icon: 'memory' },
+  { path: '/settings/usage', title: '用量仪表盘', icon: 'telemetry' },
   { path: '/system/user', title: '用户管理', icon: 'group', permission: 'system:user:list' },
   { path: '/system/role', title: '角色管理', icon: 'shield_person', permission: 'system:role:list' },
   { path: '/system/session', title: '登录设备管理', icon: 'devices', permission: 'system:session:list' },
