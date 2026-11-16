@@ -47,6 +47,10 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
   --ws-backdrop-top: 0px;
   --ws-backdrop-bottom: 0px;
 }
+/* Home: keep composer fixed; only .recent-chats scrolls. */
+.agent-host :deep(.agent-main:has(> .chat-page:not(.has-session))) {
+  overflow: hidden;
+}
 /* Match existing content gutters and preview bounds without changing either. */
 .agent-host :deep(.agent-main.session-layout),
 .agent-host :deep(.document-open > .agent-main) {
@@ -55,12 +59,12 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
 .agent-host :deep(.agent-main:has(> .page-header)) {
   --ws-backdrop-top: 52px;
 }
-@media (max-width: 700px) {
+@media (max-width: 767px) {
   .agent-host :deep(.document-open > .agent-main) {
     --ws-backdrop-bottom: 44dvh;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .agent-host :deep(.agent-main) {
     --ws-backdrop-gutter: 0px;
   }

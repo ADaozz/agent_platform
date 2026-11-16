@@ -238,3 +238,41 @@ test('output files belong to the turn that wrote them',()=>{
  const blocks=conversationTimeline([...turn(1,'one',[{path:'a.py',size:1}]),...turn(10,'two',[{path:'b.wav',size:2},{path:'a.py',size:3}])],'completed')
  assert.deepEqual(blocks.filter(block=>block.footer).map(block=>block.footer.files),[['a.py'],['b.wav','a.py']])
 })
+
+test('a background subagent card outlives its turn and settles from the host notification',()=>{
+ const events=[
+  {seq:1,type:'operation',operation:'message',text:'Go',occurred_at:at(0)},
+  {seq:2,type:'tool_started',name:'start_background_task',tool_call_id:'bg',arguments:{description:'Write marker'},occurred_at:at(1)},
+  {seq:3,type:'tool_completed',name:'start_background_task',tool_call_id:'bg',content:'Background subagent started (run_id=abcdef0123456789). It runs while you continue.',occurred_at:at(2)},
+  {seq:4,type:'result',status:'completed',output:'Started.',occurred_at:at(3)},
+ ]
+ const live=processOf(events,'completed')
+ assert.equal(live.steps[0].status,'running')
+ assert.equal(live.steps[0].backgroundLive,true)
+ assert.equal(live.steps[0].background.runId,'abcdef0123456789')
+ assert.equal(live.steps[0].resultSummary,'Write marker')
+ const gone=conversationTimeline(events,'completed',{backgroundTasks:[{tool_call_id:'bg',status:'cancelled'}]}).find(block=>block.kind==='process')
+ assert.equal(gone.steps[0].status,'interrupted')
+ events.push(
+  {seq:5,type:'subagent_finished',result:{tool_call_id:'bg',run_id:'abcdef0123456789',status:'completed',content:'[subagent run_id=abcdef0123456789]\nMarker written.'},occurred_at:at(9)},
+  {seq:6,type:'operation',operation:'notify',occurred_at:at(10)},
+  {seq:7,type:'result',status:'completed',output:'Got it.',occurred_at:at(11)},
+ )
+ const blocks=conversationTimeline(events,'completed',{backgroundTasks:[{tool_call_id:'bg',status:'completed'}]})
+ assert.deepEqual(blocks.map(block=>block.kind),['user','process','assistant','notice','assistant'])
+ const step=blocks[1].steps[0]
+ assert.equal(step.status,'completed')
+ assert.equal(step.resultSummary,'Marker written.')
+ assert.equal(step.durationMs,8000)
+ assert.deepEqual(blocks[3].items.map(item=>item.description),['Write marker'])
+})
+
+test('a refused background launch fails its card immediately',()=>{
+ const events=[
+  {seq:1,type:'operation',operation:'message',text:'Go',occurred_at:at(0)},
+  {seq:2,type:'tool_started',name:'start_background_task',tool_call_id:'bg',arguments:{description:'x'},occurred_at:at(1)},
+  {seq:3,type:'tool_completed',name:'start_background_task',tool_call_id:'bg',content:'Subagent failed: Subagent concurrency limit (2) reached',occurred_at:at(2)},
+ ]
+ assert.equal(processOf(events).steps[0].status,'failed')
+ assert.equal(processOf(events).steps[0].background,undefined)
+})

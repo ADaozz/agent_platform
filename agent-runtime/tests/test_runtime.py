@@ -100,6 +100,40 @@ class DelegationModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=msg)])
 
 
+class BackgroundDelegationModel(BaseChatModel):
+    target: str
+    child: bool = False
+
+    @property
+    def _llm_type(self):
+        return 'background-delegation-integration'
+
+    def bind_tools(self, tools, **kwargs):
+        names = [t.get('name') if isinstance(t, dict) else t.name for t in tools]
+        if 'task' in names:
+            assert {'start_background_task', 'check_background_task', 'cancel_background_task'} <= set(names)
+            return self.model_copy(update={'child': False})
+        assert 'start_background_task' not in names
+        return self.model_copy(update={'child': True})
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        last_user = max(i for i, message in enumerate(messages) if isinstance(message, HumanMessage))
+        text = str(messages[last_user].content)
+        answered = any(isinstance(m, ToolMessage) for m in messages[last_user:])
+        if self.child and not answered:
+            msg = AIMessage(content='', tool_calls=[{'name': 'execute', 'args': {'command': 'sleep 0.3; printf background-ok > ' + shlex.quote(self.target)}, 'id': 'child-exec', 'type': 'tool_call'}])
+        elif self.child:
+            msg = AIMessage(content='Background subagent wrote background-ok.')
+        elif text.startswith('[Background subagent finished'):
+            assert 'Background subagent wrote background-ok.' in text
+            msg = AIMessage(content='Main agent received background result.')
+        elif not answered:
+            msg = AIMessage(content='', tool_calls=[{'name': 'start_background_task', 'args': {'description': 'Write the background marker file.'}, 'id': 'bg-start', 'type': 'tool_call'}])
+        else:
+            msg = AIMessage(content='Started in background.')
+        return ChatResult(generations=[ChatGeneration(message=msg)])
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(d, 'DATA', tmp_path)
@@ -1055,3 +1089,31 @@ def test_failed_native_sandbox_rebuild_keeps_old_policy_and_clears_pending(clien
     record=client.get(base).json()
     assert record['sandbox_mode']=='restricted' and record['pending_sandbox_mode'] is None
     assert any(e['type']=='runtime_config_failed' for e in rt.journal(session_id,0))
+
+
+def test_background_subagent_wakes_idle_session(client, monkeypatch):
+    import time
+    session_id = new_session(client)
+    target = files_root() / 'background.txt'
+    def build_model(profile, **kwargs):
+        model = BackgroundDelegationModel(target=str(target))
+        object.__setattr__(model, '_deep_agent_model_id', profile.id)
+        return model
+    monkeypatch.setattr('platform_app.agent_core.llm.build_chat_model', build_model)
+    monkeypatch.setattr('platform_app.agent_core.runner.build_chat_model', build_model)
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'Run this in background.'}).status_code == 202
+    record = client.get('/api/agent/sessions/' + session_id).json()
+    assert record['output'] == 'Started in background.'
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        record = client.get('/api/agent/sessions/' + session_id).json()
+        if record['output'] == 'Main agent received background result.' and record['status'] == 'completed':
+            break
+        time.sleep(0.1)
+    assert record['output'] == 'Main agent received background result.', record
+    assert target.read_text() == 'background-ok'
+    events = client.get(f'/api/agent/sessions/{session_id}/journal').json()['events']
+    finished = [e for e in events if e['type'] == 'subagent_finished']
+    assert finished and finished[0]['result']['tool_call_id'] == 'bg-start' and finished[0]['result']['status'] == 'completed'
+    assert any(e['type'] == 'operation' and e['operation'] == 'notify' for e in events)
+    assert record['background_tasks'][0]['status'] == 'completed'

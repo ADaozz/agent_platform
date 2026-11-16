@@ -25,6 +25,7 @@ interface MenuItem {
 const SETTINGS_GROUP = '平台设置'
 const settingsMenus: MenuItem[] = [
   { path: '/settings/models', title: '模型配置', icon: 'memory' },
+  { path: '/settings/capabilities', title: '平台能力', icon: 'extension' },
   { path: '/settings/usage', title: '用量仪表盘', icon: 'telemetry' },
   { path: '/system/user', title: '用户管理', icon: 'group', permission: 'system:user:list' },
   { path: '/system/role', title: '角色管理', icon: 'shield_person', permission: 'system:role:list' },
@@ -41,6 +42,23 @@ const settingsActive = computed(() => currentGroup.value === SETTINGS_GROUP)
 // 侧栏鼠标悬停展开、移出收起（略作延迟避免划过边缘时闪烁）；展开时占用宽度，主区域整体右移不被遮挡
 const sidebarOpen = ref(false)
 const railHover = ref(false)
+
+// ≤767px：侧栏改为抽屉，由页头菜单按钮打开，导航后自动收起
+const mobileQuery = window.matchMedia('(max-width: 767px)')
+const mobile = ref(mobileQuery.matches)
+const drawerOpen = ref(false)
+const expanded = computed(() => (mobile.value ? drawerOpen.value : sidebarOpen.value))
+function onMobileChange(e: MediaQueryListEvent) {
+  mobile.value = e.matches
+  drawerOpen.value = false
+  sidebarOpen.value = false
+}
+mobileQuery.addEventListener('change', onMobileChange)
+/** 抽屉内点了导航项（含最近对话）就收起；设置按钮只负责展开飞出菜单 */
+function onNavClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (mobile.value && target.closest('.rail-item') && !target.closest('.rail-settings')) drawerOpen.value = false
+}
 let sidebarTimer: ReturnType<typeof setTimeout> | undefined
 function scheduleSidebarClose() {
   clearTimeout(sidebarTimer)
@@ -49,11 +67,13 @@ function scheduleSidebarClose() {
   }, 150)
 }
 function openSidebar() {
+  if (mobile.value) return
   clearTimeout(sidebarTimer)
   railHover.value = true
   sidebarOpen.value = true
 }
 function closeSidebar() {
+  if (mobile.value) return
   railHover.value = false
   // 飞出菜单打开时保持侧栏展开，避免移入菜单途中被收起
   if (settingsMenuOpen.value) return
@@ -70,6 +90,16 @@ function placeFlyout() {
   if (!rect) return
   const gap = 8
   const maxH = Math.min(360, window.innerHeight - 24)
+  // 抽屉里右侧没有空间：贴在按钮上方展开
+  if (mobile.value) {
+    flyoutStyle.value = {
+      bottom: `${window.innerHeight - rect.top + gap}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      maxHeight: `${Math.min(maxH, rect.top - 24)}px`,
+    }
+    return
+  }
   // 贴按钮右侧，垂直对齐底部；空间不够时改为顶对齐并限制高度
   const bottomSpace = window.innerHeight - rect.top
   if (bottomSpace >= Math.min(maxH, visibleSettings.value.length * 40 + 48)) {
@@ -114,7 +144,10 @@ function onSettingsKeydown(e: KeyboardEvent) {
 
 watch(
   () => route.fullPath,
-  () => closeSettingsMenu(),
+  () => {
+    closeSettingsMenu()
+    drawerOpen.value = false
+  },
 )
 
 watch(settingsMenuOpen, (open) => {
@@ -123,12 +156,13 @@ watch(settingsMenuOpen, (open) => {
 })
 
 // 侧栏一旦收起，同步关掉飞出菜单，避免菜单悬空留在原位置
-watch(sidebarOpen, (open) => {
+watch(expanded, (open) => {
   if (!open && settingsMenuOpen.value) settingsMenuOpen.value = false
 })
 
 onUnmounted(() => {
   clearTimeout(sidebarTimer)
+  mobileQuery.removeEventListener('change', onMobileChange)
   document.removeEventListener('keydown', onSettingsKeydown)
 })
 
@@ -150,15 +184,24 @@ function handleLogout() {
 <template>
   <div class="shell flex h-full min-h-0">
     <!-- 侧栏：跟随明暗主题 -->
-    <aside class="rail" :class="{ 'rail-open': sidebarOpen }" @mouseenter="openSidebar" @mouseleave="closeSidebar">
+    <div v-if="mobile && drawerOpen" class="rail-scrim" aria-hidden="true" @click="drawerOpen = false" />
+    <aside
+      id="app-rail"
+      class="rail"
+      :class="{ 'rail-open': expanded, 'rail-drawer': mobile, 'rail-drawer-open': mobile && drawerOpen }"
+      :inert="mobile && !drawerOpen"
+      @mouseenter="openSidebar"
+      @mouseleave="closeSidebar"
+      @click="onNavClick"
+    >
       <div class="rail-brand">
-        <BrandMark v-if="sidebarOpen" :size="40" class="rail-logo shrink-0" />
+        <BrandMark v-if="expanded" :size="40" class="rail-logo shrink-0" />
         <BrandGlyph v-else :size="30" />
       </div>
 
       <nav class="flex min-h-0 flex-1 flex-col">
         <div class="rail-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <AgentNav :open="sidebarOpen" />
+          <AgentNav :open="expanded" />
         </div>
 
         <!-- 平台设置：点击飞出菜单，收起/展开侧栏交互一致 -->
@@ -174,7 +217,7 @@ function handleLogout() {
             @click.stop="toggleSettingsMenu"
           >
             <AppIcon name="settings" />
-            <template v-if="sidebarOpen">
+            <template v-if="expanded">
               <span class="flex-1 truncate text-left">{{ tr(SETTINGS_GROUP) }}</span>
               <AppIcon name="chevron_right" class="rail-caret" />
             </template>
@@ -187,7 +230,7 @@ function handleLogout() {
         <div class="rail-avatar" aria-hidden="true">
           {{ (auth.user?.username || '?').charAt(0).toUpperCase() }}
         </div>
-        <template v-if="sidebarOpen">
+        <template v-if="expanded">
           <div class="min-w-0 flex-1 whitespace-nowrap leading-tight">
             <div class="truncate text-[13px] font-medium text-[var(--chrome-ink)]">{{ auth.user?.username }}</div>
             <div class="rail-role">{{ tr(isAdmin ? '管理员' : '普通用户') }}</div>
@@ -230,6 +273,17 @@ function handleLogout() {
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <header class="topbar">
         <div class="flex min-w-0 items-center gap-3">
+          <button
+            v-if="mobile"
+            type="button"
+            class="topbar-menu"
+            :aria-label="tr('打开导航')"
+            aria-controls="app-rail"
+            :aria-expanded="drawerOpen"
+            @click="drawerOpen = true"
+          >
+            <AppIcon name="menu" class="!text-[20px]" />
+          </button>
           <div class="topbar-path">
             <span class="whitespace-nowrap">DEEP AGENT</span>
             <template v-if="currentGroup">
@@ -487,12 +541,70 @@ function handleLogout() {
   font-weight: 600;
   color: var(--color-ink);
 }
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .topbar {
     padding: 0 0.875rem;
   }
   .topbar-path > :not(.topbar-current) {
     display: none;
+  }
+}
+
+/* ≤767px：侧栏为抽屉，覆盖在内容之上 */
+.rail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgb(0 0 0 / 0.45);
+  animation: rail-scrim-in 0.2s var(--ease-out);
+}
+@keyframes rail-scrim-in {
+  from { opacity: 0; }
+}
+.rail.rail-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 45;
+  width: min(17rem, 84vw);
+  height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  transform: translateX(-100%);
+  transition: transform 0.24s var(--ease-out), box-shadow 0.24s;
+}
+.rail.rail-drawer-open {
+  transform: none;
+  box-shadow: 12px 0 32px rgb(0 0 0 / 0.28);
+}
+.topbar-menu {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  margin-left: -0.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--color-ink-muted);
+}
+.topbar-menu:hover,
+.topbar-menu:focus-visible {
+  background-color: var(--color-line);
+  color: var(--color-ink);
+  outline: none;
+}
+@media (max-width: 767px) {
+  .rail-flyout-scrim {
+    z-index: 46;
+  }
+  .rail-flyout {
+    z-index: 47;
+    min-width: 0;
+    max-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail.rail-drawer {
+    transition: none;
   }
 }
 
@@ -512,7 +624,7 @@ function handleLogout() {
 .page-canvas {
   padding: 1.75rem 2rem 2.5rem;
 }
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .page-canvas {
     padding: 1.25rem 1rem 2rem;
   }

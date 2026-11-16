@@ -27,6 +27,7 @@ from platform_app.agent_core.attachments import (
 )
 from platform_app.agent_core.session_lock import SessionLease, SessionLockManager
 from platform_app.agent_core.stream import message_text, reasoning_text, visible_text
+from platform_app.agent_core.subagents.notifications import START_TOOL, parse_notification
 
 SessionStatus = Literal[
     "running", "completed", "waiting", "cancelled", "failed",
@@ -430,6 +431,18 @@ def messages_to_transcript(
                 for call in message.tool_calls or [] if call.get("name") == "task"}
     for message in messages:
         if isinstance(message, HumanMessage):
+            notice = parse_notification(message)
+            if notice is not None:
+                # A host notification is the outcome of a background card,
+                # not something the user typed.
+                marker, result = notice
+                for block in reversed(blocks):
+                    if block.kind == "tool" and block.tool_call_id == str(marker.get("tool_call_id") or ""):
+                        block.content = result
+                        block.status = subagent_result_status(result)
+                        block.is_error = block.status in {"error", "cancelled"}
+                        break
+                continue
             blocks.append(TranscriptBlock(
                 kind="user",
                 content=message_text(message),
@@ -467,6 +480,13 @@ def messages_to_transcript(
                 else None
             )
             exit_code = code if isinstance(code, int) and not isinstance(code, bool) else None
+            if message.name == START_TOOL and status == "completed":
+                # Only the launch returned. The card stays open until its
+                # notification arrives; without one it is settled as interrupted.
+                refused = subagent_result_status(content, is_error=is_error)
+                if refused == "completed":
+                    continue
+                status, is_error = refused, True
             updated = False
             for block in reversed(blocks):
                 if block.kind == "tool" and block.tool_call_id == tool_call_id:

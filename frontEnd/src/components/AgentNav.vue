@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import { toast } from '@/composables/toast'
 import { tr } from '@/composables/preferences'
 import type { IconName } from '@/icons'
 import {
@@ -10,7 +9,7 @@ import {
   deletable,
   dispatch,
   loadSessions,
-  removeSession,
+  recentSessions,
   sessions,
   sessionTitle,
   workspaceView,
@@ -40,14 +39,6 @@ function actionActive(type: string) {
 async function go(type: string, payload: Record<string, unknown> = {}) {
   if (!onAgent.value) await router.push('/agent')
   dispatch(type, payload)
-}
-
-async function remove(session: any) {
-  try {
-    await removeSession(session)
-  } catch (e) {
-    toast(e instanceof Error ? e.message : String(e), 'error')
-  }
 }
 
 // On /agent the workspace keeps the list fresh; elsewhere the sidebar polls by itself.
@@ -80,12 +71,9 @@ onUnmounted(() => clearInterval(timer))
   <div v-if="open" class="mt-5">
     <div class="recent-head">
       <span class="flex-1">{{ tr('最近对话') }}</span>
-      <button type="button" class="recent-action" :title="tr('搜索对话')" :aria-label="tr('搜索对话')" @click="go('search')">
-        <AppIcon name="search" class="!text-[14px]" />
-      </button>
     </div>
     <button
-      v-for="s in sessions"
+      v-for="s in recentSessions"
       :key="s.id"
       type="button"
       class="rail-item recent-row"
@@ -95,20 +83,8 @@ onUnmounted(() => clearInterval(timer))
       <span class="status-lamp" :class="s.status" />
       <span class="min-w-0 flex-1 truncate text-left">{{ sessionTitle(s) }}</span>
       <span v-if="!deletable(s)" class="spinner" />
-      <span
-        v-else
-        class="recent-action row-delete"
-        role="button"
-        tabindex="0"
-        :title="tr('删除对话')"
-        :aria-label="tr('删除对话')"
-        @click.stop="remove(s)"
-        @keydown.enter.stop.prevent="remove(s)"
-      >
-        <AppIcon name="delete" class="!text-[14px]" />
-      </span>
     </button>
-    <p v-if="!sessions.length" class="recent-empty">{{ tr('暂无对话') }}</p>
+    <p v-if="!recentSessions.length" class="recent-empty">{{ tr(sessions.length ? '近 7 天暂无对话' : '暂无对话') }}</p>
   </div>
 </template>
 
@@ -127,7 +103,7 @@ onUnmounted(() => clearInterval(timer))
 .recent-row {
   height: 2rem;
   gap: 0.5rem;
-  padding-right: 0.375rem;
+  padding-right: 0.75rem;
   font-size: 12.5px;
 }
 .recent-row-active {
@@ -138,33 +114,6 @@ onUnmounted(() => clearInterval(timer))
   padding: 0.5rem 1.25rem;
   font-size: 12px;
   color: var(--chrome-ink-3);
-}
-.recent-action {
-  display: inline-flex;
-  height: 1.375rem;
-  width: 1.375rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--chrome-ink-3);
-  transition:
-    background-color 0.16s,
-    color 0.16s;
-}
-.recent-action:hover {
-  background-color: var(--chrome-glass);
-  color: var(--chrome-ink);
-}
-.row-delete {
-  display: none;
-}
-.recent-row:hover .row-delete,
-.row-delete:focus-visible {
-  display: inline-flex;
-}
-.row-delete:hover {
-  color: var(--color-danger);
 }
 /* 状态指示灯：颜色承担状态语义 */
 .status-lamp {

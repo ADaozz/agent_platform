@@ -58,6 +58,8 @@ const EN: Record<string, string> = {
   'Agent 对话': 'Agent Chat',
   平台设置: 'Platform Settings',
   模型配置: 'Model Settings',
+  平台能力: 'Capabilities',
+  打开导航: 'Open navigation',
   用量仪表盘: 'Usage Dashboard',
   '按天 / 会话统计模型 Tokens 与估算费用，数据来自会话生成指标。':
     'Token and estimated cost by day or session, from generation metrics.',
@@ -105,6 +107,7 @@ const EN: Record<string, string> = {
   搜索对话: 'Search chats',
   删除对话: 'Delete chat',
   暂无对话: 'No chats yet',
+  '近 7 天暂无对话': 'No chats in the last 7 days',
   确认操作: 'Confirm',
   取消: 'Cancel',
   确定: 'OK',

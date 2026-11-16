@@ -239,7 +239,7 @@ const chartOption = computed<EChartsOption | null>(() => {
   line-height: 1.55;
   color: var(--color-ink-faint);
 }
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .rate-grid {
     grid-template-columns: 1fr;
   }

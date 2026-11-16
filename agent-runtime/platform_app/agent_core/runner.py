@@ -89,6 +89,7 @@ from platform_app.agent_core.session import (
 from platform_app.agent_core.session_lock import SessionLockBusyError
 from platform_app.agent_core.session_runtime import RestorePlan, SessionLeaseLike, SessionRuntime
 from platform_app.agent_core.stream import DeltaHandler, StreamDeltaCallback, merge_stream_callbacks
+from platform_app.agent_core.subagents.notifications import notification_message
 from platform_app.agent_core.tools.human_interaction import validate_human_input_values
 
 HUMAN_TOOLS = frozenset({"request_human_input"})
@@ -450,6 +451,10 @@ class AgentRunner:
         try:
             if self.current_interrupt() is not None:
                 return False
+            # Reconfiguring the sandbox drops its processes. Background
+            # subagents still use them, so the runner is not idle for that.
+            if self.pending_sandbox_mode() is not None and self.background_task_count():
+                return False
             self._apply_pending_runtime_config(handler)
             return True
         finally:
@@ -736,6 +741,40 @@ class AgentRunner:
         that path stays PENDING, which recovery already handles.
         """
         self.control.cancel()
+        # An idle parent has no run to cancel, but its background subagents
+        # are still the user's work in progress.
+        manager = self._subagent_manager()
+        if manager is not None:
+            manager.cancel_all()
+
+    def _subagent_manager(self) -> Any:
+        return getattr(self.control, "subagent_manager", None)
+
+    def background_task_count(self) -> int:
+        """Background subagents of this runner that are still running."""
+        manager = self._subagent_manager()
+        return manager.background_count if manager is not None else 0
+
+    def background_tasks(self) -> list[Any]:
+        manager = self._subagent_manager()
+        return manager.background_tasks(self.thread_id) if manager is not None else []
+
+    def cancel_background_task(self, run_id: str) -> Any:
+        manager = self._subagent_manager()
+        return manager.cancel(run_id, str(self.thread_id)) if manager is not None else None
+
+    def cancel_background_tasks(self) -> None:
+        """Stop background subagents without cancelling the parent run."""
+        manager = self._subagent_manager()
+        if manager is not None:
+            manager.cancel_all()
+
+    def _drop_background_tasks(self, *, wait: float | None = None) -> bool:
+        """Leave the conversation: stop its background tasks and forget their results."""
+        manager = self._subagent_manager()
+        stopped = manager.cancel_all(wait=wait, discard=True) if manager is not None else True
+        self.control.clear_notifications()
+        return stopped
 
     def reserve_run(self) -> int:
         """Mark that the caller is dispatching a run so an early cancel is not lost."""
@@ -866,6 +905,7 @@ class AgentRunner:
             raise KeyError(f"Unknown session: {session_id}")
         if info.id != self.thread_id:
             self._require_empty_input_queue()
+            self._drop_background_tasks()
         self._runtime.clear_pending()
         # A→A with the lease still held only reloads the snapshot; every other
         # target is acquired first so the old thread never sees a lock gap.
@@ -987,6 +1027,7 @@ class AgentRunner:
     def new_session(self, *, title: str = "") -> SessionInfo:
         assert self._runtime is not None
         self._require_empty_input_queue()
+        self._drop_background_tasks()
         self._resume_context = None
         self.control.clear_pause()
         self.control.set_defer_steering(False)
@@ -1017,6 +1058,7 @@ class AgentRunner:
         self._runtime.abort_wait()
         if self._busy:
             self.request_cancel()
+        self._drop_background_tasks(wait=MODEL_STREAM_CLOSE_SECONDS)
         drained = self._operation_lock.acquire(timeout=CLOSE_DRAIN_SECONDS)
         if drained:
             self._operation_lock.release()
@@ -1044,6 +1086,34 @@ class AgentRunner:
     def _require_empty_input_queue(self) -> None:
         if self.control.pending_steering_count() or self.control.pending_follow_up_count():
             raise RuntimeError("Unapplied input belongs to the current session; reclaim it before switching")
+
+    @_exclusive_operation
+    def deliver_notifications(
+        self,
+        *,
+        on_delta: DeltaHandler | None = None,
+        on_event: RunEventHandler | None = None,
+    ) -> RunResult | None:
+        """Start a turn from finished background subagents while the runner is idle.
+
+        Returns None when nothing was delivered: no result is queued, or an
+        interrupt is pending and the results wait for its resumed run.
+        """
+        self._require_active_session()
+        if self.current_interrupt() is not None:
+            return None
+        notices = self.control.pop_notifications()
+        if not notices:
+            return None
+        self._apply_pending_runtime_config(on_event)
+        if self._resume_context is not None:
+            self._resume_context.armed = True
+        if self.session_store is not None:
+            self.session_store.touch(self.thread_id, last_run_status=StopReason.PENDING)
+        return self._stream(
+            {"messages": [notification_message(item) for item in notices]},
+            on_delta=on_delta, on_event=on_event,
+        )
 
     @_exclusive_operation
     def invoke(
@@ -1403,7 +1473,10 @@ class AgentRunner:
                 text = self.control.pop_steering()
                 if text is None:
                     text = self.control.pop_follow_up()
-                if text is None:
+                # A background result that arrived after the last model
+                # boundary continues the run like queued input does.
+                notices = self.control.pop_notifications() if text is None else []
+                if text is None and not notices:
                     break
                 emit_turn_completed(result.output)
                 run_control = self.control.begin_run()
@@ -1411,7 +1484,8 @@ class AgentRunner:
                 turn_started = time.monotonic()
                 self._apply_pending_runtime_config(event_handler)
                 result = self._stream_once(
-                    {"messages": [HumanMessage(content=text)]},
+                    {"messages": [HumanMessage(content=text)] if text is not None
+                     else [notification_message(item) for item in notices]},
                     config,
                     run_control,
                     event_handler,

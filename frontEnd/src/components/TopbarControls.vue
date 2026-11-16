@@ -92,7 +92,7 @@ onUnmounted(() => clearInterval(clockTimer))
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-secondary);
 }
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .topbar-clock {
     display: none;
   }

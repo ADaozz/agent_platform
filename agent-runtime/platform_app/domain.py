@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 
 DATA = Path(os.environ.get('PLATFORM_DATA_DIR', '.platform')).resolve()
 LOCK = threading.RLock()
-CORE_TOOLS = ('ls', 'read_file', 'write_file', 'edit_file', 'delete', 'glob', 'grep', 'execute', 'task', 'read_subagent_log', 'request_human_input', 'web_search', 'web_fetch')
+CORE_TOOLS = ('ls', 'read_file', 'write_file', 'edit_file', 'delete', 'glob', 'grep', 'execute', 'task', 'start_background_task', 'read_subagent_log', 'request_human_input', 'web_search', 'web_fetch')
 REMOVED_TOOLS = ('write_todos',)
 
 

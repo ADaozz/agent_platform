@@ -516,7 +516,7 @@ input[type='radio'] {
 }
 
 /* 窄屏页头同时放了分段开关与操作按钮时，收紧内边距让两者保持同一行 */
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .page-head-actions .segmented button {
     padding-inline: 0.625rem;
   }

@@ -31,6 +31,12 @@ const router = createRouter({
           meta: { title: '模型配置', icon: 'memory', group: '平台设置', eyebrow: 'MODEL REGISTRY' },
         },
         {
+          path: 'settings/capabilities',
+          name: 'settings-capabilities',
+          component: () => import('@/views/PlatformCapabilitiesView.vue'),
+          meta: { title: '平台能力', icon: 'extension', group: '平台设置', eyebrow: 'CAPABILITY MOUNTS' },
+        },
+        {
           path: 'settings/usage',
           name: 'settings-usage',
           component: () => import('@/views/UsageDashboardView.vue'),

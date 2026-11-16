@@ -18,7 +18,7 @@ from . import domain as d
 USER = ContextVar('itam_user_id', default=None)
 ROLE = ContextVar('itam_role', default='user')
 SESSION_PATH = re.compile(r'^/api/agent/sessions/([a-zA-Z0-9_-]{1,80})(?:/|$)')
-SENSITIVE = {'/api/models'}
+SENSITIVE = {'/api/models', '/api/platform/capabilities'}
 # Agent tools, skills and feature plugins are server-managed in ITAM mode, even for admins.
 LOCKED = {'/api/settings', '/api/features'}
 CONFIG_WRITE = {'POST', 'PUT', 'PATCH', 'DELETE'}

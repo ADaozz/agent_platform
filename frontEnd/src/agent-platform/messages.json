@@ -2138,5 +2138,205 @@
   "（分支）": {
     "zh": "（分支）",
     "en": " (branch)"
+  },
+  "后台子任务": {
+    "zh": "后台子任务",
+    "en": "Background subagent"
+  },
+  "查看后台任务": {
+    "zh": "查看后台任务",
+    "en": "Check background task"
+  },
+  "取消后台任务": {
+    "zh": "取消后台任务",
+    "en": "Cancel background task"
+  },
+  "process.status.background": {
+    "zh": "后台运行中",
+    "en": "Running in background"
+  },
+  "process.task.background": {
+    "zh": "后台任务运行中",
+    "en": "Background task running"
+  },
+  "subagent.notice": {
+    "zh": "后台结果送达",
+    "en": "Background result delivered"
+  },
+  "subagent.brief": {
+    "zh": "任务说明",
+    "en": "Brief"
+  },
+  "subagent.answer": {
+    "zh": "子 Agent 回复",
+    "en": "Subagent answer"
+  },
+  "subagent.outcome": {
+    "zh": "结束原因",
+    "en": "Outcome"
+  },
+  "subagent.running": {
+    "zh": "子 Agent 正在独立执行…",
+    "en": "Subagent is working on its own…"
+  },
+  "subagent.backgroundRunning": {
+    "zh": "在后台独立运行，主 Agent 可继续工作；完成后结果会自动送达。",
+    "en": "Running in the background while the main agent continues; the result is delivered automatically."
+  },
+  "subagent.cancel": {
+    "zh": "停止",
+    "en": "Stop"
+  },
+  "subagent.cancelAll": {
+    "zh": "全部停止",
+    "en": "Stop all"
+  },
+  "subagent.runningCount": {
+    "zh": "{n} 个后台子任务运行中",
+    "en": "{n} background subagent(s) running"
+  },
+  "subagent.noticeOne": {
+    "zh": "后台子任务已完成，Agent 正在处理结果",
+    "en": "A background subagent finished; the agent is processing its result"
+  },
+  "subagent.noticeMany": {
+    "zh": "{n} 个后台子任务已完成，Agent 正在处理结果",
+    "en": "{n} background subagents finished; the agent is processing their results"
+  },
+  "搜索标题或模型…": {
+    "zh": "搜索标题或模型…",
+    "en": "Search title or model…"
+  },
+  "清空搜索": {
+    "zh": "清空搜索",
+    "en": "Clear search"
+  },
+  "时间范围": {
+    "zh": "时间范围",
+    "en": "Time range"
+  },
+  "全部时间": {
+    "zh": "全部时间",
+    "en": "Any time"
+  },
+  "今天": {
+    "zh": "今天",
+    "en": "Today"
+  },
+  "近 7 天": {
+    "zh": "近 7 天",
+    "en": "Last 7 days"
+  },
+  "近 30 天": {
+    "zh": "近 30 天",
+    "en": "Last 30 days"
+  },
+  "状态筛选": {
+    "zh": "状态筛选",
+    "en": "Filter by status"
+  },
+  "类型筛选": {
+    "zh": "类型筛选",
+    "en": "Filter by type"
+  },
+  "全部": {
+    "zh": "全部",
+    "en": "All"
+  },
+  "进行中": {
+    "zh": "进行中",
+    "en": "In progress"
+  },
+  "待处理": {
+    "zh": "待处理",
+    "en": "Needs action"
+  },
+  "失败 / 中断": {
+    "zh": "失败 / 中断",
+    "en": "Failed / stopped"
+  },
+  "筛选出 {n} 个对话": {
+    "zh": "筛选出 {n} 个对话",
+    "en": "{n} chats match"
+  },
+  "筛选出 {n} 个文件": {
+    "zh": "筛选出 {n} 个文件",
+    "en": "{n} files match"
+  },
+  "清除筛选": {
+    "zh": "清除筛选",
+    "en": "Clear filters"
+  },
+  "没有符合条件的对话": {
+    "zh": "没有符合条件的对话",
+    "en": "No matching chats"
+  },
+  "没有符合条件的文件": {
+    "zh": "没有符合条件的文件",
+    "en": "No matching files"
+  },
+  "换个关键词或放宽筛选条件试试。": {
+    "zh": "换个关键词或放宽筛选条件试试。",
+    "en": "Try another keyword or loosen the filters."
+  },
+  "搜索文件名、路径或所属对话…": {
+    "zh": "搜索文件名、路径或所属对话…",
+    "en": "Search file name, path or chat…"
+  },
+  "搜索文件": {
+    "zh": "搜索文件",
+    "en": "Search files"
+  },
+  "搜索对话": {
+    "zh": "搜索对话",
+    "en": "Search chats"
+  },
+  "文档": {
+    "zh": "文档",
+    "en": "Docs"
+  },
+  "演示": {
+    "zh": "演示",
+    "en": "Slides"
+  },
+  "表格": {
+    "zh": "表格",
+    "en": "Sheets"
+  },
+  "图片": {
+    "zh": "图片",
+    "en": "Images"
+  },
+  "代码": {
+    "zh": "代码",
+    "en": "Code"
+  },
+  "文本": {
+    "zh": "文本",
+    "en": "Text"
+  },
+  "压缩包": {
+    "zh": "压缩包",
+    "en": "Archives"
+  },
+  "音视频": {
+    "zh": "音视频",
+    "en": "Media"
+  },
+  "其他": {
+    "zh": "其他",
+    "en": "Other"
+  },
+  "近 7 天没有对话": {
+    "zh": "近 7 天没有对话",
+    "en": "No chats in the last 7 days"
+  },
+  "更早的对话可以在历史对话中查看。": {
+    "zh": "更早的对话可以在历史对话中查看。",
+    "en": "Older chats are in your history."
+  },
+  "查看历史对话": {
+    "zh": "查看历史对话",
+    "en": "Open history"
   }
 }

@@ -29,8 +29,22 @@ function timeSpan(start, end) { return start != null && end != null ? Math.max(0
 // read point (steering_applied) is where they belong in the timeline.
 function steeringText(value) { return rawText(value).split('\n[Presentation feedback:')[0].split('\n[Document feedback:')[0] }
 
-export function conversationTimeline(events, sessionStatus = 'idle') {
-  const turns = [], seen = new Set(), queued = [], waiting = new Map()
+// Delegation tools. A background launch returns at once; its card stays open
+// until the host reports the subagent's outcome (subagent_finished).
+export const SUBAGENT_TOOLS = new Set(['task', 'start_background_task', 'check_background_task', 'cancel_background_task', 'read_subagent_log'])
+const BACKGROUND_START = 'start_background_task'
+const RUN_ID = /run_id=([0-9a-f]{8,})/i
+export function subagentResult(text) { return rawText(text).replace(/^\[subagent run_id=[^\]]*\]\n?/, '').trim() }
+function subagentSubject(step) {
+  const args = step.arguments || {}
+  if (step.name === 'task' || step.name === BACKGROUND_START) return rawText(args.description ?? '').replace(/\s+/g, ' ').trim()
+  return rawText(args.run_id ?? '')
+}
+
+export function conversationTimeline(events, sessionStatus = 'idle', { backgroundTasks = [] } = {}) {
+  const turns = [], seen = new Set(), queued = [], waiting = new Map(), allTools = new Map(), notices = []
+  const liveBackground = new Set(backgroundTasks.filter(task => task.status === 'running').map(task => task.tool_call_id))
+  const knownBackground = new Set(backgroundTasks.map(task => task.tool_call_id))
   let turn, model
   const ensureTurn = (event, index) => {
     if (!turn) {
@@ -65,8 +79,9 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
     const identity = event.tool_call_id || `unidentified-${event.seq ?? index}`
     let step = turn.tools.get(identity)
     if (!step) {
-      step = { key: `tool-${turn.key}-${identity}`, kind: 'tool', name: event.name || 'tool', order: index, status: 'pending', arguments: null, streamedOutput: '', finalOutput: '', streams: [], startedAt: eventTime(event), endedAt: null, durationMs: null }
+      step = { key: `tool-${turn.key}-${identity}`, kind: 'tool', name: event.name || 'tool', toolCallId: event.tool_call_id || '', order: index, status: 'pending', arguments: null, streamedOutput: '', finalOutput: '', streams: [], startedAt: eventTime(event), endedAt: null, durationMs: null }
       turn.tools.set(identity, step); turn.steps.push(step)
+      if (event.tool_call_id) allTools.set(event.tool_call_id, step)
     }
     if (event.name && event.name !== 'tool') step.name = event.name
     return step
@@ -84,6 +99,27 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
       const current = ensureTurn(event, index)
       current.user = { kind: 'user', key: `user-${current.key}`, content: event.text, attachments: event.attachments || [], at: eventTime(event) }
       current.status = 'running'
+    } else if (event.type === 'operation' && event.operation === 'notify') {
+      turn = null; model = null
+      const current = ensureTurn(event, index)
+      current.notice = { kind: 'notice', key: `notice-${current.key}`, items: notices.splice(0), at: eventTime(event) }
+      current.status = 'running'
+    } else if (event.type === 'subagent_finished') {
+      const result = event.result || {}
+      const step = allTools.get(result.tool_call_id)
+      const status = result.status === 'completed' ? 'completed' : result.status === 'cancelled' ? 'cancelled' : 'failed'
+      if (step) {
+        step.finalOutput = rawText(result.content)
+        step.background = { ...step.background, runId: result.run_id, phase: status }
+        finish(step, status, event)
+      }
+      if (status !== 'cancelled') {
+        const item = { runId: result.run_id, status, description: step ? subagentSubject(step) : '' }
+        // A live run reads the result at its next model boundary; an idle one is woken by a notify turn.
+        if (turn && liveStatuses.has(turn.status)) {
+          turn.steps.push({ key: `notice-${event.seq ?? index}`, kind: 'notice', name: 'notice', order: index, content: item.description, status, startedAt: eventTime(event), endedAt: eventTime(event), durationMs: 0 })
+        } else notices.push(item)
+      }
     } else if (event.type === 'operation' && event.operation === 'resume') {
       if (turn) {
         if (!settledStatuses.has(turn.status)) turn.status = 'paused'
@@ -130,9 +166,15 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
       } else if (['tool_completed', 'tool_failed', 'tool_cancelled'].includes(event.type)) {
         const finalOutput = event.content != null ? rawText(event.content) : rawText(event.result)
         if (terminalStatuses.has(step.status)) { if (!step.finalOutput) step.finalOutput = finalOutput; continue }
+        const refused = SUBAGENT_TOOLS.has(step.name) && /^subagent (failed|cancelled)/i.test(finalOutput.trim())
+        if (step.name === BACKGROUND_START && event.type === 'tool_completed' && !event.is_error && !refused) {
+          step.status = 'running'
+          step.background = { runId: finalOutput.match(RUN_ID)?.[1] || '', phase: 'running', launch: finalOutput }
+          continue
+        }
         step.finalOutput = finalOutput
         const cancelled = event.type === 'tool_cancelled' || event.status === 'cancelled' || event.result?.status === 'cancelled'
-        finish(step, cancelled ? 'cancelled' : event.type === 'tool_failed' || event.is_error ? 'failed' : 'completed', event)
+        finish(step, cancelled ? 'cancelled' : event.type === 'tool_failed' || event.is_error || refused ? 'failed' : 'completed', event)
       }
     } else if (event.type === 'result') {
       ensureTurn(event, index).status = event.status
@@ -173,7 +215,7 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
     }
   }
   return turns.flatMap((item, index) => {
-    const blocks = []; if (item.user) blocks.push(item.user)
+    const blocks = []; if (item.user) blocks.push(item.user); if (item.notice) blocks.push(item.notice)
     const last = index === turns.length - 1
     let currentStatus = last && settledStatuses.has(sessionStatus) ? sessionStatus : item.status || (last ? sessionStatus : 'interrupted')
     // Only the latest execution can be live. A restart may have persisted the
@@ -183,12 +225,20 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
     const endedAt = item.endedAt ?? (ended ? item.lastEventAt : null)
     const steps = item.steps.sort((a, b) => a.order - b.order).map(step => {
       const projected = { ...step }
-      if (ended && !terminalStatuses.has(projected.status)) {
+      // Outlives the turn that started it. The session list may lag a launch that just returned.
+      const unlisted = last && sessionStatus !== 'interrupted' && !knownBackground.has(projected.toolCallId)
+      if (projected.background?.phase === 'running' && (liveBackground.has(projected.toolCallId) || unlisted)) {
+        projected.backgroundLive = true
+      } else if (ended && !terminalStatuses.has(projected.status)) {
         projected.status = currentStatus === 'completed' ? 'interrupted' : currentStatus === 'cancelled' ? 'cancelled' : currentStatus
         projected.endedAt = endedAt ?? projected.endedAt
       }
       projected.durationMs ??= timeSpan(projected.startedAt, projected.endedAt)
-      projected.resultSummary = shortResult(projected.finalOutput || projected.streamedOutput || projected.content)
+      if (projected.kind === 'tool' && SUBAGENT_TOOLS.has(projected.name)) {
+        projected.subject = subagentSubject(projected)
+        const outcome = projected.background?.phase === 'running' ? '' : subagentResult(projected.finalOutput)
+        projected.resultSummary = shortResult(outcome || projected.subject)
+      } else projected.resultSummary = shortResult(projected.finalOutput || projected.streamedOutput || projected.content)
       return projected
     })
     // Model text written alongside tool calls is shown as ordinary assistant output
@@ -212,7 +262,8 @@ export function conversationTimeline(events, sessionStatus = 'idle') {
           status: final && (ended || !followedByText) ? currentStatus : 'segment_completed',
           active: final && live && !followedByText,
           finished: followedByText || (ended && group.every(step => settledStatuses.has(step.status))),
-          stepCount: group.filter(step => step.kind !== 'steer').length, actionCount: group.filter(step => step.kind === 'tool').length,
+          background: group.some(step => step.backgroundLive),
+          stepCount: group.filter(step => !['steer', 'notice'].includes(step.kind)).length, actionCount: group.filter(step => step.kind === 'tool').length,
           startedAt: start, endedAt: end, durationMs: timeSpan(start, end),
         })
       }

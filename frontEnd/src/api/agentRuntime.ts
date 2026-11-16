@@ -109,6 +109,41 @@ export interface UsageOverview {
   sessions: UsageSessionRow[]
 }
 
+export interface CapabilityTool {
+  name: string
+  enabled: boolean
+  description?: string
+}
+
+export interface CapabilitySkill {
+  id: string
+  name: string
+  description: string
+  source: 'feature' | 'platform'
+  feature_id?: string | null
+  enabled: boolean
+  available: boolean
+}
+
+export interface PlatformCapabilities {
+  revision: number
+  editable: boolean
+  core_tools: CapabilityTool[]
+  tools: CapabilityTool[]
+  skills: CapabilitySkill[]
+}
+
+export interface CapabilityMounts {
+  revision: number
+  core_tools: Record<string, boolean>
+  tools: Record<string, boolean>
+  skill_bindings: Record<string, boolean>
+}
+
+export const getPlatformCapabilities = () => runtimeJson<PlatformCapabilities>('/platform/capabilities')
+export const savePlatformCapabilities = (mounts: CapabilityMounts) =>
+  runtimeJson<PlatformCapabilities>('/platform/capabilities', { method: 'PUT', body: JSON.stringify(mounts) })
+
 export const getModelOptions = () => runtimeJson<ModelOptions>('/models/options')
 export const getPersonalModels = () => runtimeJson<ModelConfigResult>('/models/personal')
 export const getGlobalModels = () => runtimeJson<ModelConfigResult>('/models')

@@ -106,3 +106,60 @@ def update_settings(value: dict):
         value['revision'] += 1
         d.put('settings', value)
         return d.effective_config()
+
+
+def capabilities_editable():
+    return not itam_bridge.is_enabled() or itam_bridge.ROLE.get() == 'admin'
+
+
+def platform_capabilities():
+    value = d.effective_config()
+    core = value.get('core_tools', {})
+    return {
+        'revision': value['revision'],
+        'editable': capabilities_editable(),
+        'core_tools': [{'name': name, 'enabled': core.get(name, True)} for name in d.CORE_TOOLS],
+        'tools': [{'name': tool['name'], 'description': tool.get('description', ''), 'enabled': tool.get('enabled', True)} for tool in value.get('tools', [])],
+        'skills': [{k: skill.get(k) for k in ('id', 'name', 'description', 'source', 'feature_id', 'enabled')} | {'available': skill.get('available', True)}
+                   for skill in value['native_skills']],
+    }
+
+
+class CapabilityMounts(BaseModel):
+    model_config = {'extra': 'forbid'}
+    revision: int
+    core_tools: dict[str, bool] = {}
+    tools: dict[str, bool] = {}
+    skill_bindings: dict[str, bool] = {}
+
+
+@app.get('/api/platform/capabilities')
+def get_platform_capabilities():
+    return platform_capabilities()
+
+
+@app.put('/api/platform/capabilities')
+def update_platform_capabilities(value: CapabilityMounts):
+    """Mount or unmount tools and skills for new sessions; only the mount switches are editable."""
+    if not capabilities_editable():
+        raise HTTPException(403, 'Admin permission required')
+    with d.LOCK:
+        previous = d.get('settings', 'global')
+        if value.revision != previous['revision']:
+            raise HTTPException(409, '配置已更新，请刷新后重试')
+        if set(value.tools) - {tool['name'] for tool in previous.get('tools', [])}:
+            raise HTTPException(422, '工具未注册，请刷新后重试')
+        unavailable = {s['id'] for s in d.native_skills() if s.get('available') is False}
+        if any(enabled and key in unavailable for key, enabled in value.skill_bindings.items()):
+            raise HTTPException(422, '扩展功能已停用，无法挂载其 Skill')
+        updated = {**previous,
+                   'core_tools': {**previous.get('core_tools', {}), **value.core_tools},
+                   'skill_bindings': {**previous.get('skill_bindings', {}), **value.skill_bindings},
+                   'tools': [{**tool, 'enabled': value.tools.get(tool['name'], tool.get('enabled', True))} for tool in previous.get('tools', [])]}
+        try:
+            d.validate_config(updated)
+        except Exception as exc:
+            raise HTTPException(422, str(exc))
+        updated['revision'] += 1
+        d.put('settings', updated)
+    return platform_capabilities()

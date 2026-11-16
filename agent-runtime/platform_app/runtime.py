@@ -152,6 +152,10 @@ def public(record):
     value['workspace_id'] = context.workspace_id
     value['output_files'] = [{'path': path, 'size': size, 'modified_at': mtime / 1e9} for path, (mtime, size) in file_snapshot(context.files_root).items()
         if Path(path).parts[0] != 'uploads']
+    rt = RUNTIMES.get(record['id'])
+    tasks = rt.runner.background_tasks() if rt is not None and rt.runner is not None else []
+    value['background_tasks'] = [{'run_id': t.run_id, 'tool_call_id': t.tool_call_id, 'status': t.status,
+        'description': ' '.join(t.description.split())[:200]} for t in tasks]
     root = context.artifacts_root
     value['artifacts'] = [p.name for p in root.iterdir() if p.is_file() and not p.is_symlink()] if root.exists() else []
     return value
@@ -330,6 +334,25 @@ class Runtime:
         self.event(data)
         for service in self.artifact_services.values():
             if data['type'] in ('tool_completed','tool_failed'):service.detect_external()
+        if data['type'] == 'subagent_finished':
+            self.deliver_notifications()
+
+    def deliver_notifications(self):
+        """Wake an idle session with finished background results.
+
+        A running session consumes them at its next model boundary; one that
+        waits for approval or an answer receives them in the resumed run.
+        """
+        runner = self.runner
+        if runner is None or not runner.control.pending_notification_count():
+            return
+        with self.lock:
+            if find(self.id)['status'] not in ('completed', 'failed', 'cancelled', 'idle'):
+                return
+        try:
+            schedule(self.id, 'notify', {})
+        except HTTPException:
+            pass
 
     def build(self):
         if self.runner is not None:
@@ -385,7 +408,7 @@ class Runtime:
         settings = Settings.from_mapping({'llm': m.unseal(snapshot['encrypted'])})
         hidden = d.hidden_tools(config)
         settings = replace(settings, trust_env=True, llm_default=record['model_id'],
-            subagents=SubAgentConfig(enabled='task' not in hidden), hidden_tools=hidden,
+            subagents=SubAgentConfig(enabled='task' not in hidden, background='start_background_task' not in hidden), hidden_tools=hidden,
             sandbox=SandboxPolicyBuilder().build(context, record.get('sandbox_mode', 'restricted')),
             config_dir=context.session_root, agent_instructions=config['system_prompt'])
         model = build_chat_model(settings.active_profile, reasoning_effort=record['reasoning_effort'], trust_env=True, timeout=settings.request_timeout)
@@ -456,6 +479,15 @@ class Runtime:
                 result = runner.submit_human_input(payload['values'])
             elif operation == 'resume':
                 result = runner.resume_runtime_config() if str(runner.current_interrupt().kind) == 'runtime_config_boundary' else runner.continue_run()
+            elif operation == 'notify':
+                result = runner.deliver_notifications()
+                if result is None:
+                    with self.lock:
+                        record = find(self.id)
+                        record.update(status=payload.get('previous') or 'completed')
+                        d.put('session', record)
+                    self.event({'type': 'status', 'status': record['status']})
+                    return
             elif operation == 'compact':
                 result = runner.compact_context()
                 self.event({'type': 'compacted', **asdict(result)})
@@ -496,6 +528,10 @@ class Runtime:
                 record.update(status='failed', error=message, turn_ended_at=now())
                 d.put('session', record)
             self.event({'type': 'error', 'content': message})
+        finally:
+            # A result that arrived after the last model boundary waits here.
+            if operation != 'compact':
+                POOL.submit(self.deliver_notifications)
 
 
 def runtime(session_id):
@@ -534,6 +570,10 @@ def schedule(session_id, operation, payload):
                 validate_human_input_values(payload.get('values'), record['human_input'])
             except ValueError as exc:
                 raise HTTPException(422, str(exc))
+        if operation == 'notify':
+            if previous in ('waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'):
+                raise HTTPException(409, '请先处理当前审批、提问或暂停')
+            payload = {**payload, 'previous': previous}
         record.update(status='queued', updated_at=now(), error=None)
         if operation == 'message':
             record['messages'].append({'role': 'user', 'content': payload['text'], 'created_at': now(), 'images': [i['name'] for i in payload.get('images', [])], 'attachments': payload.get('attachments', [])})
@@ -808,6 +848,16 @@ def action(session_id: str, action: str, value: dict):
     if action in ('approve', 'answer', 'resume', 'compact'):
         return schedule(session_id, action, value)
     rt = runtime(session_id)
+    if action == 'cancel_background':
+        run_id = str(value.get('run_id') or '')
+        if rt.runner is None:
+            raise HTTPException(409, '没有运行中的后台子任务')
+        if run_id:
+            if rt.runner.cancel_background_task(run_id) is None:
+                raise HTTPException(404, '后台子任务不存在')
+        else:
+            rt.runner.cancel_background_tasks()
+        return {'accepted': True}
     with rt.lock:
         record = find(session_id)
         if rt.runner is None or record['status'] != 'running':

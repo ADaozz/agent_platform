@@ -26,7 +26,7 @@ const CERT_ERROR_MESSAGES: Record<string, string> = {
 }
 
 /** 窄屏下左侧主视觉区隐藏，不加载 3D 场景 */
-const wideQuery = window.matchMedia('(min-width: 901px)')
+const wideQuery = window.matchMedia('(min-width: 1024px)')
 const wide = ref(wideQuery.matches)
 function onWideChange(e: MediaQueryListEvent) {
   wide.value = e.matches
@@ -655,7 +655,7 @@ onBeforeUnmount(() => {
   font-size: 15px;
   letter-spacing: 0.12em;
 }
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .reg-pass-row {
     grid-template-columns: 1fr;
   }
@@ -669,7 +669,7 @@ onBeforeUnmount(() => {
   color: var(--color-ink-faint);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .login {
     grid-template-columns: minmax(0, 1fr);
   }

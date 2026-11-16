@@ -1067,7 +1067,7 @@
   background: rgb(8 8 7 / 0.62);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .dap-root.agent-host .chat-thumbnail {
     width: 76px;
     height: 60px;
@@ -1131,7 +1131,7 @@
 }
 
 /* 窄屏：工具栏间距收紧，把空间留给模型名 */
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .dap-root.agent-host .composer-toolbar {
     gap: 6px;
     padding-inline: 10px 8px;

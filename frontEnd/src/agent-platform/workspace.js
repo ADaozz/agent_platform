@@ -1,7 +1,7 @@
 // Shared between the embedded workspace and the platform sidebar, which hosts the
 // conversation navigation. The sidebar stays mounted on every page, while the
 // workspace only exists on /agent, so the sidebar sends commands it executes when ready.
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { runtimeFetch } from './runtime'
 import { t } from './preferences'
 
@@ -41,6 +41,13 @@ export function sessionTime(s) {
   const value = (IN_PROGRESS.has(s.status) ? s.last_message_at : s.turn_ended_at) || s.updated_at || s.created_at
   return Date.parse(value) || 0
 }
+
+const RECENT_DAYS = 7
+/** Home and sidebar list only the last week; older chats stay reachable from history. */
+export const recentSessions = computed(() => {
+  const since = Date.now() - RECENT_DAYS * 86400000
+  return sessions.value.filter(s => sessionTime(s) >= since)
+})
 
 async function fetchSessions() {
   const response = await runtimeFetch('/agent/sessions?summary=true')

@@ -2,6 +2,11 @@ import type { Component } from 'vue'
 import {
   Archive,
   BadgeCheck,
+  Blocks,
+  BookOpen,
+  Lock,
+  Menu,
+  Wrench,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -103,6 +108,11 @@ export const lucideIcons = {
   history: History,
   folder: Folder,
   search: Search,
+  extension: Blocks,
+  build: Wrench,
+  menu_book: BookOpen,
+  lock: Lock,
+  menu: Menu,
 } satisfies Record<string, Component>
 
 export type IconName = keyof typeof lucideIcons | keyof typeof lonetrailIcons

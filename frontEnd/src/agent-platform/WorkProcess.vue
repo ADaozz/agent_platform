@@ -8,12 +8,12 @@ const props=defineProps({process:Object,actionLabel:Function,statusLabels:Object
 const collapsed=ref(props.process.finished),collapseEpoch=ref(0),now=ref(Date.now())
 let timer
 watch(()=>props.process.finished,(finished,previous)=>{if(finished&&!previous){collapsed.value=true;collapseEpoch.value++}else if(!finished&&previous)collapsed.value=false})
-watch(()=>props.process.active,active=>{clearInterval(timer);now.value=Date.now();if(active)timer=setInterval(()=>now.value=Date.now(),250)},{immediate:true})
+watch(()=>props.process.active||props.process.background,active=>{clearInterval(timer);now.value=Date.now();if(active)timer=setInterval(()=>now.value=Date.now(),250)},{immediate:true})
 onUnmounted(()=>clearInterval(timer))
 function toggleTask(){if(collapsed.value&&props.process.finished)collapseEpoch.value++;collapsed.value=!collapsed.value}
 const duration=computed(()=>formatDuration(elapsed(props.process.startedAt,props.process.endedAt,props.process.durationMs,now.value,!props.process.finished),t))
-const stateLabel=computed(()=>t('process.task.'+props.process.status)!=='process.task.'+props.process.status?t('process.task.'+props.process.status):props.statusLabels[props.process.status]||t('process.title'))
-const icon=computed(()=>props.process.active?'LoaderCircle':['completed','segment_completed'].includes(props.process.status)?'CircleCheck':props.process.status==='failed'?'CircleAlert':props.process.status==='cancelled'||props.process.status==='interrupted'?'X':'Clock')
+const stateLabel=computed(()=>props.process.background&&!props.process.active?t('process.task.background'):t('process.task.'+props.process.status)!=='process.task.'+props.process.status?t('process.task.'+props.process.status):props.statusLabels[props.process.status]||t('process.title'))
+const icon=computed(()=>props.process.active?'LoaderCircle':props.process.background?'Workflow':['completed','segment_completed'].includes(props.process.status)?'CircleCheck':props.process.status==='failed'?'CircleAlert':props.process.status==='cancelled'||props.process.status==='interrupted'?'X':'Clock')
 </script>
 <template>
  <section class="work-process" :class="{'is-finished':process.finished}" :data-task-finished="process.finished" :aria-label="t('process.title')">
