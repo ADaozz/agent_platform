@@ -1,44 +1,163 @@
+<div align="center">
+
 # Deep Agent
 
-智能体工作平台：对话、执行与交付在同一座控制台完成。
+**智能体工作平台：对话、执行与交付在同一座控制台完成。**
 
-面向需要可靠多用户协作的团队——用自然语言把任务交给 Agent，在隔离环境中执行，并把可交付的 Word / PPT 文档直接带回工作台预览与下载。
+用自然语言把任务交给 Agent，在隔离环境中执行，并把可打开的 Word / PPT 直接带回工作台预览与下载。
 
-## 能做什么
+[![Status](https://img.shields.io/badge/status-active-success.svg)](#)
+[![GitHub Stars](https://img.shields.io/github/stars/ADaozz/agent_platform?style=social)](https://github.com/ADaozz/agent_platform)
 
-**进入工作台**  
-邮箱验证码自助注册，或使用账号密码、客户端证书登录。管理员可管理用户与角色，查看并踢下线登录设备；个人可申请与管理自己的证书。
+[快速开始](#-快速开始) ·
+[功能介绍](#-核心功能) ·
+[文档](./docs) ·
+[反馈问题](https://github.com/ADaozz/agent_platform/issues)
 
-**与 Agent 协作**  
-多轮对话、实时执行时间线、工具调用审批，以及暂停、继续、取消或运行中追加指令。历史会话可回看、可删除；每位用户的会话彼此隔离。输入区旁可查看本会话轮次、步数与输出速度；悬停可展开模型用时、工具用时、TTFT、TPS 与估算费用。
+</div>
 
-**文件与成果**  
-上传附件作为上下文，下载会话产出文件，在全局文件库中按类型浏览。生成的 DOCX / PPTX 支持按页预览：Word 含公式、图表、目录与复杂排版；演示文稿支持风格化生成与逐页查看。
+---
 
-**模型与用量**  
-管理员维护团队可用的全局模型；普通用户也可配置仅自己可见的私人模型。工具与 Skill 由平台统一提供，无需每人单独部署。用量仪表盘按天汇总 Tokens 与估算费用（DeepSeek 刊例，含缓存命中与峰谷），便于团队对照消耗。
+<div align="center">
 
-**使用体验**  
-中英文界面、明暗主题（默认深色）、可折叠侧栏。登录页宽屏呈现工业走廊主视觉与悬浮数据卡带模块（金属高光、正面文字清晰）；窄屏自动简化，不加载立体场景。
+![Product Preview](./assets/preview.png)
 
-## 谁适合用
+*工作台主界面：对话、执行时间线与文档预览*
 
-- 需要把调研、写作、排版交给 Agent，并直接拿到可打开的办公文档的人  
-- 同一平台上多人各自工作、互不窥探会话与文件的小团队  
-- 希望用证书或统一账号体系接入、由管理员管控权限与设备的组织
+</div>
 
-## 安全承诺（产品侧）
+## ✨ 简介
 
-- 用户会话、文件与执行环境按账号隔离，他人无法打开你的对话或产物  
-- 证书登录与设备管理用于收紧入口；管理员可吊销异常会话  
-- Agent 在受限环境中执行，不开放「完全接管本机」一类高危模式给多用户部署
+Deep Agent 是一个面向团队的智能体工作台，解决「把调研、写作、排版交给 Agent，却拿不到可交付办公文档、也无法多人安全共用」的问题。
 
-## 了解更多
+区别于只给聊天窗口的方案，本项目提供：
 
-| 文档 | 内容 |
-| --- | --- |
-| [架构与部署](docs/AGENT_WORKSPACE.md) | 系统组成、部署与验收要点 |
+- **可交付产物** — Word / PPT 在隔离环境中生成，工作台内按页预览与下载
+- **可控执行** — 实时时间线、工具审批、暂停 / 继续 / 追加指令，压缩上下文也算进步骤
+- **多用户隔离** — 会话、文件与执行环境按账号隔离；支持密码、邮箱验证码与客户端证书登录
+
+## 🚀 核心功能
+
+### 01 — 与 Agent 协作
+
+多轮对话、流式执行时间线、工具调用审批，以及运行中追加指令。历史可回看；每位用户的会话彼此隔离。输入区旁可查看轮次、步数与输出速度，悬停展开模型 / 工具用时与估算费用。
+
+![Feature chat](./assets/feature-chat.png)
+
+### 02 — 文档预览与文件库
+
+生成的 DOCX / PPTX 支持按页预览；全局文件库按类型浏览。预览只挂在当前 Agent 对话上，切换菜单或新建对话会自动收起；依赖未就绪时也能关闭失败面板，而不是留下空白占位。
+
+![Feature docx](./assets/feature-docx.png)
+
+### 03 — 账号、证书与用量
+
+邮箱验证码自助注册，或账号密码 / 客户端证书登录。管理员管理用户、角色与登录设备；个人可申请与管理证书。用量仪表盘按天汇总 Tokens 与估算费用，便于团队对照消耗。
+
+![Feature workspace](./assets/feature-workspace.png)
+
+## ⚡ 快速开始
+
+### 环境要求
+
+- JDK 8（后端构建与运行）
+- Node.js 22.18+ 或 24.12+（仅前端构建）
+- Python 3.12（Agent Runtime）
+- nginx、Redis、Bubblewrap（生产）；LibreOffice 可选（文档正式分页渲染）
+
+### 1. 克隆仓库
+
+```bash
+git clone https://github.com/ADaozz/agent_platform.git
+cd agent_platform
+```
+
+### 2. 本地开发（分模块）
+
+```bash
+# 后端（SQLite profile）
+cd backend && mvn -DskipTests spring-boot:run
+
+# 前端
+cd frontEnd && npm ci && npm run dev
+
+# Agent Runtime
+cd agent-runtime && python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.lock
+# 文档预览还需：pip install -r requirements-features.lock
+uvicorn platform_app.main:app --reload --port 8090
+```
+
+### 3. 单机生产部署
+
+```bash
+sudo cp deploy/deploy.env.example /etc/agent-platform/deploy.env
+sudo chmod 600 /etc/agent-platform/deploy.env
+# 编辑 DOMAIN / 邮件等参数；密钥由安装脚本生成到 secrets.env，勿把本机 deploy/local 提交进仓库
+
+sudo deploy/scripts/install-host.sh
+sudo deploy/scripts/build-release.sh
+sudo deploy/scripts/release.sh /path/to/release-<版本>
+sudo deploy/scripts/healthcheck.sh
+```
+
+详细步骤、TLS / 证书登录边界与踩坑见 [docs/DEPLOY.md](docs/DEPLOY.md)。
+
+## 🏗️ 技术架构
+
+| 模块 | 技术 |
+|------|------|
+| 前端 | Vue 3 / Vite / TypeScript |
+| 平台后端 | Spring Boot 2.6 / JDK 8 / Shiro / SQLite |
+| Agent Runtime | Python 3.12 / FastAPI / Bubblewrap 沙箱 |
+| 入口 | nginx（443 静态 + `/api`；可选 8443 客户端证书） |
+
+### 架构设计
+
+![Architecture](./assets/architecture.svg)
+
+组成与验收要点见 [docs/AGENT_WORKSPACE.md](docs/AGENT_WORKSPACE.md)；公网发布见 [docs/DEPLOY.md](docs/DEPLOY.md)。
+
+## 📖 文档
+
+| 文档 | 说明 |
+|------|------|
+| [部署与公网发布](docs/DEPLOY.md) | 依赖、安装、TLS、证书登录、备份回滚与常见故障 |
+| [架构与部署](docs/AGENT_WORKSPACE.md) | 系统组成与验收要点 |
 | [后台说明](backend/README.md) | 认证、注册、权限与接口 |
 | [网页端说明](frontEnd/README.md) | 登录与工作台界面 |
 | [Agent Runtime](agent-runtime/README.md) | 执行引擎与文档 Skill |
-| [登录页视觉](docs/login-scene/README.md) | 登录主视觉设计说明 |
+| [deploy/](deploy/README.md) | 生产部署脚本与配置模板 |
+
+## 🗺️ Roadmap
+
+- [x] 多用户工作台与会话隔离
+- [x] DOCX / PPTX 生成与预览
+- [x] 客户端证书登录与设备管理
+- [x] 用量仪表盘与会话统计
+- [x] 单机 nginx + systemd 部署套件
+- [ ] 更完善的插件 / Skill 生态
+- [ ] 性能与长会话稳定性增强
+
+查看 [Issues](https://github.com/ADaozz/agent_platform/issues) 了解开发进度。
+
+## 🤝 Contributing
+
+欢迎提交 Issue 和 Pull Request。
+
+1. Fork 本仓库
+2. 创建功能分支
+3. 提交修改（勿提交 `deploy/local/`、密钥、本机 IP / 邮箱等环境数据）
+4. 发起 Pull Request
+
+## ⭐ Support
+
+如果这个项目对你有帮助，欢迎给仓库一个 Star。
+
+---
+
+<div align="center">
+
+Made with care by [ADaozz](https://github.com/ADaozz)
+
+</div>

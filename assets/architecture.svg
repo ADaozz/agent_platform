@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-label="Deep Agent architecture">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1916"/>
+      <stop offset="100%" stop-color="#2a241c"/>
+    </linearGradient>
+    <style>
+      .box { fill: #2c271f; stroke: #6b5a42; stroke-width: 1.5; rx: 12; }
+      .title { fill: #f2ead9; font: 600 16px ui-sans-serif, system-ui, sans-serif; }
+      .sub { fill: #b9a88c; font: 12px ui-sans-serif, system-ui, sans-serif; }
+      .label { fill: #958a78; font: 11px ui-sans-serif, system-ui, sans-serif; }
+      .line { stroke: #8a734f; stroke-width: 1.5; fill: none; }
+    </style>
+  </defs>
+  <rect width="960" height="420" fill="url(#bg)"/>
+  <text x="40" y="42" class="title">Deep Agent · 运行时路径</text>
+
+  <rect class="box" x="40" y="70" width="200" height="80"/>
+  <text x="56" y="104" class="title">Browser</text>
+  <text x="56" y="126" class="sub">Vue 3 工作台 · HTTPS</text>
+
+  <path class="line" d="M250 110 H310"/>
+  <rect class="box" x="310" y="70" width="220" height="80"/>
+  <text x="326" y="104" class="title">nginx</text>
+  <text x="326" y="126" class="sub">443 静态 + /api · 8443 mTLS</text>
+
+  <path class="line" d="M530 110 H590"/>
+  <rect class="box" x="590" y="50" width="330" height="120"/>
+  <text x="606" y="84" class="title">Spring Boot（ITAM）</text>
+  <text x="606" y="106" class="sub">JWT / Shiro · 证书登录 · 用量</text>
+  <text x="606" y="128" class="sub">签名网关 → Agent Runtime</text>
+  <text x="606" y="150" class="label">仅监听 127.0.0.1:8080</text>
+
+  <path class="line" d="M755 170 V210"/>
+  <rect class="box" x="590" y="210" width="330" height="120"/>
+  <text x="606" y="244" class="title">Agent Runtime</text>
+  <text x="606" y="266" class="sub">FastAPI · LangGraph · Bubblewrap</text>
+  <text x="606" y="288" class="sub">DOCX / PPTX Skill · 沙箱执行</text>
+  <text x="606" y="310" class="label">仅监听 127.0.0.1:8090</text>
+
+  <rect class="box" x="40" y="210" width="200" height="120"/>
+  <text x="56" y="244" class="title">Redis</text>
+  <text x="56" y="266" class="sub">登录会话 / 验证码</text>
+  <text x="56" y="288" class="label">127.0.0.1:6379</text>
+
+  <rect class="box" x="280" y="210" width="220" height="120"/>
+  <text x="296" y="244" class="title">SQLite</text>
+  <text x="296" y="266" class="sub">用户 · 权限 · 资产</text>
+  <text x="296" y="288" class="label">/var/lib/agent-platform</text>
+
+  <path class="line" d="M140 210 V170 H755 V170"/>
+  <text x="40" y="380" class="label">公网只暴露 80/443（证书登录再加 8443）；应用端口全部回环。</text>
+</svg>
