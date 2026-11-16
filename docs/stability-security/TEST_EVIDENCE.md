@@ -10,6 +10,14 @@
 | `cd agent-runtime && node --test tests/*.test.mjs` | **36 passed** |
 | `cd backend && JAVA_HOME=.../java-17-openjdk-amd64 mvn -Dtest=CertTrustedProxyTest,AgentRuntimeTimeoutTest,LogDesensitizeUtilsTest test` | **17 passed** |
 
+## 审查后续（仍为 draft）
+
+- `CertLoginRedirectTest`：回跳不使用 Host；未配置 public origin 时失败；启用证书登录必须同时有可信代理与 HTTPS Origin。
+- `test_kill_after_file_write_does_not_replay_tool`：真实进程在 `write_file` 之后被 SIGKILL，重启后续聊标记文件仍为 `marker-once`。
+- `test_kill_while_waiting_for_approval_keeps_interrupt`：审批中 SIGKILL 后状态仍为 `waiting_confirmation`。
+- `test_delete_keeps_store_when_runner_close_times_out`：`close()` 失败返回 409，Store 与 Checkpoint 保留。
+- 真实 Nginx + 浏览器 + sign.p12 的证书登录尚未在本环境执行，因此 PR 保持 Draft。
+
 ## 恢复相关验收要点
 
 - `test_build_reloads_session_like_cli_switch_and_arms_recovery`：`Runtime.build()` 经 `switch_session` 装载 RecoveryContext；checkpoint 可读；续聊后上下文清除；用户 transcript 不被恢复提示污染。

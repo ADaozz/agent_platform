@@ -1,5 +1,5 @@
 """Platform Runtime.build 必须走 deep_agent_cli 同等的 switch_session 恢复路径。"""
-import ipaddress
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -182,3 +182,52 @@ def test_delete_rejects_running_background_task(client):
     bg.mark_finished(run_id='alive1', session_id=session_id, status='interrupted', result='stopped',
                      finished_at='2020-01-01T00:02:00+00:00')
     assert client.delete(f'/api/agent/sessions/{session_id}').status_code == 204
+
+
+def test_background_result_redacts_secrets_and_hides_failures():
+    from platform_app import background_store as bg
+    assert 'sk-supersecretvalue' not in bg.redact_secrets('token sk-supersecretvalue tail')
+    session_id = 's'
+    bg.mark_started(run_id='r1', session_id=session_id, tool_call_id='t', description='use sk-supersecretvalue', created_at='t0')
+    assert 'sk-supersecretvalue' not in bg.get('r1')['description']
+    bg.mark_finished(run_id='r1', session_id=session_id, status='failed', result='boom sk-supersecretvalue', finished_at='t1')
+    assert bg.get('r1')['result'] == '后台任务失败'
+    assert 'sk-supersecretvalue' not in json.dumps(bg.get('r1'))
+
+
+def test_delete_keeps_store_when_runner_close_times_out(client):
+    session_id = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()['id']
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'hello'}).status_code == 202
+    runtime = rt.RUNTIMES[session_id]
+    store = runtime.runner.session_store
+    checkpoint = store.path
+
+    def timeout_close():
+        raise RuntimeError('model stream still open')
+
+    runtime.runner.close = timeout_close
+    response = client.delete(f'/api/agent/sessions/{session_id}')
+    assert response.status_code == 409
+    assert not store._closed
+    assert checkpoint.is_file()
+    assert client.get(f'/api/agent/sessions/{session_id}').status_code == 200
+
+
+def test_build_checkpoint_read_failure_does_not_delete_workspace(client, monkeypatch):
+    session_id = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()['id']
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'hello'}).status_code == 202
+    runtime = rt.RUNTIMES[session_id]
+    runtime.runner.close()
+    runtime.runner.session_store.close()
+    runtime.runner = None
+    checkpoint = resolve(session_id).session_root / 'checkpoint.sqlite'
+    assert checkpoint.is_file()
+
+    def fail_switch(self, session):
+        raise RuntimeError('checkpoint read failed')
+
+    monkeypatch.setattr('platform_app.agent_core.runner.AgentRunner.switch_session', fail_switch)
+    with pytest.raises(RuntimeError, match='checkpoint read failed'):
+        rt.runtime(session_id).build()
+    assert checkpoint.is_file()
+    assert resolve(session_id).files_root.exists()

@@ -15,9 +15,20 @@
 ## 证书登录边界验收（必须）
 
 - Spring Boot 仅监听可信地址（生产默认 `127.0.0.1:8080`，或内部网卡 + 防火墙）。
-- Nginx 在全部转发路径上使用 `proxy_set_header` **覆盖** `X-Client-Verify` / `X-Client-DN` / `X-Client-Cert`，禁止透传客户端同名 Header。
-- 仅当边界确认后设置 `CERT_LOGIN_ENABLED=true`，并配置 `CERT_LOGIN_TRUSTED_PROXIES`。
-- 无法确保代理边界时，保持 `CERT_LOGIN_ENABLED=false`（默认），伪造 Header 不得获得身份。
+- 443 清除外部 `X-Client-*`；8443 只写入 `$ssl_client_*`。示例：`nginx-cert-boundary.conf`。
+- Beta 启用证书登录时必须同时设置：
+
+```bash
+CERT_LOGIN_ENABLED=true
+CERT_LOGIN_TRUSTED_PROXIES=127.0.0.1,::1
+CERT_LOGIN_PUBLIC_ORIGIN=https://实际域名
+CERT_LOGIN_ALLOWED_ORIGINS=https://实际域名
+SERVER_ADDRESS=127.0.0.1
+```
+
+- 缺少可信代理或 HTTPS `public-origin` 时进程启动失败，登录页不展示证书按钮。
+- 回跳地址只使用白名单 Origin 或 `public-origin`，不使用请求 `Host`。
+- 无法确保代理边界时，保持 `CERT_LOGIN_ENABLED=false`。
 
 ## 个人模型 SSRF
 

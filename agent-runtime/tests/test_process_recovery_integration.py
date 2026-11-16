@@ -1,4 +1,5 @@
 """Process-level recovery: simulate runtime restart without replaying tools."""
+import json
 import os
 import subprocess
 import sys
@@ -27,6 +28,46 @@ def _wait_http(url: str, timeout: float = 30.0):
             last = exc
         time.sleep(0.1)
     raise AssertionError(f'service did not become ready: {last}')
+
+
+def _run_worker(mode, data):
+    import subprocess
+    env = os.environ.copy()
+    env['PLATFORM_DATA_DIR'] = str(data)
+    env['PYTHONPATH'] = str(ROOT)
+    python = ROOT / '.venv' / 'bin' / 'python'
+    if not python.exists():
+        python = Path(sys.executable)
+    return subprocess.run(
+        [str(python), str(ROOT / 'tests' / 'crash_recovery_worker.py'), mode, str(data)],
+        cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=90,
+    )
+
+
+@pytest.mark.integration
+def test_kill_after_file_write_does_not_replay_tool(tmp_path):
+    data = tmp_path / 'crash-write'
+    data.mkdir()
+    crashed = _run_worker('write-kill', data)
+    assert crashed.returncode in (-9, 137), (crashed.returncode, crashed.stdout, crashed.stderr)
+    continued = _run_worker('continue', data)
+    assert continued.returncode == 0, continued.stderr
+    body = json.loads(continued.stdout.strip().splitlines()[-1])
+    assert body['marker'] == 'marker-once'
+    assert '不要重写标记文件' in body['output']
+
+
+@pytest.mark.integration
+def test_kill_while_waiting_for_approval_keeps_interrupt(tmp_path):
+    data = tmp_path / 'crash-approval'
+    data.mkdir()
+    crashed = _run_worker('approval-kill', data)
+    assert crashed.returncode != 0, crashed.stderr
+    inspected = _run_worker('inspect', data)
+    assert inspected.returncode == 0, inspected.stderr
+    body = json.loads(inspected.stdout.strip().splitlines()[-1])
+    assert body['status'] == 'waiting_confirmation'
+    assert body['pending']
 
 
 @pytest.mark.integration
