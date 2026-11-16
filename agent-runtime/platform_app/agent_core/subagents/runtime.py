@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 from time import monotonic
 from contextvars import Context
@@ -171,8 +172,9 @@ class SubAgentRuntime(Runnable):
                 run_id=run_id, session_id=parent, tool_call_id=tool_call_id,
                 description=description, created_at=started_at,
             )
-        except Exception:  # noqa: BLE001 - persistence must not block admission
-            pass
+        except Exception as exc:
+            self.manager.release(run_id)
+            raise RuntimeError('后台任务状态未能写入，未启动执行') from exc
 
         def work() -> None:
             try:
@@ -198,8 +200,10 @@ class SubAgentRuntime(Runnable):
                         finished_at=finished_at, tool_call_id=tool_call_id,
                         description=description, created_at=started_at,
                     )
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception:
+                    logging.getLogger(__name__).error(
+                        'Background task result was not persisted: run_id=%s status=%s', run_id, status,
+                    )
                 if not task.discarded:
                     payload = {"run_id": run_id, "tool_call_id": tool_call_id, "parent": parent,
                                "status": status, "content": content}

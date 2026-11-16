@@ -1,16 +1,34 @@
 """Minimal SQLite persistence for background subagent runs (no thread restore)."""
 from __future__ import annotations
 
+import logging
+import re
+
 from . import domain as d
 
 KIND = 'background_task'
 ACTIVE = frozenset({'running'})
-SAFE_RESULT_LIMIT = 2000
+DESCRIPTION_LIMIT = 200
+RESULT_LIMIT = 200
+LOG = logging.getLogger(__name__)
+_SECRET = re.compile(
+    r'(?i)(sk-[A-Za-z0-9_\-]{8,}|bearer\s+[A-Za-z0-9._\-]{8,}|api[_-]?key["\']?\s*[:=]\s*["\']?[^"\'\s,}]+)'
+)
+_SAFE_STATUS = {
+    'failed': '后台任务失败',
+    'cancelled': '后台任务已取消',
+    'interrupted': '后台任务已中断，不会自动重执行',
+}
 
 
-def _brief(value: str | None) -> str:
-    text = ' '.join(str(value or '').split())
-    return text[:SAFE_RESULT_LIMIT]
+def redact_secrets(value: str | None) -> str:
+    """Strip credential-like substrings before anything is written to SQLite."""
+    return _SECRET.sub('[REDACTED]', str(value or ''))
+
+
+def _brief(value: str | None, limit: int = DESCRIPTION_LIMIT) -> str:
+    text = ' '.join(redact_secrets(value).split())
+    return text[:limit]
 
 
 def upsert(task: dict) -> dict:
@@ -19,13 +37,20 @@ def upsert(task: dict) -> dict:
         'run_id': task['run_id'],
         'session_id': task['session_id'],
         'tool_call_id': task.get('tool_call_id') or '',
-        'description': _brief(task.get('description')),
+        'description': _brief(task.get('description'), DESCRIPTION_LIMIT),
         'status': task['status'],
         'created_at': task.get('created_at'),
         'finished_at': task.get('finished_at'),
-        'result': _brief(task.get('result')),
+        'result': safe_result(task.get('status'), task.get('result')),
     }
     return d.put(KIND, record)
+
+
+def safe_result(status: str | None, result: str | None) -> str:
+    """Failures keep a category, not the raw exception or model output."""
+    if status in _SAFE_STATUS:
+        return _SAFE_STATUS[status]
+    return _brief(result, RESULT_LIMIT)
 
 
 def mark_started(*, run_id: str, session_id: str, tool_call_id: str, description: str, created_at: str) -> dict:
