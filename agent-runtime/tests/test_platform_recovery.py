@@ -242,6 +242,33 @@ def test_failed_build_retries_close_before_creating_a_new_runner(client):
     assert client.get(f'/api/agent/sessions/{session_id}').json()['output'] == 'ok'
 
 
+def test_schedule_does_not_record_message_while_cleanup_still_times_out(client):
+    session_id = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()['id']
+    assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'hello'}).status_code == 202
+    runtime = rt.RUNTIMES[session_id]
+    runner = runtime.runner
+    real_close = runner.close
+    before = list(d.get('session', session_id)['messages'])
+
+    def still_timing_out():
+        runner._closed = True
+        raise RuntimeError('model stream still open')
+
+    runner.close = still_timing_out
+    runtime.release_partial_runner(runner, runner.session_store, None)
+    rejected = client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'not accepted'})
+    assert rejected.status_code == 409
+    assert d.get('session', session_id)['messages'] == before
+
+    runner.close = real_close
+    accepted = client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'accepted after cleanup'})
+    assert accepted.status_code == 202
+    recorded = [item['content'] for item in client.get(f'/api/agent/sessions/{session_id}').json()['messages']]
+    transcript = [block.content for block in runtime.runner.load_session(session_id).transcript if block.kind == 'user']
+    assert recorded == ['hello', 'accepted after cleanup']
+    assert transcript == recorded
+
+
 def test_build_checkpoint_read_failure_does_not_delete_workspace(client, monkeypatch):
     session_id = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()['id']
     assert client.post(f'/api/agent/sessions/{session_id}/messages', json={'text': 'hello'}).status_code == 202

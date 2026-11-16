@@ -654,6 +654,9 @@ def runtime(session_id):
 def schedule(session_id, operation, payload):
     rt = runtime(session_id)
     with rt.lock:
+        # Reject the request before recording a message the runner cannot accept.
+        if rt._pending_cleanup is not None:
+            rt._retry_pending_cleanup()
         record = find(session_id)
         if record['status'] in ACTIVE:
             raise HTTPException(409, '当前会话正在执行')

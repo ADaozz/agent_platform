@@ -13,12 +13,14 @@
 ## 审查后续（仍为 draft）
 
 - `CertLoginRedirectTest`：回跳不使用 Host；未配置 public origin 时失败；启用证书登录必须同时有可信代理与 HTTPS Origin。
-- `test_kill_after_file_write_does_not_replay_tool`：真实进程在 `write_file` 之后被 SIGKILL，重启后续聊标记文件仍为 `marker-once`。
+- `test_kill_after_file_write_does_not_replay_tool`：真实进程在 `execute` 追加写入单个 `x` 后被 SIGKILL；重启后续聊标记仍是 `x`，重复执行才会变成 `xx`。
 - `test_kill_while_waiting_for_approval_keeps_interrupt`：审批中 SIGKILL 后状态仍为 `waiting_confirmation`。
 - `test_delete_keeps_store_when_runner_close_times_out`：`close()` 失败返回 409，Store 与 Checkpoint 保留。
 - 构建失败且首次 `close()` 超时后，Runner 进入待清理，不会交给后续 `invoke()`。流结束后再次 `close()` 成功，会话可以重建并继续。
 - 写文件崩溃测试改为追加计数：重启后续聊标记仍为单个 `x`，重复执行会变成 `xx`。
 - 后台记录脱敏改为与子代理日志相同的已知密钥替换。
+- 待清理未完成时发送消息返回 409，Platform 历史不追加；关闭成功后消息进入 Platform 历史和 Checkpoint。
+- 本轮回归：上述 Python 套件 **105 passed**；`node --test tests/*.test.mjs` **36 passed**。
 - 真实 Nginx + 浏览器 + sign.p12 的证书登录尚未在本环境执行，因此 PR 保持 Draft。
 
 ## 恢复相关验收要点
