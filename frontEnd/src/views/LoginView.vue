@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
-import { sendRegisterCode, register } from '@/api/auth'
+import { sendRegisterCode, register, certLoginAvailable } from '@/api/auth'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import BrandMark from '@/components/BrandMark.vue'
@@ -20,6 +20,7 @@ const userName = ref('')
 const passWord = ref('')
 const loading = ref(false)
 const certLoading = ref(false)
+const certLoginEnabled = ref(false)
 
 const CERT_ERROR_MESSAGES: Record<string, string> = {
   no_client_cert: '未检测到客户端证书，请确认已导入 sign.p12',
@@ -34,6 +35,11 @@ function onWideChange(e: MediaQueryListEvent) {
 
 onMounted(() => {
   wideQuery.addEventListener('change', onWideChange)
+  certLoginAvailable().then((data) => {
+    certLoginEnabled.value = Boolean(data?.enabled)
+  }).catch(() => {
+    certLoginEnabled.value = false
+  })
   const certError = route.query.certError as string | undefined
   if (certError) {
     toast.error(CERT_ERROR_MESSAGES[certError] ? tr(CERT_ERROR_MESSAGES[certError]) : decodeURIComponent(certError))
@@ -243,12 +249,14 @@ onBeforeUnmount(() => {
           </button>
         </form>
 
-        <div class="login-divider"><span>{{ tr('或') }}</span></div>
+        <template v-if="certLoginEnabled">
+          <div class="login-divider"><span>{{ tr('或') }}</span></div>
 
-        <button class="btn-ghost login-cert" type="button" :disabled="loading || certLoading" @click="handleCertLogin">
-          <AppIcon name="verified_user" class="!text-[17px]" />
-          {{ tr(certLoading ? '证书登录中…' : '证书登录') }}
-        </button>
+          <button class="btn-ghost login-cert" type="button" :disabled="loading || certLoading" @click="handleCertLogin">
+            <AppIcon name="verified_user" class="!text-[17px]" />
+            {{ tr(certLoading ? '证书登录中…' : '证书登录') }}
+          </button>
+        </template>
 
         <p class="login-register">
           {{ tr('还没有账号？') }}

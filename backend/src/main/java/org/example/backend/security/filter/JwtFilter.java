@@ -35,6 +35,7 @@ public class JwtFilter extends AuthenticatingFilter {
                 || "/register".equals(httpRequest.getServletPath())
                 || "/register/code".equals(httpRequest.getServletPath())
                 || "/login/cert".equals(httpRequest.getServletPath())
+                || "/login/cert/availability".equals(httpRequest.getServletPath())
                 || "/login/cert/check".equals(httpRequest.getServletPath())
                 || "/login/cert/debug".equals(httpRequest.getServletPath())) {
             return true;
