@@ -1,7 +1,9 @@
--- 测试账号：admin/123456  user/123456（密码 bcrypt）
-INSERT OR IGNORE INTO sys_user (user_id, user_name, pass_word, status, create_time, update_time) VALUES
-(1001, 'admin', '$2b$10$UPiwFujaC3YD28nYRmDOtOipO5fdFzZNBGSHXDk1xX1h0JESl7hD2', '0', datetime('now'), datetime('now')),
-(1002, 'user',  '$2b$10$UPiwFujaC3YD28nYRmDOtOipO5fdFzZNBGSHXDk1xX1h0JESl7hD2', '0', datetime('now'), datetime('now'));
+-- 初始管理员：admin/123456（密码 bcrypt）。仅当 sys_user 为空时插入。
+-- 用 WHERE NOT EXISTS 而不是 INSERT OR IGNORE：运维改过账号/密码后重启不会再种回内置账号，
+-- 删掉的测试账号也不会复活（见 deploy/scripts/set-admin.sh）。
+INSERT INTO sys_user (user_id, user_name, pass_word, status, create_time, update_time)
+SELECT 1001, 'admin', '$2b$10$UPiwFujaC3YD28nYRmDOtOipO5fdFzZNBGSHXDk1xX1h0JESl7hD2', '0', datetime('now'), datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM sys_user);
 
 INSERT OR IGNORE INTO sys_role (role_id, sys_role) VALUES
 (1, 'admin'),
@@ -35,9 +37,9 @@ INSERT OR IGNORE INTO sys_permission (permission_id, sys_permission) VALUES
 (25, 'system:cert:approve'),
 (26, 'system:cert:revoke');
 
-INSERT OR IGNORE INTO sys_user_role (user_id, role_id) VALUES
-(1001, 1),
-(1002, 2);
+INSERT OR IGNORE INTO sys_user_role (user_id, role_id)
+SELECT 1001, 1
+WHERE EXISTS (SELECT 1 FROM sys_user WHERE user_id = 1001);
 
 INSERT OR IGNORE INTO sys_role_permission (role_id, permission_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9),

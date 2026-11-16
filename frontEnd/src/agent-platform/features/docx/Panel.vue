@@ -39,7 +39,7 @@ watch(documents,values=>emit('catalog',Object.values(values).filter(file=>file.p
 watch(()=>props.openRequest,async request=>{
  if(!request||!props.session)return
  const id=props.session.id
- await guard(async()=>{
+ try{
   const epoch=documentEpoch
   const values=await api(`/agent/sessions/${id}/documents`)
   if(props.session?.id!==id||props.openRequest?.token!==request.token)return
@@ -47,7 +47,13 @@ watch(()=>props.openRequest,async request=>{
   const document=Object.values(documents.value).find(file=>file.path===request.path)
   if(!document)throw new Error(t('artifacts.previewUnavailable'))
   activeDocumentId.value=document.document_id;showDocument()
- })
+ }catch(error){
+  if(props.session?.id===id&&props.openRequest?.token===request.token){
+   documentOpen.value=false
+   emit('open',false)
+   emit('error',error.message)
+  }
+ }
 },{immediate:true})
 function closeDocument() { documentOpen.value = false; sessionStorage.setItem(documentStorageKey.value + ':closed', 'true') }
 function showDocument() { documentOpen.value = true; emit('open',true); sessionStorage.removeItem(documentStorageKey.value + ':closed') }

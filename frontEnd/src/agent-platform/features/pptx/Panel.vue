@@ -37,7 +37,13 @@ watch(()=>props.openRequest,async request=>{
    const preview=await api(`/agent/sessions/${id}/presentations/${encodeURIComponent(item.presentation_id)}/preview`,{method:'POST'})
    if(props.session?.id===id&&props.openRequest?.token===request.token)receive([preview])
   }
- }catch(e){emit('error',e.message)}
+ }catch(e){
+  if(props.session?.id===id&&props.openRequest?.token===request.token){
+   opened.value=false
+   emit('open',false)
+   emit('error',e.message)
+  }
+ }
 },{immediate:true})
 function close(){opened.value=false;sessionStorage.setItem(key(identity.value),'true');emit('open',false)}
 function show(){opened.value=true;sessionStorage.removeItem(key(identity.value));emit('open',true)}

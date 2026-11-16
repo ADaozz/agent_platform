@@ -101,7 +101,8 @@ public class AuthController {
             return AjaxResult.success("登录成功", vo);
         } catch (BusinessException e) {
             if (browserRedirect) {
-                redirectCertLoginError(response, "证书登录失败", origin);
+                // 用稳定错误码回跳，登录页可给出可操作提示；勿回传任意异常原文
+                redirectCertLoginError(response, certLoginErrorCode(e.getMessage()), origin);
                 return null;
             }
             throw e;
@@ -121,9 +122,31 @@ public class AuthController {
                 + URLEncoder.encode(message, StandardCharsets.UTF_8.name()));
     }
 
+    /** Map backend refusal text to a small allowlist of URL-safe codes for the login page. */
+    static String certLoginErrorCode(String message) {
+        if (!StringUtils.hasText(message)) {
+            return "cert_login_failed";
+        }
+        if (message.contains("未检测到") || message.contains("解析失败")) {
+            return "no_client_cert";
+        }
+        if (message.contains("未绑定") || message.contains("未签发")) {
+            return "cert_not_bound";
+        }
+        if (message.contains("过期")) {
+            return "cert_expired";
+        }
+        if (message.contains("未启用") || message.contains("可信代理") || message.contains("代理")) {
+            return "cert_proxy";
+        }
+        if (message.contains("停用")) {
+            return "account_disabled";
+        }
+        return "cert_login_failed";
+    }
+
     private boolean isAllowedOrigin(String origin) {
-        return CertLoginRedirect.isExactHttpsOrigin(origin)
-                && CertLoginRedirect.parseOrigins(allowedOriginsCsv).contains(origin.trim());
+        return CertLoginRedirect.isAllowedRedirectOrigin(origin, CertLoginRedirect.parseOrigins(allowedOriginsCsv));
     }
 
     private String buildLoginUrl(String origin) {

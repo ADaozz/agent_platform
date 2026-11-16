@@ -1,7 +1,7 @@
 Windows Registry Editor Version 5.00
 
-; 仅自动选择 CN=user 的签名证，避免误选 encrypt 证
-; 双击导入后重启 Chrome
+; 仅自动选择指定 CN 的签名证，避免误选 encrypt 证。
+; 把 your-cert-cn / 203.0.113.10 换成实际值后再导入；双击后重启 Chrome。
 
 [HKEY_CURRENT_USER\SOFTWARE\Policies\Google\Chrome\AutoSelectCertificateForUrls]
-"1"="{\"pattern\":\"https://10.8.40.225:8443\",\"filter\":{\"SUBJECT\":{\"CN\":\"user\"},\"ISSUER\":{\"CN\":\"personalDemo Intermediate CA\",\"O\":\"personalDemo\",\"C\":\"CN\"}}}"
+"1"="{\"pattern\":\"https://203.0.113.10:8443\",\"filter\":{\"SUBJECT\":{\"CN\":\"your-cert-cn\"},\"ISSUER\":{\"CN\":\"personalDemo Intermediate CA\",\"O\":\"personalDemo\",\"C\":\"CN\"}}}"

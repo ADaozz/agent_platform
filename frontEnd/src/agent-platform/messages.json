@@ -1539,6 +1539,34 @@
     "zh": "{count} 个步骤",
     "en": "{count} steps"
   },
+  "process.compaction": {
+    "zh": "压缩上下文",
+    "en": "Compacting context"
+  },
+  "process.compaction.running": {
+    "zh": "正在压缩…",
+    "en": "Compacting…"
+  },
+  "process.compaction.compacted": {
+    "zh": "已压缩",
+    "en": "Compacted"
+  },
+  "process.compaction.nothing_to_compact": {
+    "zh": "无需压缩",
+    "en": "Nothing to compact"
+  },
+  "process.compaction.ineligible": {
+    "zh": "暂不可压缩",
+    "en": "Not eligible yet"
+  },
+  "process.compaction.failed": {
+    "zh": "压缩失败",
+    "en": "Compaction failed"
+  },
+  "process.compaction.tokens": {
+    "zh": "{used} / {window} tokens",
+    "en": "{used} / {window} tokens"
+  },
   "process.status.paused": {
     "zh": "已暂停",
     "en": "Paused"
@@ -1744,8 +1772,8 @@
     "en": "Select preview file"
   },
   "artifacts.previewUnavailable": {
-    "zh": "此文件的预览暂不可用，可下载查看。",
-    "en": "Preview is unavailable for this file. You can download it."
+    "zh": "无法预览：文档未进入预览目录（多为生成时扩展依赖未就绪）。请下载查看，或让 Agent 重新生成后再预览。",
+    "en": "Preview unavailable: this file is not in the preview catalog (often because office deps were missing when it was created). Download it, or ask the Agent to regenerate it."
   },
   "pptx.automatic": {
     "zh": "自动检查",
@@ -1862,6 +1890,10 @@
   "暂无文件": {
     "zh": "暂无文件",
     "en": "No files yet"
+  },
+  "files.emptyHint": {
+    "zh": "各对话里 Agent 产出的文档会出现在这里。先开始一次对话即可。",
+    "en": "Files the Agent creates in any chat will show up here. Start a conversation to begin."
   },
   "预览最新文件": {
     "zh": "预览最新文件",

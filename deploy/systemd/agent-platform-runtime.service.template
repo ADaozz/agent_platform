@@ -1,0 +1,37 @@
+[Unit]
+Description=Agent Platform agent-runtime (FastAPI, loopback only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${SERVICE_USER}
+Group=${SERVICE_USER}
+WorkingDirectory=${APP_ROOT}/current/runtime
+EnvironmentFile=${ETC_ROOT}/secrets.env
+EnvironmentFile=${ETC_ROOT}/runtime.env
+ExecStart=${APP_ROOT}/venv/bin/uvicorn platform_app.main:app --host 127.0.0.1 --port ${RUNTIME_PORT}
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+TimeoutStopSec=60
+KillMode=mixed
+LimitNOFILE=65535
+
+# 沙箱（Bubblewrap）需要非特权 user namespace，因此不要加
+# PrivateTmp / PrivateDevices / ProtectKernelTunables 这类会与 bwrap 挂载冲突的选项。
+# NoNewPrivileges 不影响 unshare(CLONE_NEWUSER)，可以保留。
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=${DATA_ROOT}
+CapabilityBoundingSet=
+AmbientCapabilities=
+# 必须包含 AF_NETLINK：bwrap 在 --unshare-net 之后要创建 NETLINK_ROUTE socket
+# 把沙箱内的 lo 接口拉起来，缺了会报
+#   bwrap: loopback: Failed to create NETLINK_ROUTE socket: Address family not supported by protocol
+# 整个沙箱预检直接失败（restricted 模式每个会话都建沙箱，等于平台不可用）。
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

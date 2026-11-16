@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+; 本机 / WSL 调试：自动在 8443 选择签名证，避免「记住不发送」导致一直无证。
+; 导入前把 CN 改成你的签名证 Subject CN；需要公网 IP 时再加一条 pattern。
+; 双击导入后必须完全退出 Chrome 再打开。
+
+[HKEY_CURRENT_USER\SOFTWARE\Policies\Google\Chrome\AutoSelectCertificateForUrls]
+"1"="{\"pattern\":\"https://localhost:8443\",\"filter\":{\"SUBJECT\":{\"CN\":\"your-cert-cn\"},\"ISSUER\":{\"CN\":\"personalDemo Intermediate CA\"}}}"

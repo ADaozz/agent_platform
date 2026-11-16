@@ -31,6 +31,16 @@ class CertLoginRedirectTest {
     }
 
     @Test
+    void localhostIsAlwaysAnAllowedRedirectEvenWhenNotListed() {
+        Set<String> allowed = CertLoginRedirect.parseOrigins("https://203.0.113.10");
+        assertTrue(CertLoginRedirect.isAllowedRedirectOrigin("https://localhost", allowed));
+        assertEquals(
+                "https://localhost/login",
+                CertLoginRedirect.loginUrl("https://localhost", "https://203.0.113.10", allowed));
+        assertFalse(CertLoginRedirect.isAllowedRedirectOrigin("https://evil.example", allowed));
+    }
+
+    @Test
     void missingPublicOriginDoesNotInventAHost() {
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> CertLoginRedirect.loginUrl("https://attacker.example", "", Set.of()));

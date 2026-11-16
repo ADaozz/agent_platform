@@ -1,0 +1,35 @@
+[Unit]
+Description=Agent Platform backend (Spring Boot, /api + agent-runtime gateway)
+After=network-online.target redis-agent-platform.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${SERVICE_USER}
+Group=${SERVICE_USER}
+WorkingDirectory=${APP_ROOT}/current
+EnvironmentFile=${ETC_ROOT}/secrets.env
+EnvironmentFile=${ETC_ROOT}/backend.env
+ExecStart=/usr/bin/java $JAVA_OPTS -jar ${APP_ROOT}/current/backend.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+TimeoutStopSec=45
+KillMode=mixed
+LimitNOFILE=65535
+
+# 权限收敛：只需要写数据目录（SQLite、证书、日志缓冲）
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=${DATA_ROOT}
+CapabilityBoundingSet=
+AmbientCapabilities=
+# AF_NETLINK：JDK 枚举网卡（getifaddrs/NetworkInterface）在 Linux 上走 netlink，
+# 白名单里缺它会拿到不完整或空的网卡列表。
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

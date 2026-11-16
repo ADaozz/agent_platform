@@ -132,6 +132,46 @@ test('task and step duration use persisted event timestamps, no fabricated old t
  assert.equal(processOf([{seq:1,type:'tool_completed',tool_call_id:'old',name:'read_file'}],'completed').steps[0].durationMs,null)
 })
 
+test('finished process duration fills from step times when the turn start timestamp is missing',()=>{
+ const process=processOf([
+  {seq:1,type:'operation',operation:'message',text:'Go'},
+  {seq:2,type:'tool_started',name:'execute',tool_call_id:'a',occurred_at:at(2)},
+  {seq:3,type:'tool_completed',tool_call_id:'a',occurred_at:at(5)},
+  {seq:4,type:'result',status:'completed',occurred_at:at(8)},
+ ],'completed')
+ assert.equal(process.startedAt,Date.parse(at(2)))
+ assert.equal(process.endedAt,Date.parse(at(8)))
+ assert.equal(process.durationMs,6000)
+ assert.equal(process.steps[0].durationMs,3000)
+})
+
+test('manual and automatic compaction appear as process steps with duration',()=>{
+ const manual=conversationTimeline([
+  {seq:1,type:'operation',operation:'compact',occurred_at:at(0)},
+  {seq:2,type:'compacted',status:'compacted',used_tokens:12000,window_tokens:20000,message:'Conversation compacted.',occurred_at:at(4)},
+ ],'completed').filter(block=>block.kind==='process')
+ assert.equal(manual.length,1)
+ assert.equal(manual[0].finished,true)
+ assert.equal(manual[0].durationMs,4000)
+ assert.equal(manual[0].steps[0].kind,'compaction')
+ assert.equal(manual[0].steps[0].status,'completed')
+ assert.equal(manual[0].steps[0].compactionStatus,'compacted')
+ assert.equal(manual[0].steps[0].durationMs,4000)
+ assert.equal(manual[0].steps[0].usedTokens,12000)
+ const auto=processOf([
+  {seq:1,type:'operation',operation:'message',text:'Continue',occurred_at:at(0)},
+  {seq:2,type:'tool_started',name:'execute',tool_call_id:'a',occurred_at:at(1)},
+  {seq:3,type:'compaction_started',occurred_at:at(2)},
+  {seq:4,type:'compaction_finished',occurred_at:at(5)},
+  {seq:5,type:'tool_completed',tool_call_id:'a',content:'ok',occurred_at:at(6)},
+  {seq:6,type:'result',status:'completed',occurred_at:at(7)},
+ ],'completed')
+ assert.deepEqual(auto.steps.map(step=>step.kind),['tool','compaction'])
+ assert.equal(auto.steps[1].status,'completed')
+ assert.equal(auto.steps[1].durationMs,3000)
+ assert.equal(auto.durationMs,7000)
+})
+
 test('steering moves from the end of the turn to the point where the run read it', () => {
   const base = [
     { seq: 1, type: 'operation', operation: 'message', text: '做一份 PPT' },

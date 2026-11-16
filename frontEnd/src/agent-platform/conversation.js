@@ -24,6 +24,28 @@ export function shortResult(value) {
   return Array.from(brief.replace(/\s+/g, ' ').trim()).slice(0, 120).join('')
 }
 function timeSpan(start, end) { return start != null && end != null ? Math.max(0, end - start) : null }
+/** Wall-clock bounds for a process segment; never drop known step times when hints are missing. */
+function processTiming(group, startHint, endHint) {
+  let start = startHint ?? null, end = endHint ?? null
+  for (const step of group) {
+    if (step.startedAt != null) start = start == null ? step.startedAt : Math.min(start, step.startedAt)
+    const stepEnd = step.endedAt ?? (step.startedAt != null && typeof step.durationMs === 'number' ? step.startedAt + step.durationMs : null)
+    if (stepEnd != null) end = end == null ? stepEnd : Math.max(end, stepEnd)
+  }
+  return { startedAt: start, endedAt: end, durationMs: timeSpan(start, end) }
+}
+function compactionStep(event, index, status = 'running') {
+  const at = eventTime(event)
+  return {
+    key: `compaction-${event.seq ?? index}`, kind: 'compaction', name: 'compaction', order: index,
+    status, content: '', compactionStatus: null, usedTokens: null, windowTokens: null,
+    startedAt: at, endedAt: status === 'running' ? null : at,
+    durationMs: status === 'running' ? null : 0,
+  }
+}
+function activeCompaction(turn) {
+  return turn?.steps?.find(step => step.kind === 'compaction' && step.status === 'running')
+}
 
 // Steering notes wait at the end of the turn until the run reads them; the
 // read point (steering_applied) is where they belong in the timeline.
@@ -127,6 +149,32 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
       }
       turn = null; model = null
       ensureTurn(event, index).status = 'running'
+    } else if (event.type === 'operation' && event.operation === 'compact') {
+      turn = null; model = null
+      const current = ensureTurn(event, index)
+      current.status = 'running'
+      current.steps.push(compactionStep(event, index))
+    } else if (event.type === 'compaction_started') {
+      const current = ensureTurn(event, index)
+      if (!activeCompaction(current)) current.steps.push(compactionStep(event, index))
+    } else if (event.type === 'compaction_finished') {
+      const step = activeCompaction(ensureTurn(event, index))
+      if (step) {
+        finish(step, 'completed', event)
+        step.compactionStatus = 'compacted'
+      }
+    } else if (event.type === 'compacted') {
+      const current = ensureTurn(event, index)
+      const step = activeCompaction(current) || compactionStep(event, index, 'running')
+      if (!activeCompaction(current)) current.steps.push(step)
+      const outcome = event.status || 'compacted'
+      finish(step, outcome === 'failed' ? 'failed' : 'completed', event)
+      step.compactionStatus = outcome
+      step.usedTokens = typeof event.used_tokens === 'number' ? event.used_tokens : null
+      step.windowTokens = typeof event.window_tokens === 'number' ? event.window_tokens : null
+      step.content = rawText(event.message || '')
+      current.status = outcome === 'failed' ? 'failed' : 'completed'
+      current.endedAt = eventTime(event) ?? current.endedAt
     } else if (event.type === 'operation' && ['approve', 'answer'].includes(event.operation)) {
       ensureTurn(event, index).status = 'running'
       for (const step of turn.steps) if (step.status === 'pending') step.status = 'running'
@@ -188,7 +236,8 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
       ensureTurn(event, index).status = event.type === 'run_cancelled' ? 'cancelled' : 'failed'
       turn.endedAt = eventTime(event)
     } else if (event.type === 'task_progress' && event.content) {
-      ensureTurn(event, index).steps.push({ key: `progress-${event.seq ?? index}`, kind: 'progress', name: 'progress', order: index, content: rawText(event.content), status: 'completed', startedAt: eventTime(event), endedAt: eventTime(event) })
+      const at = eventTime(event)
+      ensureTurn(event, index).steps.push({ key: `progress-${event.seq ?? index}`, kind: 'progress', name: 'progress', order: index, content: rawText(event.content), status: 'completed', startedAt: at, endedAt: at, durationMs: 0 })
     } else if (event.type === 'output_files') {
       const current = ensureTurn(event, index)
       for (const file of event.files || []) if (file.path && !current.files.includes(file.path)) current.files.push(file.path)
@@ -209,9 +258,10 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
         content: entry?.note.content ?? steeringText(event.result?.content ?? event.content), status: 'completed',
         startedAt: eventTime(event), endedAt: eventTime(event), durationMs: 0 })
     }
-    if (turn && !settledStatuses.has(turn.status) && eventTime(event) != null
-        && !event.type.startsWith('presentation_') && !event.type.startsWith('document_')) {
-      turn.lastEventAt = eventTime(event)
+    const at = eventTime(event)
+    if (turn && at != null && !event.type.startsWith('presentation_') && !event.type.startsWith('document_')) {
+      turn.startedAt ??= at
+      if (!settledStatuses.has(turn.status)) turn.lastEventAt = at
     }
   }
   return turns.flatMap((item, index) => {
@@ -238,7 +288,9 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
         projected.subject = subagentSubject(projected)
         const outcome = projected.background?.phase === 'running' ? '' : subagentResult(projected.finalOutput)
         projected.resultSummary = shortResult(outcome || projected.subject)
-      } else projected.resultSummary = shortResult(projected.finalOutput || projected.streamedOutput || projected.content)
+      } else if (projected.kind !== 'compaction') {
+        projected.resultSummary = shortResult(projected.finalOutput || projected.streamedOutput || projected.content)
+      }
       return projected
     })
     // Model text written alongside tool calls is shown as ordinary assistant output
@@ -254,8 +306,13 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
       const followedByText = !final || answers.length > 0
       if (group.length || (final && live && !followedByText)) {
         const previousText = texts[position - 1]
-        const start = position === 0 ? item.startedAt : group[0]?.startedAt ?? previousText?.endedAt ?? previousText?.startedAt ?? item.startedAt
-        const end = final && !followedByText ? endedAt : group.at(-1)?.endedAt ?? texts[position]?.startedAt ?? endedAt
+        const startHint = position === 0
+          ? item.startedAt ?? group[0]?.startedAt
+          : group[0]?.startedAt ?? previousText?.endedAt ?? previousText?.startedAt ?? item.startedAt
+        const endHint = final && !followedByText
+          ? endedAt ?? group.at(-1)?.endedAt
+          : group.at(-1)?.endedAt ?? texts[position]?.startedAt ?? endedAt
+        const timing = processTiming(group, startHint, endHint)
         blocks.push({
           kind: 'process', key: `process-${item.key}-${position}`, steps: group,
           // Individual tool errors are routine mid-run; only the last segment carries the run's outcome.
@@ -264,7 +321,7 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
           finished: followedByText || (ended && group.every(step => settledStatuses.has(step.status))),
           background: group.some(step => step.backgroundLive),
           stepCount: group.filter(step => !['steer', 'notice'].includes(step.kind)).length, actionCount: group.filter(step => step.kind === 'tool').length,
-          startedAt: start, endedAt: end, durationMs: timeSpan(start, end),
+          startedAt: timing.startedAt, endedAt: timing.endedAt, durationMs: timing.durationMs,
         })
       }
       if (!final) blocks.push({ kind: 'assistant', key: `text-${texts[position].key}`, content: texts[position].content })

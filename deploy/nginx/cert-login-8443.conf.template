@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# 8443：客户端证书登录入口
+# 只有证书相关路径，其余 404，避免变成通用代理
+# ---------------------------------------------------------------------------
+server {
+    listen 8443 ssl;
+    listen [::]:8443 ssl;
+    # 同时接受公网名与本机 localhost（WSL / 本机调试常用 https://localhost）
+    server_name ${DOMAIN} localhost;
+
+    ssl_certificate     ${TLS_CERT};
+    ssl_certificate_key ${TLS_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # 禁止会话复用：optional 下若某次未交证，Chrome 会复用无证会话且不再弹窗
+    ssl_session_cache off;
+    ssl_session_tickets off;
+
+    # on：每次握手强制选客户端证。optional_no_ca 在 Chrome 上容易「记住不发送」
+    # 导致 verify=NONE；取消/未发送时用 error_page 跳回登录页，而不是停在 400。
+    ssl_verify_client on;
+    ssl_client_certificate ${TLS_CLIENT_CA};
+    ssl_verify_depth 3;
+
+    server_tokens off;
+    add_header X-Content-Type-Options nosniff always;
+    ${HSTS_HEADER}
+
+    # log_format 只能写在 http{}，勿放进本 snippet
+    access_log /var/log/nginx/agent-platform-cert.log;
+
+    error_page 495 496 = @cert_missing;
+
+    location @cert_missing {
+        return 302 https://$host/login?certError=no_client_cert;
+    }
+
+    location = /login/cert {
+        proxy_pass http://agent_platform_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Client-Verify $ssl_client_verify;
+        proxy_set_header X-Client-Cert $ssl_client_escaped_cert;
+        proxy_set_header X-Client-DN $ssl_client_s_dn;
+        proxy_read_timeout 30s;
+    }
+
+    # 诊断：浏览器打开后看 JSON（期望 verify=SUCCESS、hasCert=true、ok=true）
+    location = /login/cert/check {
+        proxy_pass http://agent_platform_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Client-Verify $ssl_client_verify;
+        proxy_set_header X-Client-Cert $ssl_client_escaped_cert;
+        proxy_set_header X-Client-DN $ssl_client_s_dn;
+        proxy_read_timeout 15s;
+    }
+
+    location = /cert-check {
+        return 302 /login/cert/check;
+    }
+
+    location / {
+        return 404;
+    }
+}

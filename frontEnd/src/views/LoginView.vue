@@ -23,7 +23,12 @@ const certLoading = ref(false)
 const certLoginEnabled = ref(false)
 
 const CERT_ERROR_MESSAGES: Record<string, string> = {
-  no_client_cert: '未检测到客户端证书，请确认已导入 sign.p12',
+  no_client_cert: '未检测到客户端证书，请确认已导入 sign.p12（不要选 encrypt.p12），并在弹窗中选择签名证',
+  cert_not_bound: '证书未绑定或不是签名证，请重新导入本次签发的 sign.p12',
+  cert_expired: '客户端证书已过期，请重新申请',
+  cert_proxy: '证书登录代理边界未就绪，请检查服务端配置',
+  account_disabled: '账号已停用',
+  cert_login_failed: '证书登录失败',
 }
 
 /** 窄屏下左侧主视觉区隐藏，不加载 3D 场景 */

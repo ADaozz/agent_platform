@@ -8,6 +8,9 @@
 # 构建产物与依赖
 target/
 dist/
+build/
+# 本机部署参数（含邮箱授权码等，绝不入库）
+deploy/local/
 node_modules/
 logs/
 *.log
@@ -21,3 +24,4 @@ logs/
 *.srl
 backend/docs/API-test.txt
 application-local.yml
+.deepagents/

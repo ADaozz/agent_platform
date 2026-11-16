@@ -1,0 +1,50 @@
+# /etc/redis/agent-platform.conf 的模板
+# 由 deploy/scripts/install-host.sh 渲染（端口与密码占位符会被替换）
+#
+# Redis 存放：登录会话（JWT jti）、API Token 鉴权缓存、注册验证码。
+# 会话被淘汰 = 用户被登出，所以 maxmemory-policy 必须是 noeviction，并开启 AOF。
+
+bind 127.0.0.1 ::1
+protected-mode yes
+port ${REDIS_PORT}
+
+requirepass ${REDIS_PASSWORD}
+
+timeout 0
+tcp-keepalive 300
+tcp-backlog 511
+
+daemonize no
+supervised systemd
+pidfile /run/redis-agent-platform/redis-server.pid
+
+loglevel notice
+logfile ${REDIS_LOG_DIR}/agent-platform.log
+always-show-logo no
+
+databases 16
+
+# 数据目录：AOF 文件存放位置
+dir ${REDIS_DATA_DIR}
+
+# 允许慢一点，也不允许丢会话
+maxmemory 512mb
+maxmemory-policy noeviction
+
+# 持久化：AOF 每秒落盘，重启后在线会话仍然有效
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+
+# 不再额外写 RDB（AOF 已覆盖；重启恢复更快）
+save ""
+
+# 关闭危险命令，降低误操作与横向移动风险
+rename-command CONFIG ""
+rename-command SHUTDOWN ""
+rename-command FLUSHALL ""
+rename-command FLUSHDB ""
+rename-command DEBUG ""

@@ -53,8 +53,25 @@ public final class CertLoginRedirect {
         return origin.trim().equals(canonical(uri));
     }
 
+    /**
+     * Whether {@code origin} may receive the login token.
+     * Exact allowlist match, or {@code https://localhost} (WSL / same-machine browser).
+     * Never derived from Host / X-Forwarded-Host.
+     */
+    public static boolean isAllowedRedirectOrigin(String origin, Set<String> allowedOrigins) {
+        if (!isExactHttpsOrigin(origin)) {
+            return false;
+        }
+        String trimmed = origin.trim();
+        if (allowedOrigins != null && allowedOrigins.contains(trimmed)) {
+            return true;
+        }
+        // Same-machine only: missing this makes WSL localhost sessions 302 to PUBLIC_ORIGIN and hang.
+        return "https://localhost".equals(trimmed);
+    }
+
     public static String loginUrl(String requestedOrigin, String publicOrigin, Set<String> allowedOrigins) {
-        if (isExactHttpsOrigin(requestedOrigin) && allowedOrigins != null && allowedOrigins.contains(requestedOrigin.trim())) {
+        if (isAllowedRedirectOrigin(requestedOrigin, allowedOrigins)) {
             return requestedOrigin.trim() + "/login";
         }
         if (isExactHttpsOrigin(publicOrigin)) {

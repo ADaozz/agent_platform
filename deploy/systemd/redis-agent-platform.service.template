@@ -1,0 +1,25 @@
+[Unit]
+Description=Redis for Agent Platform (loopback only, AOF)
+After=network-online.target
+Wants=network-online.target
+Before=agent-platform-backend.service
+
+[Service]
+Type=notify
+User=redis
+Group=redis
+RuntimeDirectory=redis-agent-platform
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/redis-server ${REDIS_CONF} --supervised systemd
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=always
+RestartSec=2
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=${REDIS_DATA_DIR} ${REDIS_LOG_DIR}
+
+[Install]
+WantedBy=multi-user.target

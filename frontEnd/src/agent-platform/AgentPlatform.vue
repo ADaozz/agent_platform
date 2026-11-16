@@ -347,10 +347,16 @@ async function init() {
   }); loading.value = false
 }
 function toggle(name) { popup.value = popup.value === name ? '' : name }
+function closeArtifactPanel() {
+  artifactPanelOpen.value = false
+  artifactContext.value = null
+  featurePanels.value?.close?.()
+}
 function newChat() {
   source?.close(); source = null; resetStream(); selected.value = null; draftPermission.value = 'ask'; events.value = []; error.value = ''; draft.value = ''; clearAttachments(); humanValues.value = {}
   modelId.value = modelConfig.value?.default || profiles.value[0]?.id || ''
   effort.value = profiles.value.find(p => p.id === modelId.value)?.default_reasoning_effort || ''
+  closeArtifactPanel()
   history.replaceState(null, '', '/agent'); mainView.value = 'agents'
 }
 async function openSession(id, preserveAttachments = false) {
@@ -554,6 +560,10 @@ watch(() => selected.value?.id, () => { humanOtherValues.value = {} })
 watch(() => selected.value?.status, () => { humanValues.value = {}; humanOtherValues.value = {}; decisions.value = {} })
 watch(() => selected.value?.id, id => { activeSessionId.value = id ?? null }, { immediate: true })
 watch(mainView, value => { workspaceView.value = value }, { immediate: true })
+// Preview belongs only to an open agent conversation — leave chat/home/history/files and it collapses.
+watch(() => [mainView.value, selected.value?.id], ([view, id]) => {
+  if (view !== 'agents' || !id) closeArtifactPanel()
+}, { immediate: true })
 // Created after an await, so it is not bound to this component and must be stopped explicitly.
 let stopCommands = null, unmounted = false
 onMounted(() => { init().then(() => { if (!unmounted) stopCommands = watch(command, runCommand, { immediate: true }) }); document.addEventListener('keydown', keydown); poll = setInterval(() => refreshSessions().catch(() => {}), 3000) })
@@ -561,7 +571,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
 </script>
 
 <template>
-  <div class="shell" :class="{ expanded: sidebar, 'document-open': artifactPanelOpen }">
+  <div class="shell" :class="{ expanded: sidebar, 'document-open': artifactPanelOpen && mainView === 'agents' && !!selected }">
 
     <div class="agent-main" :class="{'session-layout':selected&&mainView==='agents'}">
       <!-- 遮罩必须与 .popover 处于同一层叠上下文（主区域有 isolation:isolate），
@@ -586,7 +596,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
           <div class="filter-chips" role="radiogroup" :aria-label="t('类型筛选')"><button type="button" role="radio" class="filter-chip" :class="{ active: fileKind === 'all' }" :aria-checked="fileKind === 'all'" @click="fileKind = 'all'">{{ t('全部') }}<span>{{ searchedFiles.length }}</span></button><button v-for="kind in fileKinds" :key="kind.key" type="button" role="radio" class="filter-chip" :class="{ active: fileKind === kind.key }" :aria-checked="fileKind === kind.key" @click="fileKind = kind.key"><i class="file-kind-dot" :class="'file-tone-' + kind.key"></i>{{ t(kind.label) }}<span>{{ kind.count }}</span></button></div>
         </div>
         <div v-if="filesFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个文件', { n: visibleFiles.length }) }}</span><button type="button" class="text-button" @click="resetFileFilters">{{ t('清除筛选') }}</button></div>
-        <button v-for="f in visibleFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.branched_from ? branchFileName(f.path.split('/').pop()) : f.path.split('/').pop() }}</strong><small>{{ f.branched_from ? t('分支') + '·' : '' }}{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && allFiles.length && !visibleFiles.length" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的文件") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetFileFilters">{{ t("清除筛选") }}</button></div><div v-if="!filesLoading && !allFiles.length" class="empty-state"><Icon name="Files" :size="28" /><h3>{{ t("暂无文件") }}</h3></div></div>
+        <button v-for="f in visibleFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.branched_from ? branchFileName(f.path.split('/').pop()) : f.path.split('/').pop() }}</strong><small>{{ f.branched_from ? t('分支') + '·' : '' }}{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && allFiles.length && !visibleFiles.length" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的文件") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetFileFilters">{{ t("清除筛选") }}</button></div><div v-if="!filesLoading && !allFiles.length" class="empty-state"><h3>{{ t("暂无文件") }}</h3><p>{{ t("files.emptyHint") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div>
 
 
       <div v-else class="chat-page" :class="{ 'has-session': selected }">

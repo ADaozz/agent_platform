@@ -17,7 +17,12 @@ personalDemo 客户端证书包（Windows 测试）
    - 若仍 400：旧版 sign.p12 的 issuer DN 有误，需管理员重新签发后再导入
 6. 443 登录页不请求客户端证；证书登录仅走 8443
 7. 重启浏览器
-8. 自测：https://你的IP:8443/debug-cert
+8. 本机 / WSL 用 https://localhost 调试时：
+   - 导入 chrome-autoselect-localhost.reg 或 edge-autoselect-localhost.reg
+   - 把文件里的 your-cert-cn 改成你的签名证 CN 后再导入
+   - 可用 list-client-certs.ps1 核对个人存储里的 ClientAuth 证书
+9. 自测：https://你的主机:8443/debug-cert
    - hasCert=true, ok=true 表示浏览器已提交客户端证
    - verify=FAILED:... 是正常的（后端用指纹校验，不要求 SUCCESS）
-9. 登录页点击「证书登录」
+10. 登录页点击「证书登录」（只用 sign.p12，不要选 encrypt）
+

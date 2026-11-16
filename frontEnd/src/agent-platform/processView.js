@@ -1,5 +1,16 @@
 import { rawText } from './conversation.js'
 export function stepBody(step, t) {
+  if (step.kind === 'compaction') {
+    const sections = []
+    const outcome = step.compactionStatus || (step.status === 'running' ? 'running' : 'compacted')
+    const outcomeKey = `process.compaction.${outcome}`
+    sections.push(t(outcomeKey) !== outcomeKey ? t(outcomeKey) : t('process.compaction.compacted'))
+    if (step.usedTokens != null && step.windowTokens != null && step.windowTokens > 0) {
+      sections.push(t('process.compaction.tokens', { used: step.usedTokens, window: step.windowTokens }))
+    }
+    if (step.content) sections.push(step.content)
+    return sections.join('\n\n')
+  }
   if (step.kind !== 'tool') return step.content || t('process.waitingSummary')
   const sections = []
   if (step.arguments != null) sections.push(`${t('process.input')}\n${rawText(step.arguments)}`)

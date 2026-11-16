@@ -632,8 +632,16 @@ class Runtime:
         except Exception as exc:
             # Provider errors may contain credentials; only publish known safe diagnoses.
             from platform_app.agent_core.sandbox import SandboxUnavailableError
-            message = 'Bubblewrap 沙箱不可用，请检查主机 user namespace 与 bwrap 配置。' if isinstance(exc, SandboxUnavailableError) else 'Agent 执行失败，请检查模型配置与服务端日志。'
-            LOG.error('Agent operation failed: session=%s exception=%s', self.id, type(exc).__name__)
+            if isinstance(exc, SandboxUnavailableError):
+                # bwrap 的 stderr 才是排障依据（哪个源路径不存在、被哪个限制挡住），
+                # 只给一句“沙箱不可用”会让运维完全无法定位。这里取首行附到界面与日志。
+                detail = str(exc).strip().splitlines()[0][:300] if str(exc).strip() else ''
+                message = f'Bubblewrap 沙箱不可用：{detail}' if detail else \
+                    'Bubblewrap 沙箱不可用，请检查主机 user namespace 与 bwrap 配置。'
+            else:
+                message = 'Agent 执行失败，请检查模型配置与服务端日志。'
+            LOG.error('Agent operation failed: session=%s exception=%s: %s',
+                      self.id, type(exc).__name__, exc)
             with self.lock:
                 record = find(self.id)
                 record.update(status='failed', error=message, turn_ended_at=now())

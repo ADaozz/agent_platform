@@ -196,7 +196,8 @@ const hasPending = () => overview.value?.applies?.some((a) => a.status === 'pend
       <ol class="list-decimal space-y-1 pl-5 text-sm text-ink-secondary">
         <li>下载证书包，将 root-ca.crt 导入「受信任的根证书颁发机构」</li>
         <li>将 intermediate-ca.crt 导入「中间证书颁发机构」</li>
-        <li>导入 sign.p12 与 encrypt.p12 到「个人」证书存储（P12 密码在本页查看，仅展示一次，证书包内不含密码）</li>
+        <li>导入 sign.p12 与 encrypt.p12 到「个人」证书存储（同一 P12 密码；密码仅本页展示一次）</li>
+        <li><strong>证书登录只用 sign.p12</strong>（用途含客户端身份验证）。选错 encrypt 会导致登录失败或浏览器报 SSL 错误</li>
         <li>使用 HTTPS 访问本站点，在登录页选择「证书登录」（使用签名证书）</li>
       </ol>
     </div>
