@@ -159,9 +159,20 @@ class SubAgentRuntime(Runnable):
 
         Raises when no permit is available; nothing is started in that case.
         """
+        from datetime import datetime, timezone
+        from platform_app import background_store as bg
+
         run_id, controller = self.manager.admit()
         task = BackgroundTask(run_id=run_id, tool_call_id=tool_call_id, parent=parent,
                               description=description, controller=controller)
+        started_at = datetime.now(timezone.utc).isoformat()
+        try:
+            bg.mark_started(
+                run_id=run_id, session_id=parent, tool_call_id=tool_call_id,
+                description=description, created_at=started_at,
+            )
+        except Exception:  # noqa: BLE001 - persistence must not block admission
+            pass
 
         def work() -> None:
             try:
@@ -180,6 +191,15 @@ class SubAgentRuntime(Runnable):
                 self.manager.release(run_id)
             finally:
                 self.manager.finish(task, status, content)
+                finished_at = datetime.now(timezone.utc).isoformat()
+                try:
+                    bg.mark_finished(
+                        run_id=run_id, session_id=parent, status=status, result=content,
+                        finished_at=finished_at, tool_call_id=tool_call_id,
+                        description=description, created_at=started_at,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
                 if not task.discarded:
                     payload = {"run_id": run_id, "tool_call_id": tool_call_id, "parent": parent,
                                "status": status, "content": content}
