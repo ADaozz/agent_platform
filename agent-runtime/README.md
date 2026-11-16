@@ -77,7 +77,7 @@ PLATFORM_DATA_DIR=.platform-itam .venv/bin/uvicorn platform_app.main:app --host 
 
 `reasoning_efforts` 的第一项是默认思考强度。全局配置中的 `api_key` 可以写成 `${ENV_NAME}` 引用服务进程的环境变量。
 
-私人模型（仅多用户模式）：每个用户独立保存、单独加密，在模型列表中以 `my-` 前缀显示，不会覆盖全局来源。私人模型不能引用服务器环境变量，`base_url` 必须是 `http://` 或 `https://` 地址。
+私人模型（仅多用户模式）：每个用户独立保存、单独加密，在模型列表中以 `my-` 前缀显示，不会覆盖全局来源。私人模型不能引用服务器环境变量；`base_url` 必须是公网 `https://` 地址，保存与调用时均拒绝回环/私网/链路本地等目标。可选环境变量 `PERSONAL_MODEL_ALLOWED_HOSTS`（逗号分隔）进一步限制允许的主机名。
 
 ## 主要功能
 

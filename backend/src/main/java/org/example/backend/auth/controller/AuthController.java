@@ -47,6 +47,12 @@ public class AuthController {
     @Value("${cert.login.allowed-origins:}")
     private List<String> allowedOrigins;
 
+    @Value("${cert.login.enabled:false}")
+    private boolean certLoginEnabled;
+
+    @Value("${cert.login.trusted-proxies:127.0.0.1,::1}")
+    private String trustedProxiesCsv;
+
     @Log(title = "认证", businessType = BusinessType.OTHER, operatorType = OperatorType.OTHER,
             excludeParamNames = {"passWord"})
     @PostMapping("/login")
@@ -132,9 +138,15 @@ public class AuthController {
     @GetMapping(value = "/login/cert/debug", produces = "text/plain;charset=UTF-8")
     public String certDebugPlain(HttpServletRequest request) {
         String verify = request.getHeader("X-Client-Verify");
+        boolean trusted = org.example.backend.auth.cert.util.CertTrustedProxy.isTrusted(
+                certLoginEnabled,
+                org.example.backend.auth.cert.util.CertTrustedProxy.parseProxies(trustedProxiesCsv),
+                request);
         return "verify=" + (StringUtils.hasText(verify) ? verify : "NONE") + "\n"
                 + "dn=" + nullToEmpty(request.getHeader("X-Client-DN")) + "\n"
-                + "hasCert=" + StringUtils.hasText(request.getHeader("X-Client-Cert")) + "\n";
+                + "hasCert=" + StringUtils.hasText(request.getHeader("X-Client-Cert")) + "\n"
+                + "proxyTrusted=" + trusted + "\n"
+                + "certLoginEnabled=" + certLoginEnabled + "\n";
     }
 
     private static String nullToEmpty(String value) {
@@ -146,10 +158,17 @@ public class AuthController {
     public AjaxResult certCheck(HttpServletRequest request) {
         Map<String, Object> data = new LinkedHashMap<>();
         String verify = request.getHeader("X-Client-Verify");
+        boolean trusted = org.example.backend.auth.cert.util.CertTrustedProxy.isTrusted(
+                certLoginEnabled,
+                org.example.backend.auth.cert.util.CertTrustedProxy.parseProxies(trustedProxiesCsv),
+                request);
         data.put("verify", StringUtils.hasText(verify) ? verify : "NONE");
         data.put("dn", request.getHeader("X-Client-DN"));
         data.put("hasCert", StringUtils.hasText(request.getHeader("X-Client-Cert")));
-        data.put("ok", "SUCCESS".equalsIgnoreCase(verify));
+        data.put("proxyTrusted", trusted);
+        data.put("certLoginEnabled", certLoginEnabled);
+        // ok only when proxy boundary holds and Nginx reported SUCCESS
+        data.put("ok", trusted && "SUCCESS".equalsIgnoreCase(verify));
         return AjaxResult.success("ok", data);
     }
 

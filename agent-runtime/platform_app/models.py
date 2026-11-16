@@ -8,6 +8,7 @@ import yaml
 from cryptography.fernet import Fernet
 from platform_app.agent_core.config import Settings
 from . import domain as d
+from .url_safety import assert_safe_personal_base_url, walk_personal_base_urls
 
 MASK = '__UNCHANGED_SECRET__'
 ENV = re.compile(r'^\$\{[A-Za-z_][A-Za-z0-9_]*\}$')
@@ -109,8 +110,8 @@ def personal_current(owner):
         return copy.deepcopy(EMPTY), 0
 
 
-def check_personal(config):
-    """Personal sources may not borrow server credentials or reach non-HTTP endpoints."""
+def check_personal(config, *, resolve_dns: bool = True):
+    """Personal sources may not borrow server credentials or reach non-public endpoints."""
     if not isinstance(config, dict) or set(config) - {'default', 'models'} or not isinstance(config.get('models', {}), dict):
         raise ValueError('个人模型配置只支持 default 和 models 两个字段')
 
@@ -119,13 +120,21 @@ def check_personal(config):
             for key, item in value.items():
                 if key == 'api_key' and isinstance(item, str) and '${' in item:
                     raise ValueError('个人模型不能引用服务器环境变量，请直接填写 API Key')
-                if key == 'base_url' and not (isinstance(item, str) and re.match(r'^https?://', item.strip())):
-                    raise ValueError('base_url 必须以 http:// 或 https:// 开头')
+                if key == 'base_url':
+                    if not (isinstance(item, str) and re.match(r'^https?://', item.strip())):
+                        raise ValueError('base_url 必须以 http:// 或 https:// 开头')
+                    assert_safe_personal_base_url(item, resolve_dns=resolve_dns)
                 walk(item)
         elif isinstance(value, list):
             for item in value:
                 walk(item)
     walk(config)
+
+
+def assert_personal_endpoints_safe(config, *, resolve_dns: bool = True):
+    """Enforce endpoint policy on save and on every later use, including legacy rows."""
+    for url in walk_personal_base_urls(config):
+        assert_safe_personal_base_url(url, resolve_dns=resolve_dns)
 
 
 def public_personal(owner):
@@ -152,7 +161,7 @@ def save_personal(owner, config, revision):
     return public_personal(owner)
 
 
-def merged(owner=None):
+def merged(owner=None, *, enforce_personal_safety: bool = True):
     """Global models plus the owner's personal sources; personal default wins."""
     config, _ = current()
     if owner is None:
@@ -160,6 +169,9 @@ def merged(owner=None):
     personal, _ = personal_current(owner)
     if not personal['models']:
         return config, set()
+    if enforce_personal_safety:
+        # Old rows must not bypass the Beta SSRF policy at call time.
+        assert_personal_endpoints_safe(personal)
     result = copy.deepcopy(config)
     result['models'] = dict(result.get('models') or {})
     added = set()
@@ -198,11 +210,16 @@ def save(config, revision):
 
 
 def selection(model_id=None, effort=UNSET, owner=None):
-    config, _ = merged(owner)
+    config, personal_sources = merged(owner)
     if not config['models']:
         raise LookupError('请在设置的模型配置中新增模型来源和模型')
     parsed = validate(config)
     profile = parsed.get_profile(model_id or config['default'])
+    source = profile.id.split('/', 1)[0]
+    if source in personal_sources:
+        group = config['models'].get(source) or {}
+        if isinstance(group.get('base_url'), str):
+            assert_safe_personal_base_url(group['base_url'])
     if effort is UNSET:
         effort = profile.reasoning_efforts[0] if profile.reasoning_efforts else None
     if effort is not None and effort not in profile.reasoning_efforts:

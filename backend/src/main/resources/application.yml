@@ -78,6 +78,10 @@ cert:
   root-cert: /home/neo/application/personalDemo/ca/root/root-ca.crt
   default-valid-days: 365
   p12-password-length: 16
+  login:
+    # 默认关闭：只有部署确认 Nginx 覆盖 X-Client-* 且 8080 仅可信代理可达后才开启
+    enabled: ${CERT_LOGIN_ENABLED:false}
+    trusted-proxies: ${CERT_LOGIN_TRUSTED_PROXIES:127.0.0.1,::1}
 # Agent Runtime 由 Python 进程提供，仅通过本应用的 JWT/Shiro 网关访问。
 # AGENT_RUNTIME_SHARED_SECRET 与 Python 的 ITAM_RUNTIME_SHARED_SECRET 必须相同，
 # 至少 32 字节。禁止将该密钥提交到仓库。
@@ -85,3 +89,8 @@ agent:
   runtime:
     url: ${AGENT_RUNTIME_URL:http://127.0.0.1:8090}
     shared-secret: ${AGENT_RUNTIME_SHARED_SECRET:}
+    connect-timeout-ms: ${AGENT_RUNTIME_CONNECT_TIMEOUT_MS:5000}
+    # 普通 REST；SSE 与文件传输使用下面的独立超时，避免互相误杀
+    read-timeout-ms: ${AGENT_RUNTIME_READ_TIMEOUT_MS:60000}
+    sse-read-timeout-ms: ${AGENT_RUNTIME_SSE_READ_TIMEOUT_MS:0}
+    file-read-timeout-ms: ${AGENT_RUNTIME_FILE_READ_TIMEOUT_MS:300000}

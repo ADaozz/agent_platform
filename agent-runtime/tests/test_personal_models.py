@@ -1,8 +1,11 @@
 """Per-user model sources: merged with global models, isolated per owner, sealed at rest."""
+import ipaddress
+
 import pytest
 
 from platform_app import domain as d
 from platform_app import models as m
+from platform_app import url_safety
 
 
 def source(key='sk-personal-secret', base_url='https://llm.example.com/v1'):
@@ -12,8 +15,9 @@ def source(key='sk-personal-secret', base_url='https://llm.example.com/v1'):
 @pytest.fixture(autouse=True)
 def data(tmp_path, monkeypatch):
     monkeypatch.setattr(d, 'DATA', tmp_path)
-    for name in ('PLATFORM_CONFIG', 'PLATFORM_MODEL', 'PLATFORM_API_KEY', 'PLATFORM_BASE_URL'):
+    for name in ('PLATFORM_CONFIG', 'PLATFORM_MODEL', 'PLATFORM_API_KEY', 'PLATFORM_BASE_URL', 'PERSONAL_MODEL_ALLOWED_HOSTS'):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(url_safety, '_host_ips', lambda host: [ipaddress.ip_address('93.184.216.34')])
 
 
 def test_personal_models_are_merged_only_for_their_owner():

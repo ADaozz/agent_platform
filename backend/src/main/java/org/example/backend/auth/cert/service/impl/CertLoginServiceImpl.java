@@ -5,15 +5,20 @@ import org.example.backend.auth.cert.constant.CertConstants;
 import org.example.backend.auth.cert.entity.SysUserCertEntity;
 import org.example.backend.auth.cert.mapper.SysUserCertMapper;
 import org.example.backend.auth.cert.service.CertLoginService;
+import org.example.backend.auth.cert.util.CertTrustedProxy;
 import org.example.backend.auth.cert.util.X509CertUtils;
 import org.example.backend.common.exception.BusinessException;
 import org.example.backend.common.exception.Module;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.Date;
+import java.util.Set;
 
 @Service
 public class CertLoginServiceImpl implements CertLoginService {
@@ -21,9 +26,30 @@ public class CertLoginServiceImpl implements CertLoginService {
     @Autowired
     private SysUserCertMapper sysUserCertMapper;
 
+    /**
+     * Fail-closed: certificate login stays disabled until deployment confirms the
+     * Nginx → backend trust boundary (bind address / firewall + header overwrite).
+     */
+    @Value("${cert.login.enabled:false}")
+    private boolean certLoginEnabled;
+
+    @Value("${cert.login.trusted-proxies:127.0.0.1,::1}")
+    private String trustedProxiesCsv;
+
+    private Set<String> trustedProxies = Collections.emptySet();
+
+    @PostConstruct
+    void initTrustedProxies() {
+        trustedProxies = CertTrustedProxy.parseProxies(trustedProxiesCsv);
+    }
+
     @Override
     // 从请求中解析客户端证书并匹配用户
     public Long resolveUserIdFromRequest(HttpServletRequest request) {
+        String refusal = CertTrustedProxy.refusalReason(certLoginEnabled, trustedProxies, request);
+        if (refusal != null) {
+            throw new BusinessException(Module.ModuleType.AUTH, refusal, null);
+        }
         try {
             X509Certificate certificate = X509CertUtils.parseClientCertFromRequest(request);
             if (certificate == null) {

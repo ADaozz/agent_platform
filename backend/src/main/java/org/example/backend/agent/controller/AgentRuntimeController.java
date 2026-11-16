@@ -44,6 +44,18 @@ public class AgentRuntimeController {
     @Value("${jwt.expire}")
     private long jwtExpireSeconds;
 
+    @Value("${agent.runtime.connect-timeout-ms:5000}")
+    private int connectTimeoutMs;
+
+    @Value("${agent.runtime.read-timeout-ms:60000}")
+    private int readTimeoutMs;
+
+    @Value("${agent.runtime.sse-read-timeout-ms:0}")
+    private int sseReadTimeoutMs;
+
+    @Value("${agent.runtime.file-read-timeout-ms:300000}")
+    private int fileReadTimeoutMs;
+
     @Resource
     private JwtUtils jwtUtils;
 
@@ -112,9 +124,8 @@ public class AgentRuntimeController {
             }
             connection = (HttpURLConnection) target.openConnection();
             connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(5000);
-            // SSE can run indefinitely; closing the browser closes the output.
-            connection.setReadTimeout(0);
+            connection.setConnectTimeout(Math.max(1, connectTimeoutMs));
+            connection.setReadTimeout(resolveReadTimeout(path, request.getHeader("Accept")));
             connection.setRequestMethod(request.getMethod());
             connection.setRequestProperty("X-Agent-User-Id", userId.toString());
             connection.setRequestProperty("X-Agent-Role", role);
@@ -139,7 +150,7 @@ public class AgentRuntimeController {
                 String value = connection.getHeaderField(name);
                 if (value != null) response.setHeader(name, value);
             }
-            if (path.endsWith("/events")) {
+            if (isSsePath(path)) {
                 response.setHeader("Cache-Control", "no-cache, no-store");
                 response.setHeader("X-Accel-Buffering", "no");
             }
@@ -150,15 +161,41 @@ public class AgentRuntimeController {
                     int n;
                     while ((n = in.read(buf)) != -1) {
                         out.write(buf, 0, n);
-                        if (path.endsWith("/events")) out.flush();
+                        if (isSsePath(path)) out.flush();
                     }
                 }
             }
         } catch (IOException ex) {
             if (!response.isCommitted()) response.sendError(HttpStatus.BAD_GATEWAY.value(), "Agent Runtime unavailable");
         } finally {
+            // Client disconnect or completion always tears down the upstream connection.
             if (connection != null) connection.disconnect();
         }
+    }
+
+    int resolveReadTimeout(String path, String accept) {
+        if (isSsePath(path) || isEventStream(accept)) {
+            return Math.max(0, sseReadTimeoutMs);
+        }
+        if (isFilePath(path)) {
+            return Math.max(1, fileReadTimeoutMs);
+        }
+        return Math.max(1, readTimeoutMs);
+    }
+
+    static boolean isSsePath(String path) {
+        return path != null && path.endsWith("/events");
+    }
+
+    static boolean isEventStream(String accept) {
+        return accept != null && accept.toLowerCase().contains("text/event-stream");
+    }
+
+    static boolean isFilePath(String path) {
+        if (path == null) {
+            return false;
+        }
+        return path.contains("/files/") || path.endsWith("/files") || path.contains("/artifacts/");
     }
 
     private static void copy(InputStream in, OutputStream out) throws IOException {
