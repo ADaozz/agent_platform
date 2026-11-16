@@ -10,19 +10,28 @@ import java.util.List;
 
 public interface SysRoleMapper extends BaseMapper<SysRoleEntity> {
 
-    @Select("SELECT DISTINCT r.sys_role " +
-            "FROM sys_user_role ur " +
-            "JOIN sys_role r ON ur.role_id = r.role_id " +
-            "WHERE ur.user_id = #{userId}")
+    /** Kingbase 下 sys_role 等为同名系统 catalog，须限定 public；SQLite 无 schema */
+    String SCHEMA_BIND = "<bind name='sch' value=\"_databaseId == 'kingbase' ? 'public.' : ''\"/>";
+
+    @Select("<script>" + SCHEMA_BIND
+            + "SELECT DISTINCT r.sys_role "
+            + "FROM ${sch}sys_user_role ur "
+            + "JOIN ${sch}sys_role r ON ur.role_id = r.role_id "
+            + "WHERE ur.user_id = #{userId}"
+            + "</script>")
     List<String> selectSysRoleByUserId(@Param("userId") Long userId);
 
-    @Select("SELECT DISTINCT r.role_id AS id, r.sys_role AS label " +
-            "FROM sys_user_role ur " +
-            "JOIN sys_role r ON ur.role_id = r.role_id " +
-            "WHERE ur.user_id = #{userId}")
+    @Select("<script>" + SCHEMA_BIND
+            + "SELECT DISTINCT r.role_id AS id, r.sys_role AS label "
+            + "FROM ${sch}sys_user_role ur "
+            + "JOIN ${sch}sys_role r ON ur.role_id = r.role_id "
+            + "WHERE ur.user_id = #{userId}"
+            + "</script>")
     List<OptionVO> selectRoleOptionsByUserId(@Param("userId") Long userId);
 
-    @Select("SELECT role_id AS id, sys_role AS label " +
-            "FROM sys_role ORDER BY role_id")
+    @Select("<script>" + SCHEMA_BIND
+            + "SELECT role_id AS id, sys_role AS label "
+            + "FROM ${sch}sys_role ORDER BY role_id"
+            + "</script>")
     List<OptionVO> selectAllRoleOptions();
 }

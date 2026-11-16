@@ -9,7 +9,10 @@ import java.util.List;
 @Mapper
 public interface DashboardMapper {
 
-    @Select("SELECT COUNT(*) FROM sys_user")
+    /** Kingbase 下 sys_user 为同名系统 catalog，须限定 public；SQLite 无 schema */
+    String SCHEMA_BIND = "<bind name='sch' value=\"_databaseId == 'kingbase' ? 'public.' : ''\"/>";
+
+    @Select("<script>" + SCHEMA_BIND + "SELECT COUNT(*) FROM ${sch}sys_user</script>")
     Long countUsers();
 
     @Select("<script>"
@@ -72,15 +75,20 @@ public interface DashboardMapper {
     Long countVmApp(@Param("ownerUserId") Long ownerUserId);
 
     @Select("<script>"
-            + "SELECT strftime('%Y-%m', create_time) AS name, COUNT(*) AS value FROM vm_host "
+            + "SELECT "
+            + "<choose><when test=\"_databaseId == 'sqlite'\">strftime('%Y-%m', create_time)</when>"
+            + "<otherwise>TO_CHAR(create_time, 'YYYY-MM')</otherwise></choose>"
+            + " AS name, COUNT(*) AS value FROM vm_host "
             + "<if test='ownerUserId != null'>WHERE owner_user_id = #{ownerUserId}</if> "
-            + "GROUP BY strftime('%Y-%m', create_time) ORDER BY name"
+            + "GROUP BY name ORDER BY name"
             + "</script>")
     List<CountGroupRow> countVmCreateTrend(@Param("ownerUserId") Long ownerUserId);
 
-    @Select("SELECT u.user_name AS name, COUNT(*) AS value FROM vm_host h "
-            + "INNER JOIN sys_user u ON h.owner_user_id = u.user_id "
-            + "GROUP BY u.user_name ORDER BY value DESC LIMIT 10")
+    @Select("<script>" + SCHEMA_BIND
+            + "SELECT u.user_name AS name, COUNT(*) AS value FROM vm_host h "
+            + "INNER JOIN ${sch}sys_user u ON h.owner_user_id = u.user_id "
+            + "GROUP BY u.user_name ORDER BY value DESC LIMIT 10"
+            + "</script>")
     List<CountGroupRow> countVmByOwner();
 
     @Select("SELECT physical_host_ip AS name, COUNT(*) AS value FROM vm_host "

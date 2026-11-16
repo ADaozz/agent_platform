@@ -28,6 +28,9 @@ public class SysUserEntity {
     // 密码（加密存储）
     private String passWord;
 
+    // 邮箱（自助注册时验证）
+    private String email;
+
     // 用户状态：0-正常，1-停用
     private String status;
 

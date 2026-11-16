@@ -1,6 +1,6 @@
 # Agent Platform
 
-多用户 Agent 平台：Spring Boot 负责用户认证、角色权限、证书登录与登录设备管理，Vue 3 提供统一网页界面，Python Agent Runtime（FastAPI + LangGraph / deepagents）负责 Agent 执行、沙箱隔离与 DOCX / PPTX 文档生成和预览。
+多用户 Agent 平台：Spring Boot 负责用户认证、自助注册、角色权限、证书登录与登录设备管理，Vue 3 提供统一网页界面，Python Agent Runtime（FastAPI + LangGraph / deepagents）负责 Agent 执行、沙箱隔离与 DOCX / PPTX 文档生成和预览。
 
 ## 架构
 
@@ -24,20 +24,20 @@ Agent 执行引擎：Bubblewrap 沙箱、checkpoint、SSE 事件流、DOCX / PPT
 
 | 路径 | 内容 |
 | --- | --- |
-| `backend/` | Spring Boot 2.6 后台：Shiro + JWT、KingbaseES、Redis、用户/角色/证书/登录设备管理、Agent Runtime 签名代理 |
+| `backend/` | Spring Boot 2.6 后台：Shiro + JWT、KingbaseES（本地可用 SQLite）、Redis、用户/角色/证书/登录设备/自助注册、Agent Runtime 签名代理 |
 | `frontEnd/` | Vue 3 + Vite + Tailwind 前端；`src/agent-platform/` 为 Agent 对话、文件与文档预览界面 |
 | `agent-runtime/` | Python Agent Runtime、内置执行引擎、DOCX / PPTX Skill 与测试，说明见 [agent-runtime/README.md](agent-runtime/README.md) |
-| `docs/` | 架构、部署与验收说明，见 [AGENT_WORKSPACE.md](docs/AGENT_WORKSPACE.md) |
+| `docs/` | 架构、部署与验收说明，见 [AGENT_WORKSPACE.md](docs/AGENT_WORKSPACE.md)；登录页 3D 场景见 [login-scene](docs/login-scene/README.md) |
 | `ca/`、`ca_test/` | 证书登录使用的 CA 与服务端证书（仅公开证书，私钥不入库） |
 
 ## 功能
 
-- **账号与权限**：账号密码登录与客户端证书登录，用户、角色、登录设备（可踢下线）、证书签发与管理。
+- **账号与权限**：账号密码登录、邮箱验证码自助注册、客户端证书登录；用户、角色、登录设备（可踢下线）、证书签发与管理。
 - **Agent 对话**：多轮会话、流式执行时间线、工具审批、暂停/继续/取消、运行中追加指令；历史对话可删除。
 - **文件**：附件上传，会话产出文件下载与预览，跨会话的全局文件列表（按类型显示图标）。
 - **文档生成**：DOCX 支持公式、原生图表、题注与交叉引用、目录、复杂表格、图文排版、页眉页脚，预览按页浏览、只更新变化的页面；PPTX 提供风格化生成、原生图表与公式和逐页预览。
 - **模型配置**：管理员维护全局模型；普通用户使用全局模型，并可配置加密保存的私人模型。Agent 工具与 Skill 由服务端统一管理。
-- **界面**：中英文切换、白天/黑夜模式（默认黑夜）、可折叠侧栏。
+- **界面**：中英文切换、白天/黑夜模式（默认黑夜）、可折叠侧栏；登录页为工业走廊背景 + 悬浮 3D 数据模块（宽屏）。
 
 ## 快速开始
 
@@ -64,11 +64,23 @@ PLATFORM_DATA_DIR=.platform-itam .venv/bin/uvicorn platform_app.main:app --host 
 
 ### 3. Spring Boot 后台
 
-需要 JDK 8+、Maven、KingbaseES 与 Redis。
+需要 JDK 8+、Maven、Redis。生产/联调使用 KingbaseES；本地可无金仓，改用 SQLite profile。
 
-1. 按 [backend/README.md](backend/README.md) 初始化数据库。
-2. 复制 `backend/src/main/resources/application-local.example.yml` 为 `application-local.yml`（已被忽略，不入库），填写数据源和 JWT 密钥；也可使用环境变量 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET`、`JWT_API_SECRET`。
+**Kingbase（默认）**
+
+1. 按 [backend/README.md](backend/README.md) 初始化数据库（含 `23-user-email.sql`、`24-register-user-role.sql` 等增量脚本）。
+2. 复制 `backend/src/main/resources/application-local.example.yml` 为 `application-local.yml`（已被忽略，不入库），填写数据源、JWT 密钥，以及注册发信邮箱（`spring.mail` / `MAIL_USERNAME`、`MAIL_PASSWORD`）。
 3. 设置 `AGENT_RUNTIME_URL`（默认 `http://127.0.0.1:8090`）和上面的 `AGENT_RUNTIME_SHARED_SECRET`，然后启动 `BackendApplication`。
+
+**本地 SQLite（无需 KingbaseES）**
+
+```bash
+cd backend
+# IDE 或命令行激活：sqlite,dev（详见 backend/README.md）
+mvn spring-boot:run -Dspring-boot.run.profiles=sqlite,dev
+```
+
+数据文件默认写到 `backend/data/agent-platform.db`；仍需本机 Redis。自助注册发信需配置 SMTP。
 
 ### 4. 前端
 
@@ -80,10 +92,12 @@ npm run dev
 
 开发服务器把 `/api` 代理到后台，目标地址可用环境变量 `VITE_PROXY_TARGET` 指定。生产构建使用 `npm run build`，由 nginx 等代理 `/api`。
 
+前端说明见 [frontEnd/README.md](frontEnd/README.md)。
+
 ## 安全说明
 
 - Python Agent Runtime 只能监听本机或仅后台可访问的私有网络，不要暴露到公网。
-- 数据库密码、JWT 密钥、签名密钥、私钥与证书包均不入库，相应文件已在 `.gitignore` 中忽略。
+- 数据库密码、JWT 密钥、签名密钥、邮件授权码、私钥与证书包均不入库，相应文件已在 `.gitignore` 中忽略。
 - 多用户模式下禁止 `full-access` 沙箱，每个会话的文件、命令与 Skill 快照相互隔离。
 
 ## 测试

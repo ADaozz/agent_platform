@@ -7,6 +7,8 @@
 - `frontEnd/src/components/BrandMark.vue`：原生 SVG 方形徽标，Carbon Black 底色、Warm Ivory 双层边框、Signal Orange 几何 A 与指令箭头，右下两条终端横线。图标内不绘制三色条。保留原有 `size?: number` 接口、32px 默认值和无障碍名称；侧栏仍传入 30px，登录页仍传入 36px / 40px。
 - `frontEnd/src/layouts/AppLayout.vue`：字标中仅为 AGENT 添加橙色 span；DEEP 沿用现有明暗主题文字色。保留原字号、700 字重、间距、位置和占位。删除新 SVG 不再使用的浅色图标反相变量。PR #6 的三色条与反射 CSS 完全不变。
 
+> 登录页主视觉后续已改为走廊 + 3D 模块（见 [../login-scene/README.md](../login-scene/README.md)）；本页登录截图仍为 Logo 验收当时的页面。
+
 侧栏宽度仍为收起 64px、展开 248px；导航、点击区域、展开/收起动画及脚本逻辑均保持原样。全局主题和其他页面样式未修改；其他 BrandMark 使用位置自动获得新的 SVG。
 
 本轮对话没有可读取的参考截图或 SVG 附件，因此按文字规格绘制，未声称完成与参考图的逐像素对照。

@@ -237,7 +237,6 @@ export interface MyCertOverviewVO {
 
 export interface CertApproveResultVO {
   applyId: Id
-  p12Password: string
   message: string
 }
 

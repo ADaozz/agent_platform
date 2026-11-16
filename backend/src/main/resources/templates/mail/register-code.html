@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>注册验证码</title>
+</head>
+<body style="margin:0;padding:0;background:#e8deca;font-family:'IBM Plex Sans','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#e8deca;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:480px;background:#f5eddc;border:1px solid #d1c5ae;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 12px 28px;">
+              <div style="font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:22px;font-weight:700;letter-spacing:0.04em;color:#181818;">
+                DEEP AGENT
+              </div>
+              <div style="width:72px;height:3px;margin-top:10px;background:linear-gradient(90deg,#c84940 0 33.34%,#dfa93c 33.34% 66.67%,#83a695 66.67%);"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 8px 28px;">
+              <h1 style="margin:0;font-size:18px;font-weight:700;letter-spacing:0.02em;color:#181818;">注册验证码</h1>
+              <p style="margin:10px 0 0 0;font-size:14px;line-height:1.7;color:#706553;">
+                您正在注册 Agent Platform 账号。请使用以下验证码完成注册：
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:20px 28px;">
+              <div style="display:inline-block;padding:16px 28px;border-radius:12px;background:#fcf8ee;border:1px solid #d1c5ae;font-family:'IBM Plex Mono','JetBrains Mono',Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:0.28em;color:#f36b18;">
+                {{CODE}}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <p style="margin:0;font-size:13px;line-height:1.7;color:#706553;">
+                验证码 <strong style="color:#181818;">{{EXPIRE_MINUTES}} 分钟</strong>内有效。请勿泄露给他人。
+              </p>
+              <p style="margin:8px 0 0 0;font-size:13px;line-height:1.7;color:#958a78;">
+                如非本人操作，请忽略本邮件。
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 22px 28px;border-top:1px solid #d1c5ae;background:#efe8d6;">
+              <p style="margin:0;font-size:11px;letter-spacing:0.12em;color:#958a78;font-family:'IBM Plex Mono',Consolas,monospace;">
+                © 2026 AGENT WORKSPACE
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

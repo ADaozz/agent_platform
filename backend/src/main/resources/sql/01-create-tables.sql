@@ -15,6 +15,7 @@ CREATE TABLE sys_user (
     user_id         BIGINT          NOT NULL PRIMARY KEY,
     user_name       VARCHAR(64)     NOT NULL,
     pass_word       VARCHAR(128)    NOT NULL,
+    email           VARCHAR(128),
     status          CHAR(1)         DEFAULT '0',
     create_time     TIMESTAMP,
     update_time     TIMESTAMP,

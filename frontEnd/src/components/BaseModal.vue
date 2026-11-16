@@ -2,11 +2,21 @@
 import AppIcon from '@/components/AppIcon.vue'
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 
-const props = defineProps<{
-  open: boolean
-  title: string
-  width?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    title: string
+    width?: string
+    /** 垂直居中；默认偏上，便于长表单滚动 */
+    centered?: boolean
+    /** 面板底色：card 默认卡片色；page 与页面米色/主题底色一致 */
+    surface?: 'card' | 'page'
+  }>(),
+  {
+    centered: false,
+    surface: 'card',
+  },
+)
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -86,10 +96,16 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="open" class="modal-scrim" @mousedown.self="emit('close')">
+      <div
+        v-if="open"
+        class="modal-scrim"
+        :class="{ 'modal-scrim--center': centered }"
+        @mousedown.self="emit('close')"
+      >
         <div
           ref="panel"
           class="modal-panel"
+          :class="{ 'modal-panel--page': surface === 'page' }"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="titleId"
@@ -130,6 +146,10 @@ onBeforeUnmount(() => {
   background-color: var(--overlay);
   backdrop-filter: blur(6px) saturate(0.9);
 }
+.modal-scrim--center {
+  align-items: center;
+  padding: 1.5rem;
+}
 .modal-panel {
   position: relative;
   width: 100%;
@@ -138,6 +158,9 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background-color: var(--color-card);
   box-shadow: var(--shadow-panel);
+}
+.modal-panel--page {
+  background-color: var(--color-page);
 }
 .modal-head {
   display: flex;

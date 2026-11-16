@@ -115,6 +115,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!-- 注册邮箱验证码发送（SMTP） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <!-- 本地开发可用 SQLite，无需 KingbaseES -->
         <dependency>
             <groupId>org.xerial</groupId>

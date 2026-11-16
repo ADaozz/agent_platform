@@ -52,6 +52,8 @@ public class ShiroConfig {
         bean.setFilters(filters);
         Map<String, String> chain = new LinkedHashMap<>();
         chain.put("/login", "anon");
+        chain.put("/register", "anon");
+        chain.put("/register/code", "anon");
         chain.put("/login/cert", "anon");
         chain.put("/login/cert/check", "anon");
         chain.put("/login/cert/debug", "anon");

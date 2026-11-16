@@ -194,7 +194,6 @@ const approveForm = reactive({
   validDays: 365,
 })
 const approving = ref(false)
-const approveResultPassword = ref('')
 
 function openApprove(row: CertApplyVO) {
   approveTarget.value = row
@@ -202,7 +201,6 @@ function openApprove(row: CertApplyVO) {
   approveForm.subjectO = 'personalDemo'
   approveForm.subjectOu = `user-${row.userId}`
   approveForm.validDays = 365
-  approveResultPassword.value = ''
 }
 
 async function confirmApprove() {
@@ -210,8 +208,8 @@ async function confirmApprove() {
   approving.value = true
   try {
     const result = await approveCertApply(approveTarget.value.applyId, { ...approveForm })
-    approveResultPassword.value = result.p12Password
-    toast.success(result.message)
+    approveTarget.value = null
+    toast.success(result.message || '签发成功，请通知用户在「我的证书」查看 P12 密码')
     await loadApplies()
     await loadCerts()
     expandedUserIds.value = {}
@@ -220,23 +218,7 @@ async function confirmApprove() {
   }
 }
 
-async function copyApprovePassword() {
-  if (!approveResultPassword.value) return
-  try {
-    await navigator.clipboard.writeText(approveResultPassword.value)
-    toast.success('已复制到剪贴板')
-  } catch {
-    toast.error('复制失败，请手动复制')
-  }
-}
-
 function closeApproveModal() {
-  approveTarget.value = null
-  approveResultPassword.value = ''
-}
-
-function closeApproveSuccess() {
-  approveResultPassword.value = ''
   approveTarget.value = null
 }
 
@@ -532,7 +514,7 @@ async function confirmRevoke() {
       </div>
     </div>
 
-    <BaseModal :open="!!approveTarget && !approveResultPassword" title="审批并签发证书" @close="closeApproveModal">
+    <BaseModal :open="!!approveTarget" title="审批并签发证书" @close="closeApproveModal">
       <form class="space-y-3" @submit.prevent="confirmApprove">
         <div>
           <label class="form-label">主体 CN</label>
@@ -550,35 +532,12 @@ async function confirmRevoke() {
           <label class="form-label">有效期（天）</label>
           <input v-model.number="approveForm.validDays" class="input" type="number" min="1" max="3650" required />
         </div>
+        <p class="text-xs text-ink-faint">签发后 P12 密码仅申请人可在「我的证书」查看一次，管理员不可见。</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="btn-ghost" @click="closeApproveModal">取消</button>
           <button type="submit" class="btn-primary" :disabled="approving">签发</button>
         </div>
       </form>
-    </BaseModal>
-
-    <BaseModal
-      :open="!!approveResultPassword"
-      title="签发成功"
-      width="480px"
-      @close="closeApproveSuccess"
-    >
-      <div class="space-y-4">
-        <div class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-          <AppIcon name="warning" class="!text-[18px] shrink-0" />
-          P12 密码仅本次展示，关闭后无法再次查看。证书包内不含密码，请转告用户在本平台「我的证书」页查看。
-        </div>
-        <div>
-          <label class="form-label">P12 密码</label>
-          <div class="flex items-center gap-2">
-            <input class="input flex-1 font-mono text-[13px]" :value="approveResultPassword" readonly />
-            <button class="btn-ghost shrink-0" type="button" @click="copyApprovePassword">复制</button>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <button class="btn-primary" type="button" @click="closeApproveSuccess">我已保存</button>
-      </template>
     </BaseModal>
 
     <ConfirmModal

@@ -2,10 +2,11 @@
 
 ## 定位
 
-Spring Boot 后台（`backend/`）是**主产品及业务后端**：复用现有 Spring Boot 2.6 + Shiro/JWT + KingbaseES + Redis 用户认证、角色授权、证书和在线登录设备管理。资产管理、虚机、应用、仪表盘、Job、API Token **从主界面菜单和路由移除**；原 Java 实现暂不物理删除，以免破坏既有数据和认证依赖。
+Spring Boot 后台（`backend/`）是**主产品及业务后端**：复用现有 Spring Boot 2.6 + Shiro/JWT + KingbaseES（本地可用 SQLite）+ Redis 用户认证、邮箱验证码自助注册、角色授权、证书和在线登录设备管理。资产管理、虚机、应用、仪表盘、Job、API Token **从主界面菜单和路由移除**；原 Java 实现暂不物理删除，以免破坏既有数据和认证依赖。
 
 保留的页面：
 
+- `/login`：账密 / 证书登录与自助注册；宽屏为走廊背景 + 3D 悬浮模块（见 [login-scene/README.md](login-scene/README.md)）
 - `/agent`：Agent 工作台，所有已登录用户可使用
 - `/system/user`：用户管理（沿用 `system:user:list`）
 - `/system/role`：角色管理（沿用 `system:role:list`）
@@ -71,14 +72,14 @@ export PLATFORM_DATA_DIR=.platform-itam
 
 ### 3. 启动 Spring Boot
 
-仍需配置 KingbaseES、Redis、JWT、证书路径等既有依赖。另设置：
+生产/联调仍需配置 KingbaseES、Redis、JWT、证书路径、注册 SMTP 等；本地无金仓可使用 `--spring.profiles.active=sqlite,dev`（见 [backend/README.md](../backend/README.md)）。另设置：
 
 ```bash
 export AGENT_RUNTIME_URL='http://127.0.0.1:8090'
 export AGENT_RUNTIME_SHARED_SECRET='<与 Python 相同的随机密钥>'
 ```
 
-Spring Boot 启动后登录 ITAM，访问 `/agent`。开发模式仍使用 `frontEnd/vite.config.ts` 的 `/api` 代理；Vue 的 Agent API 从 `/api/agent-runtime/api/**` 走统一后端，不直接连接 Python。
+Spring Boot 启动后登录（或自助注册后登录），访问 `/agent`。开发模式仍使用 `frontEnd/vite.config.ts` 的 `/api` 代理；Vue 的 Agent API 从 `/api/agent-runtime/api/**` 走统一后端，不直接连接 Python。
 
 ## 用户和管理员边界
 
@@ -94,8 +95,9 @@ Spring Boot 启动后登录 ITAM，访问 `/agent`。开发模式仍使用 `fron
 
 ## 最低验收
 
-1. 旧 ITAM 的 login/cert、logout、用户、角色、设备和证书操作不回归。
+1. 旧 ITAM 的 login/cert、logout、用户、角色、设备和证书操作不回归；自助注册（验证码邮件 + `/register`）在 SMTP 已配置时可完成并绑定普通用户角色。
 2. user 与 admin 登录后均能使用 `/agent`，但 user 无法 PUT `/api/models` 或 `/api/settings`。
+
 3. A 创建会话、上传文件；B 的会话列表不包含 A 的记录，直接请求 A 的 ID 返回 404，包括 SSE、日志、文件和 Office 路由。
 4. JWT 过期、登出或踢掉登录设备后，新 Agent HTTP 请求返回 401。
 5. 空签名、过期签名、篡改 userId/role/path/query/method 均不允许进入 Python Runtime。

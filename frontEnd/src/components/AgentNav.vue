@@ -24,9 +24,9 @@ const router = useRouter()
 const onAgent = computed(() => route.path === '/agent')
 
 const actions: { type: string; title: string; icon: IconName }[] = [
-  { type: 'new', title: '新建对话', icon: 'console' },
-  { type: 'history', title: '历史对话', icon: 'log' },
-  { type: 'files', title: '全局文件', icon: 'archive' },
+  { type: 'new', title: '新建对话', icon: 'add' },
+  { type: 'history', title: '历史对话', icon: 'history' },
+  { type: 'files', title: '全局文件', icon: 'folder' },
 ]
 
 function actionActive(type: string) {

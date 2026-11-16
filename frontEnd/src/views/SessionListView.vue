@@ -142,7 +142,12 @@ async function confirmKick() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="登录设备管理" desc="所有账号仅允许单点登录，新登录会自动下线其他设备；列表按用户汇总，展开可查看历史登录记录">
+    <PageHeader
+      title="登录设备管理"
+      :desc="canManage
+        ? '所有账号仅允许单点登录，新登录会自动下线其他设备；列表按用户汇总，展开可查看历史登录记录'
+        : '查看并管理本账号的登录设备；可踢出当前或其他历史会话，踢出当前设备后需重新登录'"
+    >
       <button class="btn-ghost" :disabled="loading" @click="load">
         <AppIcon name="refresh" class="!text-[18px]" />
         刷新

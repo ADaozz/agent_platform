@@ -1,8 +1,8 @@
 # personalDemo Backend
 
-基于 **Spring Boot 2.6** 的后端服务：JWT + Shiro 认证、RBAC 用户/角色/权限、虚机与应用资产管理、仪表盘统计。数据库 **人大金仓 KingbaseES**。
+基于 **Spring Boot 2.6** 的后端服务：JWT + Shiro 认证、邮箱验证码自助注册、RBAC 用户/角色/权限、虚机与应用资产管理、仪表盘统计、Agent Runtime 签名代理。数据库默认 **人大金仓 KingbaseES**；本地可用 **SQLite** profile。
 
-默认端口：`8080`
+默认端口：`8080`（`dev` profile 见 `application-dev.yml`）
 
 **前端对接文档：** [docs/API.md](./docs/API.md)  
 **骨架复用文档：** [docs/SKELETON.md](./docs/SKELETON.md)（**Spring Boot Backend Skeleton v1.0**）  
@@ -31,8 +31,9 @@
 | 语言 | Java | 1.8 |
 | 框架 | Spring Boot | 2.6.13 |
 | ORM | MyBatis-Plus | 3.5.5 |
-| 数据库 | KingbaseES | 8.6.0 |
-| 缓存 | Redis + Spring Data Redis | 登录会话 / API Token |
+| 数据库 | KingbaseES（默认）/ SQLite（`sqlite` profile） | 8.6.0 / sqlite-jdbc |
+| 缓存 | Redis + Spring Data Redis | 登录会话 / API Token / 注册验证码 |
+| 邮件 | Spring Mail（SMTP） | 注册验证码（如 163 授权码） |
 | 认证 | Apache Shiro + JWT | 1.13.0 / jjwt 0.11.5 |
 | AOP | spring-boot-starter-aop | 操作日志 / 权限切面 |
 | 构建 | Maven | 3.x |
@@ -46,6 +47,7 @@
 | 模块 | 说明 |
 |------|------|
 | **认证** | 登录、JWT、Redis 在线会话、`GET /user/info` |
+| **自助注册** | `POST /register/code`、`POST /register`（邮箱验证码，默认角色「普通用户」） |
 | **用户管理** | 列表/详情/新增/修改/删除/分配角色 |
 | **虚机 / 应用** | 全员 list；仅 owner 可 update；生命周期单向流转 |
 | **角色/权限** | 角色 CRUD、权限列表、选项接口 |
@@ -77,7 +79,7 @@ backend/
 ├── scripts/
 │   └── test-all-api.sh          # 全量接口（含 AK/SK 开放接口）
 ├── src/main/java/org/example/backend/
-│   ├── auth/                    # 登录、会话、证书
+│   ├── auth/                    # 登录、注册、会话、证书
 │   ├── security/                # Shiro、JWT、PermissionAspect、Listener、AuthorizationCacheEvictor
 │   ├── api/                     # AK/SK Token、开放接口文档
 │   ├── system/user|role|permission/
@@ -86,21 +88,34 @@ backend/
 │   ├── quartz/                  # 定时任务（TaskRegistry + Quartz）
 │   ├── common/                  # Log、LogAspect、operlog、AjaxResult
 │   └── config/
-└── src/main/resources/sql/
-    ├── 01-create-tables.sql
-    ├── 02-insert-data.sql
-    ├── 04~08-*.sql
-    └── 09-fix-user-role-permissions.sql  # 纠正 user 角色误分配权限
+└── src/main/resources/
+    ├── application-sqlite.yml   # 本地无金仓：sqlite,dev
+    ├── sql/
+    │   ├── 01-create-tables.sql … 24-register-user-role.sql
+    │   └── sqlite/              # SQLite schema + seed
+    └── templates/mail/          # 注册验证码邮件模板
 ```
 
 ---
 
 ## 快速开始
 
-1. JDK 1.8+、Maven 3.6+、KingbaseES、`lib/` 下 4 个 Kingbase JAR  
-2. 按顺序执行 SQL（见下节）  
-3. 复制 `application-local.example.yml` 为 `application-local.yml`（已被 git 忽略），填写数据源与 `jwt.secret` / `jwt.api.secret`（≥32 字符）；也可用环境变量 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET`、`JWT_API_SECRET`  
+### KingbaseES（默认）
+
+1. JDK 1.8+、Maven 3.6+、KingbaseES、Redis、`lib/` 下 4 个 Kingbase JAR  
+2. 按顺序执行 SQL（见下节；已有库需跑 `23-user-email.sql`、`24-register-user-role.sql`）  
+3. 复制 `application-local.example.yml` 为 `application-local.yml`（已被 git 忽略），填写数据源、`jwt.secret` / `jwt.api.secret`（≥32 字符），以及 `spring.mail.username` / `password`（注册发信；也可用 `MAIL_USERNAME`、`MAIL_PASSWORD`）  
 4. **Rebuild Project** 后运行 `BackendApplication`
+
+### 本地 SQLite（无需 KingbaseES）
+
+仍需 Redis。激活 profile `sqlite,dev`（数据文件默认 `backend/data/agent-platform.db`，启动时执行 `sql/sqlite/schema.sql` + `data.sql`）：
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=sqlite,dev
+```
+
+自助注册仍依赖 SMTP；未配置 `MAIL_*` 时发验证码会失败。
 
 **测试账号：**
 
@@ -136,8 +151,12 @@ curl --noproxy '*' -X POST http://172.21.16.1:8080/login \
 08-dashboard-permissions.sql  # 已有库增量
 09-fix-user-role-permissions.sql  # user 角色被误加 system:user:* 时执行
 21-login-session.sql              # 登录设备会话表与权限（已有库增量）
+23-user-email.sql                 # sys_user.email + 唯一索引（自助注册）
+24-register-user-role.sql         # 普通用户证书/设备权限与缺角色补齐
 03-verify.sql                 # 可选
 ```
+
+本地 SQLite 不跑上述 Kingbase 脚本，改用 `sql/sqlite/schema.sql` / `data.sql`（已含 email 等字段）。
 
 ### 角色权限（seed）
 
@@ -151,7 +170,8 @@ user:  asset:vm:list, asset:vm:edit, asset:app:list, asset:app:edit, system:sess
 ## 认证与鉴权
 
 - Header：`Authorization: Bearer <token>`
-- `/login` 匿名；其余需 JWT（JWT 含 `jti`，绑定 `sys_login_session`）
+- `/login`、`/register`、`/register/code` 匿名；其余需 JWT（JWT 含 `jti`，绑定 `sys_login_session`）
+- **自助注册：** 邮箱验证码存 Redis（默认 5 分钟有效、60 秒重发、最多 5 次错误）；成功后绑定配置项 `register.default-role`（默认「普通用户」）
 - `POST /logout` 从 JWT 取 `jti`，删除 Redis 会话并将 DB 历史标为下线；`DELETE /system/session/{sessionId}` 使用同一吊销逻辑踢出设备
 - **单点登录：** 新登录自动吊销该用户全部旧会话（`createSingleLoginSession`）
 - **用户停用 / 删除：** `SysUserServiceImpl` 发布 `UserStatusChangedEvent`；Session、ApiToken、Cert、AuthCache 四个 Listener 在事务提交后级联吊销凭证（详见 [docs/SKELETON.md](./docs/SKELETON.md) §8.8）

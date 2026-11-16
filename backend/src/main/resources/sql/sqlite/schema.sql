@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     user_id         INTEGER         NOT NULL PRIMARY KEY,
     user_name       VARCHAR(64)     NOT NULL,
     pass_word       VARCHAR(128)    NOT NULL,
+    email           VARCHAR(128),
     status          CHAR(1)         DEFAULT '0',
     create_time     TEXT,
     update_time     TEXT,
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_user_name ON sys_user (user_name);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_email ON sys_user (email);
 
 CREATE TABLE IF NOT EXISTS sys_role (
     role_id     INTEGER         NOT NULL PRIMARY KEY,

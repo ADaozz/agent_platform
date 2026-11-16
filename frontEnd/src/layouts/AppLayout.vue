@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { tr } from '@/composables/preferences'
@@ -24,12 +24,12 @@ interface MenuItem {
 
 const SETTINGS_GROUP = '平台设置'
 const settingsMenus: MenuItem[] = [
-  { path: '/settings/models', title: '模型配置', icon: 'module' },
-  { path: '/system/user', title: '用户管理', icon: 'access', permission: 'system:user:list' },
-  { path: '/system/role', title: '角色管理', icon: 'route', permission: 'system:role:list' },
-  { path: '/system/session', title: '登录设备管理', icon: 'satellite', permission: 'system:session:list' },
-  { path: '/system/cert/mine', title: '我的证书', icon: 'scan', permission: 'system:cert:mine' },
-  { path: '/system/cert', title: '证书管理', icon: 'beacon', permission: 'system:cert:list' },
+  { path: '/settings/models', title: '模型配置', icon: 'memory' },
+  { path: '/system/user', title: '用户管理', icon: 'group', permission: 'system:user:list' },
+  { path: '/system/role', title: '角色管理', icon: 'shield_person', permission: 'system:role:list' },
+  { path: '/system/session', title: '登录设备管理', icon: 'devices', permission: 'system:session:list' },
+  { path: '/system/cert/mine', title: '我的证书', icon: 'verified_user', permission: 'system:cert:mine' },
+  { path: '/system/cert', title: '证书管理', icon: 'key', permission: 'system:cert:list' },
 ]
 const visibleSettings = computed(() => settingsMenus.filter((m) => !m.permission || auth.hasPerm(m.permission)))
 
@@ -39,19 +39,97 @@ const settingsActive = computed(() => currentGroup.value === SETTINGS_GROUP)
 
 // 侧栏鼠标悬停展开、移出收起（略作延迟避免划过边缘时闪烁）；展开时占用宽度，主区域整体右移不被遮挡
 const sidebarOpen = ref(false)
+const railHover = ref(false)
 let sidebarTimer: ReturnType<typeof setTimeout> | undefined
+function scheduleSidebarClose() {
+  clearTimeout(sidebarTimer)
+  sidebarTimer = setTimeout(() => {
+    sidebarOpen.value = false
+  }, 150)
+}
 function openSidebar() {
   clearTimeout(sidebarTimer)
+  railHover.value = true
   sidebarOpen.value = true
 }
 function closeSidebar() {
-  clearTimeout(sidebarTimer)
-  sidebarTimer = setTimeout(() => (sidebarOpen.value = false), 150)
+  railHover.value = false
+  // 飞出菜单打开时保持侧栏展开，避免移入菜单途中被收起
+  if (settingsMenuOpen.value) return
+  scheduleSidebarClose()
 }
-onUnmounted(() => clearTimeout(sidebarTimer))
 
-// 「平台设置」点击展开/收起；当前页面属于该分组时默认展开
-const settingsOpen = ref(settingsActive.value)
+/** 点击弹出飞出菜单（收起/展开侧栏都能用，避免「先悬停再点手风琴」） */
+const settingsBtn = ref<HTMLElement | null>(null)
+const settingsMenuOpen = ref(false)
+const flyoutStyle = ref<Record<string, string>>({})
+
+function placeFlyout() {
+  const rect = settingsBtn.value?.getBoundingClientRect()
+  if (!rect) return
+  const gap = 8
+  const maxH = Math.min(360, window.innerHeight - 24)
+  // 贴按钮右侧，垂直对齐底部；空间不够时改为顶对齐并限制高度
+  const bottomSpace = window.innerHeight - rect.top
+  if (bottomSpace >= Math.min(maxH, visibleSettings.value.length * 40 + 48)) {
+    flyoutStyle.value = {
+      top: `${rect.top}px`,
+      left: `${rect.right + gap}px`,
+      maxHeight: `${maxH}px`,
+    }
+  } else {
+    flyoutStyle.value = {
+      bottom: `${window.innerHeight - rect.bottom}px`,
+      left: `${rect.right + gap}px`,
+      maxHeight: `${maxH}px`,
+    }
+  }
+}
+
+async function toggleSettingsMenu() {
+  if (settingsMenuOpen.value) {
+    closeSettingsMenu()
+    return
+  }
+  placeFlyout()
+  settingsMenuOpen.value = true
+  await nextTick()
+  placeFlyout()
+}
+
+function closeSettingsMenu() {
+  if (!settingsMenuOpen.value) return
+  settingsMenuOpen.value = false
+  // 菜单关了且指针已不在侧栏上时，补一次收起
+  if (!railHover.value) scheduleSidebarClose()
+}
+
+function onSettingsKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && settingsMenuOpen.value) {
+    e.preventDefault()
+    closeSettingsMenu()
+  }
+}
+
+watch(
+  () => route.fullPath,
+  () => closeSettingsMenu(),
+)
+
+watch(settingsMenuOpen, (open) => {
+  if (open) document.addEventListener('keydown', onSettingsKeydown)
+  else document.removeEventListener('keydown', onSettingsKeydown)
+})
+
+// 侧栏一旦收起，同步关掉飞出菜单，避免菜单悬空留在原位置
+watch(sidebarOpen, (open) => {
+  if (!open && settingsMenuOpen.value) settingsMenuOpen.value = false
+})
+
+onUnmounted(() => {
+  clearTimeout(sidebarTimer)
+  document.removeEventListener('keydown', onSettingsKeydown)
+})
 
 /** 最长路径优先，避免 /system/cert/mine 同时高亮 /system/cert */
 function isMenuActive(path: string) {
@@ -82,35 +160,24 @@ function handleLogout() {
           <AgentNav :open="sidebarOpen" />
         </div>
 
-        <!-- 平台设置固定在导航最底部 -->
+        <!-- 平台设置：点击飞出菜单，收起/展开侧栏交互一致 -->
         <div v-if="visibleSettings.length" class="rail-settings shrink-0">
           <button
+            ref="settingsBtn"
             type="button"
             class="rail-item"
-            :class="{ 'rail-item-active': settingsActive && !(sidebarOpen && settingsOpen) }"
+            :class="{ 'rail-item-active': settingsActive || settingsMenuOpen }"
             :title="tr(SETTINGS_GROUP)"
-            :aria-expanded="settingsOpen"
-            @click="settingsOpen = !settingsOpen"
+            :aria-expanded="settingsMenuOpen"
+            aria-haspopup="menu"
+            @click.stop="toggleSettingsMenu"
           >
-            <AppIcon name="orbit" />
+            <AppIcon name="settings" />
             <template v-if="sidebarOpen">
               <span class="flex-1 truncate text-left">{{ tr(SETTINGS_GROUP) }}</span>
-              <AppIcon name="expand_more" class="rail-caret" :class="{ 'rotate-180': settingsOpen }" />
+              <AppIcon name="chevron_right" class="rail-caret" />
             </template>
           </button>
-          <div v-show="sidebarOpen && settingsOpen" class="rail-submenu">
-            <RouterLink
-              v-for="m in visibleSettings"
-              :key="m.path"
-              :to="m.path"
-              :title="tr(m.title)"
-              class="rail-item rail-subitem"
-              :class="{ 'rail-item-active': isMenuActive(m.path) }"
-            >
-              <AppIcon :name="m.icon" class="!text-[17px]" />
-              <span class="flex-1 truncate">{{ tr(m.title) }}</span>
-            </RouterLink>
-          </div>
         </div>
       </nav>
 
@@ -130,6 +197,33 @@ function handleLogout() {
         </template>
       </div>
     </aside>
+
+    <Teleport to="body">
+      <template v-if="settingsMenuOpen">
+        <div class="rail-flyout-scrim" aria-hidden="true" @click="closeSettingsMenu" />
+        <div
+          class="rail-flyout"
+          role="menu"
+          :aria-label="tr(SETTINGS_GROUP)"
+          :style="flyoutStyle"
+          @click.stop
+        >
+          <div class="rail-flyout-head">{{ tr(SETTINGS_GROUP) }}</div>
+          <RouterLink
+            v-for="m in visibleSettings"
+            :key="m.path"
+            :to="m.path"
+            role="menuitem"
+            class="rail-flyout-item"
+            :class="{ 'rail-flyout-item-active': isMenuActive(m.path) }"
+            @click="closeSettingsMenu"
+          >
+            <AppIcon :name="m.icon" class="!text-[17px]" />
+            <span class="min-w-0 flex-1 truncate">{{ tr(m.title) }}</span>
+          </RouterLink>
+        </div>
+      </template>
+    </Teleport>
 
     <!-- 主区域 -->
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -199,6 +293,60 @@ function handleLogout() {
   margin-left: 0;
   margin-right: 0;
 }
+.rail-flyout-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.rail-flyout {
+  position: fixed;
+  z-index: 41;
+  display: flex;
+  min-width: 11.5rem;
+  max-width: 16rem;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 0.375rem;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background-color: var(--chrome-raised);
+  box-shadow: var(--shadow-panel);
+  color: var(--chrome-ink-2);
+}
+.rail-flyout-head {
+  padding: 0.4rem 0.75rem 0.35rem;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--chrome-ink-3);
+}
+.rail-flyout-item {
+  display: flex;
+  height: 2.25rem;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--chrome-ink-2);
+  transition:
+    background-color 0.16s,
+    color 0.16s;
+}
+.rail-flyout-item:hover,
+.rail-flyout-item:focus-visible {
+  background-color: var(--chrome-glass);
+  color: var(--chrome-ink);
+  outline: none;
+}
+.rail-flyout-item-active {
+  background-color: var(--chrome-glass);
+  color: var(--chrome-ink);
+  font-weight: 500;
+}
+.rail-flyout-item-active > .app-icon:first-child {
+  color: var(--chrome-signal);
+}
 
 /* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起信号橙标记 */
 .rail-item {
@@ -261,15 +409,6 @@ function handleLogout() {
 .rail-caret {
   font-size: 15px !important;
   color: var(--chrome-ink-3);
-  transition: transform 0.2s var(--ease-out);
-}
-.rail-submenu {
-  padding-bottom: 0.25rem;
-}
-.rail-subitem {
-  height: 2.125rem;
-  padding-left: 1.75rem;
-  font-size: 13px;
 }
 
 .rail-user {
@@ -359,7 +498,7 @@ function handleLogout() {
 /* 触屏：导航项保持控制台密度，但把命中区加到 44px */
 @media (pointer: coarse) {
   .rail-item,
-  .rail-subitem {
+  .rail-flyout-item {
     height: 2.75rem;
   }
   .rail-logout {

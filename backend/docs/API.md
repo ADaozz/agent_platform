@@ -32,7 +32,7 @@
 | Header | 值 | 说明 |
 |--------|-----|------|
 | `Content-Type` | `application/json` | POST/PUT 必传 |
-| `Authorization` | `Bearer <token>` | 除 `/login`、`/login/cert` 外必传 |
+| `Authorization` | `Bearer <token>` | 除 `/login`、`/login/cert`、`/register`、`/register/code` 外必传 |
 
 ### 1.2 统一响应 `AjaxResult`
 
@@ -237,6 +237,72 @@ Nginx 8443 映射：`/debug-cert`、`/cert-check` → `/login/cert/check`
 | ok | 仅当 `verify=SUCCESS` 时为 `true` |
 
 **自测期望：** `hasCert=true`, `ok=true`, **`verify=SUCCESS`**
+
+### 2.1.3 自助注册
+
+邮箱验证码注册。需配置 SMTP（`spring.mail` / `MAIL_USERNAME`、`MAIL_PASSWORD`）与 Redis；验证码与重发间隔存 Redis。Shiro：`anon`。
+
+#### 发送验证码
+
+```
+POST /register/code
+```
+
+**权限：** 匿名
+
+**请求体：**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| email | 是 | 合法邮箱，最长 128 字符 |
+
+**成功响应：** `msg` 为「验证码已发送」，`data` 为 `null`。
+
+**说明：**
+
+- 验证码 6 位数字，默认有效期 **300 秒**（`register.code.expire-seconds`）
+- 同一邮箱重发间隔默认 **60 秒**（`register.code.resend-interval-seconds`）
+- 未配置发件邮箱时返回业务错误
+
+#### 提交注册
+
+```
+POST /register
+```
+
+**权限：** 匿名
+
+**请求体：**
+
+```json
+{
+  "userName": "neo",
+  "email": "user@example.com",
+  "passWord": "secret12",
+  "confirmPassWord": "secret12",
+  "code": "123456"
+}
+```
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| userName | 是 | 2–64 字符；字母、数字、下划线或中文 |
+| email | 是 | 合法邮箱，最长 128；全库唯一（NULL 存量不受影响） |
+| passWord | 是 | 6–128 字符 |
+| confirmPassWord | 是 | 须与 passWord 一致 |
+| code | 是 | 6 位数字验证码 |
+
+**成功响应：** `msg` 为「注册成功」，`data` 为 `null`。注册成功后默认绑定角色 `register.default-role`（默认「普通用户」），具备我的证书与登录设备等个人权限。
+
+**常见失败：** 用户名/邮箱已存在、验证码错误或过期、输错次数超限（默认 5 次，`register.code.max-attempts`）、两次密码不一致。
+
+已有 Kingbase 库需执行增量脚本 `23-user-email.sql`、`24-register-user-role.sql`。
 
 ---
 
@@ -1605,6 +1671,7 @@ export interface PermTreeNode {
 | GET `/system/session/history` | 需 `system:session:list`；无 manage 时仅看自己 |
 | DELETE `/system/session/{sessionId}` | 需 `system:session:kick`；manage 可踢任意用户 |
 | 登录 | 新登录自动吊销该用户全部旧会话（全用户单点） |
+| POST `/register/code`、`/register` | 匿名；邮箱验证码自助注册 |
 | GET `/asset/vm`、`/asset/app` | 任意登录用户，看**全部**数据 |
 | PUT `/asset/vm`、`/asset/app` | 任意登录用户，但必须是 **owner** |
 | GET `/dashboard/*?scope=mine` | 任意登录用户 |
@@ -1773,6 +1840,8 @@ ca/client/users/{userId}/{applyId}/
 | 认证 | POST | `/login/cert`（8443） |
 | 认证 | GET | `/login/cert/check`（8443 诊断） |
 | 认证 | GET | `/login/cert/debug`（8443 诊断，纯文本） |
+| 认证 | POST | `/register/code` |
+| 认证 | POST | `/register` |
 | 认证 | POST | `/logout` |
 | 认证 | GET | `/user/info` |
 | 用户 | GET | `/system/user` |

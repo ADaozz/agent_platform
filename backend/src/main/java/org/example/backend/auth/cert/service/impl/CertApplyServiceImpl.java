@@ -218,8 +218,8 @@ public class CertApplyServiceImpl implements CertApplyService {
 
         CertApproveResultVO result = new CertApproveResultVO();
         result.setApplyId(applyId);
-        result.setP12Password(p12Password);
-        result.setMessage("签发成功，P12 密码仅本次展示，请立即转告用户并在平台查看");
+        // P12 密码不返回给管理员，仅由申请人在「我的证书」领取一次
+        result.setMessage("签发成功，P12 密码已生成，请通知用户在「我的证书」查看");
         return result;
     }
 

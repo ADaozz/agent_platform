@@ -24,6 +24,35 @@ spring:
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:}
     database: ${REDIS_DATABASE:0}
+  # 注册验证码邮件（163 邮箱 SMTP，密码为第三方客户端授权码，非登录密码）
+  # 真实账号/授权码放环境变量或 application-local.yml（不入库）
+  mail:
+    host: ${MAIL_HOST:smtp.163.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
+
+# 自助注册
+register:
+  # 新注册账号默认角色（需具备我的证书 / 登录设备等个人权限）
+  default-role: 普通用户
+  code:
+    # 验证码有效期：5 分钟
+    expire-seconds: 300
+    # 同一邮箱重发等待：60 秒
+    resend-interval-seconds: 60
+    # 同一验证码最多允许输错次数
+    max-attempts: 5
 
 # MyBatis-Plus：Kingbase 下避免 sys_user 等同名系统视图冲突
 mybatis-plus:

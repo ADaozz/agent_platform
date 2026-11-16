@@ -2,6 +2,8 @@
 
 本次只调整前端视觉：碳黑工业控制台、暖白科研档案、信号橙交互，以及现有几何图案的颜色层级。保留全部布局、尺寸、间距、圆角、响应式断点、DOM 层级、业务逻辑及功能动画。没有增加依赖，没有修改后端或共享 Agent 工作区实现。
 
+> **后续演进（非本验收范围）：** 登录页主视觉已由星盘 / `OrbitDial` / `SpaceField` 改为工业走廊背景 + `LoginScene` 悬浮 3D 模块；说明见 [../login-scene/README.md](../login-scene/README.md)。下表中 `OrbitDial` / `SpaceField` / 登录截图仍对应本轮收敛当时的基线。
+
 ## 实际修改文件
 
 | 文件（相对 frontEnd/src） | 修改摘要 |

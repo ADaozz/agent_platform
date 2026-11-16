@@ -5,6 +5,24 @@ export function login(userName: string, passWord: string) {
   return request.post<LoginResult>('/login', { userName, passWord })
 }
 
+export interface RegisterPayload {
+  userName: string
+  email: string
+  passWord: string
+  confirmPassWord: string
+  code: string
+}
+
+/** 发送注册邮箱验证码 */
+export function sendRegisterCode(email: string) {
+  return request.post<null>('/register/code', { email })
+}
+
+/** 邮箱验证码注册（密码由后端哈希存储） */
+export function register(data: RegisterPayload) {
+  return request.post<null>('/register', data)
+}
+
 /**
  * 整页跳转 8443 触发 mTLS；GET 返回自动 POST 表单，由浏览器在 TLS 层提交客户端证。
  * 8443 只接受 https；origin 仅在后端白名单内时才会跳回当前前端，否则回到 https://host/login。
