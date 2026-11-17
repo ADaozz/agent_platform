@@ -447,6 +447,7 @@ async function confirmRevoke() {
           :total="certTotal"
           :page-num="certPageNum"
           :page-size="certPageSize"
+          :total-label="tr('共 {n} 位用户', { n: certTotal })"
           @change="changeCertPage"
         />
       </div>

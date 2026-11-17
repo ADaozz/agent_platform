@@ -296,6 +296,7 @@ const EN: Record<string, string> = {
   删除: 'Delete',
   暂无数据: 'No data',
   '共 {n} 条记录': '{n} records',
+  '共 {n} 位用户': '{n} users',
   上一页: 'Previous page',
   下一页: 'Next page',
   '密码（留空则不修改）': 'Password (leave blank to keep)',

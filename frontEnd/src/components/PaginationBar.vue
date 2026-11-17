@@ -3,11 +3,16 @@ import { computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { tr } from '@/composables/preferences'
 
-const props = defineProps<{
-  total: number
-  pageNum: number
-  pageSize: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    total: number
+    pageNum: number
+    pageSize: number
+    /** 覆盖默认「共 {n} 条记录」文案 */
+    totalLabel?: string
+  }>(),
+  { totalLabel: undefined },
+)
 
 const emit = defineEmits<{ change: [pageNum: number] }>()
 
@@ -34,7 +39,7 @@ function go(p: number) {
 <template>
   <div class="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
     <span class="font-mono text-[11px] tracking-[0.1em] text-ink-faint">
-      {{ tr('共 {n} 条记录', { n: total }) }}
+      {{ totalLabel || tr('共 {n} 条记录', { n: total }) }}
     </span>
     <div class="flex items-center gap-1">
       <button class="page-btn" :aria-label="tr('上一页')" :disabled="pageNum <= 1" @click="go(pageNum - 1)">

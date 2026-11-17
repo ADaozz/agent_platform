@@ -34,8 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -149,8 +152,76 @@ public class CertApplyServiceImpl implements CertApplyService {
     }
 
     @Override
-    // 分页查询用户证书列表
+    /**
+     * 按「用户」分页返回证书列表。
+     * 管理页一行对应用户（签名证 + 加密证），若按单张证书分页，重发后的有效/吊销证会被拆到不同页，
+     * 总数也会变成证书张数而非用户数。
+     */
     public PageResultVO<UserCertVO> listCerts(UserCertQueryDTO dto) {
+        LambdaQueryWrapper<SysUserCertEntity> matchWrapper = buildCertMatchWrapper(dto);
+        if (matchWrapper == null) {
+            return new PageResultVO<>(0L, Collections.emptyList());
+        }
+        List<SysUserCertEntity> matched = sysUserCertMapper.selectList(matchWrapper);
+        if (matched.isEmpty()) {
+            return new PageResultVO<>(0L, Collections.emptyList());
+        }
+
+        // 有匹配证书的用户，按该用户匹配证书的最新创建时间倒序
+        Map<Long, Date> latestByUser = new LinkedHashMap<>();
+        for (SysUserCertEntity cert : matched) {
+            Date createTime = cert.getCreateTime() != null ? cert.getCreateTime() : new Date(0L);
+            Date prev = latestByUser.get(cert.getUserId());
+            if (prev == null || createTime.after(prev)) {
+                latestByUser.put(cert.getUserId(), createTime);
+            }
+        }
+        List<Long> orderedUserIds = latestByUser.entrySet().stream()
+                .sorted(Map.Entry.<Long, Date>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+        int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
+        int from = Math.min((pageNum - 1) * pageSize, orderedUserIds.size());
+        int to = Math.min(from + pageSize, orderedUserIds.size());
+        List<Long> pageUserIds = orderedUserIds.subList(from, to);
+        if (pageUserIds.isEmpty()) {
+            return new PageResultVO<>((long) orderedUserIds.size(), Collections.emptyList());
+        }
+
+        // 取出本页用户在当前筛选条件下的证书，供前端按用户聚合成一行
+        LambdaQueryWrapper<SysUserCertEntity> pageWrapper = new LambdaQueryWrapper<>();
+        pageWrapper.in(SysUserCertEntity::getUserId, pageUserIds);
+        if (StringUtils.hasText(dto.getCertType())) {
+            pageWrapper.eq(SysUserCertEntity::getCertType, dto.getCertType());
+        }
+        if (StringUtils.hasText(dto.getStatus())) {
+            pageWrapper.eq(SysUserCertEntity::getStatus, dto.getStatus());
+        }
+        pageWrapper.orderByDesc(SysUserCertEntity::getCreateTime);
+        List<SysUserCertEntity> pageCerts = sysUserCertMapper.selectList(pageWrapper);
+
+        // 保持与用户分页顺序一致：同一用户的证挨在一起
+        Map<Long, Integer> userOrder = new LinkedHashMap<>();
+        for (int i = 0; i < pageUserIds.size(); i++) {
+            userOrder.put(pageUserIds.get(i), i);
+        }
+        pageCerts.sort(Comparator
+                .comparingInt((SysUserCertEntity c) -> userOrder.getOrDefault(c.getUserId(), Integer.MAX_VALUE))
+                .thenComparing(SysUserCertEntity::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())));
+
+        Map<Long, String> userNameMap = loadUserNameMap(pageCerts);
+        List<UserCertVO> rows = new ArrayList<>(pageCerts.size());
+        for (SysUserCertEntity entity : pageCerts) {
+            rows.add(toCertVo(entity, userNameMap.get(entity.getUserId())));
+        }
+        return new PageResultVO<>((long) orderedUserIds.size(), rows);
+    }
+
+    /** @return null 表示用户名筛选无命中，应直接返回空页 */
+    private LambdaQueryWrapper<SysUserCertEntity> buildCertMatchWrapper(UserCertQueryDTO dto) {
         LambdaQueryWrapper<SysUserCertEntity> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(dto.getCertType())) {
             wrapper.eq(SysUserCertEntity::getCertType, dto.getCertType());
@@ -163,19 +234,12 @@ public class CertApplyServiceImpl implements CertApplyService {
                             .like(SysUserEntity::getUserName, dto.getUserName()))
                     .stream().map(SysUserEntity::getUserId).collect(Collectors.toList());
             if (userIds.isEmpty()) {
-                return new PageResultVO<>(0L, Collections.emptyList());
+                return null;
             }
             wrapper.in(SysUserCertEntity::getUserId, userIds);
         }
-        wrapper.orderByDesc(SysUserCertEntity::getCreateTime);
-        int pageNum = dto.getPageNum() != null ? dto.getPageNum() : 1;
-        int pageSize = dto.getPageSize() != null ? dto.getPageSize() : 10;
-        Page<SysUserCertEntity> page = sysUserCertMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
-        Map<Long, String> userNameMap = loadUserNameMap(page.getRecords());
-        List<UserCertVO> rows = page.getRecords().stream()
-                .map(e -> toCertVo(e, userNameMap.get(e.getUserId())))
-                .collect(Collectors.toList());
-        return new PageResultVO<>(page.getTotal(), rows);
+        wrapper.select(SysUserCertEntity::getUserId, SysUserCertEntity::getCreateTime);
+        return wrapper;
     }
 
     @Override
