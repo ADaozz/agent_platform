@@ -303,37 +303,29 @@ async function confirmRevoke() {
       aria-labelledby="cert-tab-list"
       class="space-y-4"
     >
-      <div class="card p-4">
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <div>
-            <label class="form-label" for="cert-filter-name">{{ tr('用户名') }}</label>
-            <input
-              id="cert-filter-name"
-              v-model="certFilters.userName"
-              class="input"
-              @keyup.enter="searchCerts"
-            />
-          </div>
-          <div>
-            <label class="form-label" for="cert-filter-type">{{ tr('类型') }}</label>
-            <select id="cert-filter-type" v-model="certFilters.certType" class="select">
-              <option value="">{{ tr('全部') }}</option>
-              <option value="sign">{{ tr('签名') }}</option>
-              <option value="encrypt">{{ tr('加密') }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="cert-filter-status">{{ tr('状态') }}</label>
-            <select id="cert-filter-status" v-model="certFilters.status" class="select">
-              <option value="">{{ tr('全部') }}</option>
-              <option value="0">{{ tr('有效') }}</option>
-              <option value="1">{{ tr('已吊销') }}</option>
-            </select>
-          </div>
-          <div class="flex items-end">
-            <button class="btn-primary" @click="searchCerts">{{ tr('查询') }}</button>
-          </div>
-        </div>
+      <div class="filter-toolbar">
+        <label class="search-field" for="cert-filter-name">
+          <AppIcon name="search" />
+          <input
+            id="cert-filter-name"
+            v-model="certFilters.userName"
+            type="search"
+            :placeholder="tr('搜索用户名…')"
+            :aria-label="tr('用户名')"
+            @keyup.enter="searchCerts"
+          />
+        </label>
+        <select id="cert-filter-type" v-model="certFilters.certType" class="select select-fit" :aria-label="tr('类型')">
+          <option value="">{{ tr('全部类型') }}</option>
+          <option value="sign">{{ tr('签名') }}</option>
+          <option value="encrypt">{{ tr('加密') }}</option>
+        </select>
+        <select id="cert-filter-status" v-model="certFilters.status" class="select select-fit" :aria-label="tr('状态')">
+          <option value="">{{ tr('全部状态') }}</option>
+          <option value="0">{{ tr('有效') }}</option>
+          <option value="1">{{ tr('已吊销') }}</option>
+        </select>
+        <button class="btn-primary" @click="searchCerts">{{ tr('查询') }}</button>
       </div>
       <div class="card overflow-hidden">
         <div class="table-scroll">
@@ -460,31 +452,25 @@ async function confirmRevoke() {
       aria-labelledby="cert-tab-apply"
       class="space-y-4"
     >
-      <div class="card p-4">
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div>
-            <label class="form-label" for="apply-filter-name">{{ tr('用户名') }}</label>
-            <input
-              id="apply-filter-name"
-              v-model="applyFilters.userName"
-              class="input"
-              :placeholder="tr('搜索…')"
-              @keyup.enter="applyPageNum = 1; loadApplies()"
-            />
-          </div>
-          <div>
-            <label class="form-label" for="apply-filter-status">{{ tr('状态') }}</label>
-            <select id="apply-filter-status" v-model="applyFilters.status" class="select">
-              <option value="">{{ tr('全部') }}</option>
-              <option value="pending">{{ tr('待审批') }}</option>
-              <option value="approved">{{ tr('已通过') }}</option>
-              <option value="rejected">{{ tr('已拒绝') }}</option>
-            </select>
-          </div>
-          <div class="flex items-end">
-            <button class="btn-primary" @click="applyPageNum = 1; loadApplies()">{{ tr('查询') }}</button>
-          </div>
-        </div>
+      <div class="filter-toolbar">
+        <label class="search-field" for="apply-filter-name">
+          <AppIcon name="search" />
+          <input
+            id="apply-filter-name"
+            v-model="applyFilters.userName"
+            type="search"
+            :placeholder="tr('搜索用户名…')"
+            :aria-label="tr('用户名')"
+            @keyup.enter="applyPageNum = 1; loadApplies()"
+          />
+        </label>
+        <select id="apply-filter-status" v-model="applyFilters.status" class="select select-fit" :aria-label="tr('状态')">
+          <option value="">{{ tr('全部状态') }}</option>
+          <option value="pending">{{ tr('待审批') }}</option>
+          <option value="approved">{{ tr('已通过') }}</option>
+          <option value="rejected">{{ tr('已拒绝') }}</option>
+        </select>
+        <button class="btn-primary" @click="applyPageNum = 1; loadApplies()">{{ tr('查询') }}</button>
       </div>
       <div class="card overflow-hidden">
         <table>
@@ -568,8 +554,6 @@ async function confirmRevoke() {
 <style scoped>
 .cert-toolbar {
   justify-content: space-between;
-  padding: 0;
-  border-bottom: 0;
 }
 .cert-toolbar .segmented {
   flex: 0 1 auto;

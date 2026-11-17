@@ -300,8 +300,6 @@ const hasPending = () => overview.value?.applies?.some((a) => a.status === 'pend
 .cert-mine-toolbar {
   justify-content: flex-end;
   flex-wrap: wrap;
-  padding: 0;
-  border-bottom: 0;
 }
 .cert-detail-card {
   min-width: 0;

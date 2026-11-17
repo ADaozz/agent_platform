@@ -254,18 +254,19 @@ async function confirmDelete() {
       </button>
     </PageHeader>
 
-    <!-- 筛选 -->
-    <div class="card p-4">
-      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-        <div>
-          <label class="form-label">{{ tr('角色标识') }}</label>
-          <input v-model="filters.sysRole" class="input" :placeholder="tr('搜索角色标识…')" @keyup.enter="search" />
-        </div>
-        <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
-          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
-        </div>
-      </div>
+    <div class="filter-toolbar">
+      <label class="search-field">
+        <AppIcon name="search" />
+        <input
+          v-model="filters.sysRole"
+          type="search"
+          :placeholder="tr('搜索角色标识…')"
+          :aria-label="tr('角色标识')"
+          @keyup.enter="search"
+        />
+      </label>
+      <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+      <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
     </div>
 
     <!-- 表格 -->

@@ -184,39 +184,29 @@ async function confirmDelete() {
       </button>
     </PageHeader>
 
-    <!-- 筛选 -->
-    <div class="card p-4">
-      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-        <div>
-          <label class="form-label" for="user-filter-name">{{ tr('用户名') }}</label>
-          <input
-            id="user-filter-name"
-            v-model="filters.userName"
-            class="input"
-            :placeholder="tr('搜索用户名…')"
-            @keyup.enter="search"
-          />
-        </div>
-        <div>
-          <label class="form-label" for="user-filter-status">{{ tr('状态') }}</label>
-          <select id="user-filter-status" v-model="filters.status" class="select">
-            <option value="">{{ tr('全部状态') }}</option>
-            <option value="0">{{ tr('已启用') }}</option>
-            <option value="1">{{ tr('已停用') }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label" for="user-filter-role">{{ tr('角色') }}</label>
-          <select id="user-filter-role" v-model="filters.roleId" class="select">
-            <option value="">{{ tr('全部角色') }}</option>
-            <option v-for="r in roleOptions" :key="r.id" :value="r.id">{{ r.label }}</option>
-          </select>
-        </div>
-        <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
-          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
-        </div>
-      </div>
+    <div class="filter-toolbar">
+      <label class="search-field" for="user-filter-name">
+        <AppIcon name="search" />
+        <input
+          id="user-filter-name"
+          v-model="filters.userName"
+          type="search"
+          :placeholder="tr('搜索用户名…')"
+          :aria-label="tr('用户名')"
+          @keyup.enter="search"
+        />
+      </label>
+      <select id="user-filter-status" v-model="filters.status" class="select select-fit" :aria-label="tr('状态')">
+        <option value="">{{ tr('全部状态') }}</option>
+        <option value="0">{{ tr('已启用') }}</option>
+        <option value="1">{{ tr('已停用') }}</option>
+      </select>
+      <select id="user-filter-role" v-model="filters.roleId" class="select select-fit" :aria-label="tr('角色')">
+        <option value="">{{ tr('全部角色') }}</option>
+        <option v-for="r in roleOptions" :key="r.id" :value="r.id">{{ r.label }}</option>
+      </select>
+      <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+      <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
     </div>
 
     <!-- 表格 -->

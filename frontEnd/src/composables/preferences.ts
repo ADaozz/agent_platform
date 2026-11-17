@@ -284,6 +284,8 @@ const EN: Record<string, string> = {
   '搜索用户名…': 'Search username…',
   状态: 'Status',
   全部状态: 'All statuses',
+  全部类型: 'All types',
+
   已启用: 'Enabled',
   已停用: 'Disabled',
   角色: 'Roles',

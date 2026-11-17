@@ -150,7 +150,6 @@ const chartOption = computed<EChartsOption | null>(() => {
 </template>
 
 <style scoped>
-.usage-filters { border-bottom: 0; padding: 0; }
 .usage-filters .segmented { flex: 0 0 auto; }
 .usage-filters :deep(.usage-model-filter) { flex: 1 1 auto; width: auto; max-width: none; min-width: 0; }
 .panel-quiet {

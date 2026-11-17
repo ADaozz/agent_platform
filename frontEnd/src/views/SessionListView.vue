@@ -150,23 +150,20 @@ async function confirmKick() {
       </button>
     </PageHeader>
 
-    <div v-if="canManage" class="card p-4">
-      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-        <div>
-          <label class="form-label" for="session-filter-name">{{ tr('用户名') }}</label>
-          <input
-            id="session-filter-name"
-            v-model="filters.userName"
-            class="input"
-            :placeholder="tr('搜索用户名…')"
-            @keyup.enter="search"
-          />
-        </div>
-        <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
-          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
-        </div>
-      </div>
+    <div v-if="canManage" class="filter-toolbar">
+      <label class="search-field" for="session-filter-name">
+        <AppIcon name="search" />
+        <input
+          id="session-filter-name"
+          v-model="filters.userName"
+          type="search"
+          :placeholder="tr('搜索用户名…')"
+          :aria-label="tr('用户名')"
+          @keyup.enter="search"
+        />
+      </label>
+      <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+      <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
     </div>
 
     <div class="card overflow-hidden">
