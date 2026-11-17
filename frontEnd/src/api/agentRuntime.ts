@@ -83,6 +83,7 @@ export interface UsageSessionRow {
 }
 
 export interface UsageOverview {
+  filters?: { providers: string[]; models: Array<{ provider: string; id: string }> }
   days: number
   currency: string
   cost_note: string
@@ -147,8 +148,12 @@ export const savePlatformCapabilities = (mounts: CapabilityMounts) =>
 export const getModelOptions = () => runtimeJson<ModelOptions>('/models/options')
 export const getPersonalModels = () => runtimeJson<ModelConfigResult>('/models/personal')
 export const getGlobalModels = () => runtimeJson<ModelConfigResult>('/models')
-export const getUsageOverview = (days = 30) =>
-  runtimeJson<UsageOverview>(`/agent/usage/overview?days=${encodeURIComponent(String(days))}`)
+export function getUsageOverview(days = 30, filters: { provider?: string; model?: string } = {}) {
+  const query = new URLSearchParams({ days: String(days) })
+  if (filters.provider) query.set('provider', filters.provider)
+  if (filters.model) query.set('model', filters.model)
+  return runtimeJson<UsageOverview>(`/agent/usage/overview?${query}`)
+}
 
 export function savePersonalModels(llm: LlmConfig, revision: number) {
   return runtimeJson<ModelConfigResult>('/models/personal', { method: 'PUT', body: JSON.stringify({ llm, revision }) })

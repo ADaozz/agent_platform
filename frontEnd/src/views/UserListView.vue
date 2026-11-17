@@ -5,6 +5,7 @@ import { listUsers, addUser, editUser, authRole, deleteUser } from '@/api/user'
 import { getRoleOptions } from '@/api/role'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
+import { tr } from '@/composables/preferences'
 import { USER_STATUS_TAGS } from '@/constants'
 import { formatDateTime } from '@/utils/format'
 import type { Id, OptionVO, SysUserVO } from '@/types'
@@ -113,15 +114,15 @@ function toggleRole(id: Id) {
 
 async function saveForm() {
   if (!form.userName.trim()) {
-    toast.error('用户名不能为空')
+    toast.error(tr('用户名不能为空'))
     return
   }
   if (!isEdit.value && (form.passWord.length < 6 || form.passWord.length > 32)) {
-    toast.error('密码长度需为 6–32 位')
+    toast.error(tr('密码长度需为 6–32 位'))
     return
   }
   if (isEdit.value && form.passWord && (form.passWord.length < 6 || form.passWord.length > 32)) {
-    toast.error('密码长度需为 6–32 位')
+    toast.error(tr('密码长度需为 6–32 位'))
     return
   }
   saving.value = true
@@ -135,7 +136,7 @@ async function saveForm() {
       })
       // 编辑时同步覆盖角色
       await authRole(editingUserId.value!, form.roleIds)
-      toast.success('修改成功')
+      toast.success(tr('修改成功'))
     } else {
       await addUser({
         userName: form.userName.trim(),
@@ -143,7 +144,7 @@ async function saveForm() {
         status: form.status,
         roleIds: form.roleIds,
       })
-      toast.success('新增成功')
+      toast.success(tr('新增成功'))
     }
     formOpen.value = false
     load()
@@ -163,7 +164,7 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await deleteUser(deleteTarget.value.userId)
-    toast.success('删除成功')
+    toast.success(tr('删除成功'))
     deleteTarget.value = null
     load()
   } catch {
@@ -176,10 +177,10 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="用户管理" desc="管理系统登录用户，分配角色权限及账户状态控制">
+    <PageHeader :title="tr('用户管理')">
       <button v-if="canAdd" class="btn-primary" @click="openAdd">
         <AppIcon name="person_add" class="!text-[18px]" />
-        添加用户
+        {{ tr('添加用户') }}
       </button>
     </PageHeader>
 
@@ -187,58 +188,57 @@ async function confirmDelete() {
     <div class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <div>
-          <label class="form-label" for="user-filter-name">用户名</label>
+          <label class="form-label" for="user-filter-name">{{ tr('用户名') }}</label>
           <input
             id="user-filter-name"
             v-model="filters.userName"
             class="input"
-            placeholder="搜索用户名…"
+            :placeholder="tr('搜索用户名…')"
             @keyup.enter="search"
           />
         </div>
         <div>
-          <label class="form-label" for="user-filter-status">状态</label>
+          <label class="form-label" for="user-filter-status">{{ tr('状态') }}</label>
           <select id="user-filter-status" v-model="filters.status" class="select">
-            <option value="">全部状态</option>
-            <option value="0">已启用</option>
-            <option value="1">已停用</option>
+            <option value="">{{ tr('全部状态') }}</option>
+            <option value="0">{{ tr('已启用') }}</option>
+            <option value="1">{{ tr('已停用') }}</option>
           </select>
         </div>
         <div>
-          <label class="form-label" for="user-filter-role">角色</label>
+          <label class="form-label" for="user-filter-role">{{ tr('角色') }}</label>
           <select id="user-filter-role" v-model="filters.roleId" class="select">
-            <option value="">全部角色</option>
+            <option value="">{{ tr('全部角色') }}</option>
             <option v-for="r in roleOptions" :key="r.id" :value="r.id">{{ r.label }}</option>
           </select>
         </div>
         <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">查询</button>
-          <button class="btn-ghost" @click="resetFilters">重置</button>
+          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
         </div>
       </div>
     </div>
 
     <!-- 表格 -->
     <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="table-scroll">
+        <table>
           <thead>
-            <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-              <th class="px-4 py-2.5">用户信息</th>
-              <th class="px-4 py-2.5">角色</th>
-              <th class="px-4 py-2.5">状态</th>
-              <th class="px-4 py-2.5">创建时间</th>
-              <th class="px-4 py-2.5">最后登录</th>
-              <th class="px-4 py-2.5 text-right">操作</th>
+            <tr>
+              <th>{{ tr('用户信息') }}</th>
+              <th>{{ tr('角色') }}</th>
+              <th>{{ tr('状态') }}</th>
+              <th>{{ tr('创建时间') }}</th>
+              <th>{{ tr('最后登录') }}</th>
+              <th class="col-end">{{ tr('操作') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="user in rows"
               :key="user.userId"
-              class="border-b border-line transition-colors last:border-0 hover:bg-gray-50"
             >
-              <td class="px-4 py-3">
+              <td>
                 <div class="flex items-center gap-3">
                   <div class="flex h-9 w-9 shrink-0 items-center justify-center id-chip">
                     {{ user.userName.charAt(0).toUpperCase() }}
@@ -249,7 +249,7 @@ async function confirmDelete() {
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3">
+              <td>
                 <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="role in user.roles"
@@ -261,18 +261,18 @@ async function confirmDelete() {
                   <span v-if="user.roles.length === 0" class="text-xs text-ink-faint">-</span>
                 </div>
               </td>
-              <td class="px-4 py-3">
+              <td>
                 <StatusTag :value="user.status" :map="USER_STATUS_TAGS" />
               </td>
-              <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">{{ formatDateTime(user.createTime) }}</td>
-              <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">{{ user.lastLoginTime ? formatDateTime(user.lastLoginTime) : '从未登录' }}</td>
-              <td class="px-4 py-3 text-right whitespace-nowrap">
+              <td class="font-mono text-[13px]">{{ formatDateTime(user.createTime) }}</td>
+              <td class="font-mono text-[13px]">{{ user.lastLoginTime ? formatDateTime(user.lastLoginTime) : tr('从未登录') }}</td>
+              <td class="col-end">
                 <button
                   v-if="canEdit"
                   class="text-sm font-medium text-primary hover:underline"
                   @click="openEdit(user)"
                 >
-                  编辑
+                  {{ tr('编辑') }}
                 </button>
                 <button
                   v-if="canDelete"
@@ -281,12 +281,12 @@ async function confirmDelete() {
                   :class="{ 'cursor-not-allowed opacity-40': user.userId === auth.user?.userId }"
                   @click="deleteTarget = user"
                 >
-                  删除
+                  {{ tr('删除') }}
                 </button>
               </td>
             </tr>
             <tr v-if="!loading && rows.length === 0">
-              <td colspan="6" class="px-4 py-16 text-center text-ink-faint">暂无数据</td>
+              <td colspan="6" class="table-empty">{{ tr('暂无数据') }}</td>
             </tr>
           </tbody>
         </table>
@@ -295,21 +295,21 @@ async function confirmDelete() {
     </div>
 
     <!-- 新增 / 编辑弹窗 -->
-    <BaseModal :open="formOpen" :title="isEdit ? '编辑用户' : '添加用户'" width="440px" @close="formOpen = false">
+    <BaseModal :open="formOpen" :title="tr(isEdit ? '编辑用户' : '添加用户')" width="440px" @close="formOpen = false">
       <div class="space-y-4">
         <div>
-          <label class="form-label" for="user-form-name">用户名 <span class="text-danger">*</span></label>
+          <label class="form-label" for="user-form-name">{{ tr('用户名') }} <span class="text-danger">*</span></label>
           <input
             id="user-form-name"
             v-model="form.userName"
             class="input"
             maxlength="64"
-            placeholder="请输入用户名"
+            :placeholder="tr('请输入用户名')"
           />
         </div>
         <div>
           <label class="form-label" for="user-form-password">
-            {{ isEdit ? '密码（留空则不修改）' : '密码' }}<span v-if="!isEdit" class="text-danger"> *</span>
+            {{ tr(isEdit ? '密码（留空则不修改）' : '密码') }}<span v-if="!isEdit" class="text-danger"> *</span>
           </label>
           <input
             id="user-form-password"
@@ -317,19 +317,19 @@ async function confirmDelete() {
             class="input"
             type="password"
             maxlength="32"
-            placeholder="6–32 位"
+            :placeholder="tr('6–32 位')"
             autocomplete="new-password"
           />
         </div>
         <div>
-          <label class="form-label" for="user-form-status">状态</label>
+          <label class="form-label" for="user-form-status">{{ tr('状态') }}</label>
           <select id="user-form-status" v-model="form.status" class="select">
-            <option value="0">已启用</option>
-            <option value="1">已停用</option>
+            <option value="0">{{ tr('已启用') }}</option>
+            <option value="1">{{ tr('已停用') }}</option>
           </select>
         </div>
         <div>
-          <label class="form-label">角色</label>
+          <label class="form-label">{{ tr('角色') }}</label>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="r in roleOptions"
@@ -344,14 +344,14 @@ async function confirmDelete() {
             >
               {{ r.label }}
             </button>
-            <span v-if="roleOptions.length === 0" class="text-xs text-ink-faint">暂无可选角色</span>
+            <span v-if="roleOptions.length === 0" class="text-xs text-ink-faint">{{ tr('暂无可选角色') }}</span>
           </div>
         </div>
       </div>
       <template #footer>
-        <button class="btn-ghost" @click="formOpen = false">取消</button>
+        <button class="btn-ghost" @click="formOpen = false">{{ tr('取消') }}</button>
         <button class="btn-primary" :disabled="saving" @click="saveForm">
-          {{ saving ? '保存中…' : '保存' }}
+          {{ tr(saving ? '保存中…' : '保存') }}
         </button>
       </template>
     </BaseModal>
@@ -359,8 +359,8 @@ async function confirmDelete() {
     <!-- 删除确认 -->
     <ConfirmModal
       :open="!!deleteTarget"
-      title="删除用户"
-      :message="`确定要删除用户「${deleteTarget?.userName}」吗？该操作不可恢复。`"
+      :title="tr('删除用户')"
+      :message="tr('确定要删除用户「{name}」吗？该操作不可恢复。', { name: deleteTarget?.userName ?? '' })"
       :loading="deleting"
       danger
       @close="deleteTarget = null"

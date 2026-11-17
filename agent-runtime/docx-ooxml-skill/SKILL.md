@@ -3,7 +3,7 @@ name: docx-ooxml-author
 description: Generate and revise editable DOCX files from a template when one exists, using cloned sections, named styles and content controls. A blank package is only the fallback. Section transactions, document plans, local repairs and main-Agent visual review of real LibreOffice page renders.
 compatibility: Python 3.10+, lxml, Pillow, PyMuPDF, LibreOffice. Runs through execute; no separate Agent or MCP server required.
 metadata:
-  version: "0.6.0"
+  version: "0.6.1"
   maintainer: "local"
 ---
 
@@ -19,22 +19,31 @@ This skill does not register a new Agent tool. Run `scripts/office_docx.py` thro
 - Intermediate material goes in `tmp/`: operation requests, scripts, figures and chart images (`tmp/assets/fig1.png`), downloaded sources and your own renders. Inserted images are embedded in the document, so their source files stay in `tmp/`. Only an image the user uploaded is inserted from `files/`, with `--asset-root files` for that operation.
 - Uploaded files are in `files/`, so an uploaded template is `files/<template>.docx`.
 
+## When to create the document (hard rule)
+
+Create `files/<name>.docx` only when you are about to write the first real content. Until then, do the preparation with no deliverable: read sources, choose a template or style, and write `tmp/document-plan.json` then `validate-plan`. `init` is the start of writing, not a setup step. In that same stretch of work, `init`, `save-plan`, and the first `apply-section` (or the first real `apply-one`) run back to back. Do not call `init` and then research, plan, or wait while a blank document sits in `files/`. Every file under `files/` is shown to the user immediately; an empty package is not a placeholder. Editing a document the user already uploaded is not this case — that file already exists.
+
 Prefer a template's sections, paragraphs, named styles, content controls and tables. Author a WordprocessingML fragment only when the template has no suitable block and the atomic operations cannot express the change. Do not claim a page was checked unless you inspected its LibreOffice render.
 
 ## Workflow (default for multi-section documents)
 
 1. Select an uploaded template first. With no template, run `list-styles` and
-   `inspect-style academic` (also consulting, technical, business), then use
-   `init --document-id report --output files/report.docx --design academic`.
-   An explicit Design MD path is accepted; its `docx-design` JSON block maps to
-   named Word paragraph/table styles and page dimensions. `--template` takes
-   precedence and leaves all template styles intact, even if `--design` is present.
-2. Write `tmp/document-plan.json`, validate it with `validate-plan`, then persist
-   it using `save-plan files/report.docx tmp/plan-request.json`. The plan contains
-   section requirements, stable block IDs, equations/figures/tables, references
-   and styles. Page count is a soft target; never manufacture fixed pages.
-3. Submit each section with `apply-section files/report.docx tmp/section.json
-   --asset-root tmp`. It uses the existing atomic operations in memory, commits
+   `inspect-style academic` (also consulting, technical, business). An explicit
+   Design MD path is accepted; its `docx-design` JSON block maps to named Word
+   paragraph/table styles and page dimensions. Do not create the file yet.
+2. Write `tmp/document-plan.json` and validate it with `validate-plan`. The plan
+   contains section requirements, stable block IDs, equations/figures/tables,
+   references and styles. Page count is a soft target; never manufacture fixed
+   pages. Do not create the file yet. `save-plan` needs the document, so it waits
+   until the next step.
+3. When the first section is ready to write, create the document and start
+   writing immediately:
+   `init --document-id report --output files/report.docx --design academic`
+   (or `--template files/input.docx`; `--template` takes precedence and leaves
+   all template styles intact, even if `--design` is present), then
+   `save-plan files/report.docx tmp/plan-request.json`, then
+   `apply-section files/report.docx tmp/section.json --asset-root tmp`.
+   `apply-section` uses the existing atomic operations in memory, commits
    once and checkpoints the entire reflow once. Read `status` after each call.
    Validation/mutation failure rolls the entire transaction back. A render
    failure after a successful commit leaves that revision recoverable, reports

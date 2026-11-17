@@ -1388,6 +1388,7 @@ class AgentRunner:
         metrics_thread_id = self.thread_id
 
         def record_model_metrics(metrics: dict[str, Any]) -> None:
+            metrics = {"model_id": self.current_model().id, **metrics}
             if self.session_store is not None:
                 self.session_store.append_model_metrics(metrics_thread_id, metrics)
             _emit(event_handler, RunEvent(type="model_metrics", result=metrics))

@@ -14,7 +14,9 @@ import org.example.backend.common.exception.BusinessException;
 import org.example.backend.common.result.AjaxResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,10 +26,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -57,6 +61,16 @@ public class AuthController {
     @Value("${cert.login.trusted-proxies:127.0.0.1,::1}")
     private String trustedProxiesCsv;
 
+    /** GET /login/cert 过渡页；表单 action 用 {{ACTION}} 占位 */
+    private String certLoginHandoffHtml;
+
+    @PostConstruct
+    void loadCertLoginHandoffPage() throws IOException {
+        try (InputStream in = new ClassPathResource("templates/cert-login-handoff.html").getInputStream()) {
+            certLoginHandoffHtml = StreamUtils.copyToString(in, StandardCharsets.UTF_8);
+        }
+    }
+
     @Log(title = "认证", businessType = BusinessType.OTHER, operatorType = OperatorType.OTHER,
             excludeParamNames = {"passWord"})
     @PostMapping("/login")
@@ -76,12 +90,19 @@ public class AuthController {
             action += "&origin=" + URLEncoder.encode(origin, StandardCharsets.UTF_8.name());
         }
         response.setContentType("text/html;charset=UTF-8");
-        response.getWriter().write(
-                "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>证书登录</title></head><body>"
-                        + "<p>正在建立 mTLS 连接并提交证书登录…</p>"
-                        + "<form id=\"f\" method=\"POST\" action=\"" + action + "\"></form>"
-                        + "<script>document.getElementById('f').submit();</script>"
-                        + "</body></html>");
+        response.setHeader("Cache-Control", "no-store");
+        response.getWriter().write(certLoginHandoffHtml.replace("{{ACTION}}", htmlAttr(action)));
+    }
+
+    private static String htmlAttr(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace("'", "&#39;");
     }
 
     @Log(title = "认证", businessType = BusinessType.OTHER, operatorType = OperatorType.OTHER)

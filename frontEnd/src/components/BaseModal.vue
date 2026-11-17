@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tr } from '@/composables/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 
@@ -39,6 +40,8 @@ function focusable(): HTMLElement[] {
 function onKeydown(event: KeyboardEvent) {
   if (!props.open) return
   if (event.key === 'Escape') {
+    // Let the native picker consume Escape before closing its containing dialog.
+    if (CSS.supports('selector(select:open)') && panel.value?.querySelector('select:open')) return
     event.preventDefault()
     emit('close')
     return
@@ -53,6 +56,12 @@ function onKeydown(event: KeyboardEvent) {
   const first = items[0]!
   const last = items[items.length - 1]!
   const active = document.activeElement as HTMLElement | null
+  // A step change can remove the focused element; keep the next Tab in the modal.
+  if (!panel.value?.contains(active)) {
+    event.preventDefault()
+    ;(event.shiftKey ? last : first).focus()
+    return
+  }
   if (event.shiftKey && (active === first || !panel.value?.contains(active))) {
     event.preventDefault()
     last.focus()
@@ -117,7 +126,7 @@ onBeforeUnmount(() => {
               <h3 :id="titleId" class="modal-title">{{ title }}</h3>
               <span class="tri-bar modal-tri" aria-hidden="true"></span>
             </div>
-            <button type="button" class="modal-close" aria-label="关闭" @click="emit('close')">
+            <button type="button" class="modal-close" :aria-label="tr('关闭')" @click="emit('close')">
               <AppIcon name="close" class="!text-[17px]" />
             </button>
           </div>
@@ -206,7 +215,7 @@ onBeforeUnmount(() => {
   background-color: var(--glass);
 }
 
-@media (pointer: coarse) {
+@media (max-width: 767px) {
   .modal-close {
     height: 2.75rem;
     width: 2.75rem;

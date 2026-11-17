@@ -25,6 +25,10 @@ function glassTooltip(p: ReturnType<typeof telemetryPalette>) {
   // ECharts 浮层不吃极低透明度 glass；黑夜用近实色 panel，保证文字对比度
   const dark = document.documentElement.dataset.theme === 'dark'
   return {
+    confine: true,
+    hideDelay: 0,
+    transitionDuration: 0,
+    alwaysShowContent: false,
     backgroundColor: dark ? 'rgba(36, 35, 32, 0.94)' : 'rgba(251, 247, 238, 0.94)',
     borderColor: dark ? 'rgba(245, 237, 220, 0.18)' : 'rgba(24, 24, 24, 0.12)',
     borderWidth: 1,
@@ -82,102 +86,125 @@ export function dailyUsageOption(
   const axis = axisCommon(p)
 
   return {
-    animationDuration: 900,
-    animationEasing: 'cubicOut',
-    color: [p.mint, p.signal],
-    legend: {
-      bottom: 0,
-      left: 'center',
-      itemWidth: 10,
-      itemHeight: 6,
-      itemGap: 18,
-      icon: 'rect',
-      textStyle: { color: p.muted, fontFamily: p.mono, fontSize: 10 },
-      data: ['TOKENS', 'COST ¥'],
-    },
-    tooltip: {
-      ...tip,
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross',
-        crossStyle: { color: p.faint, width: 1, opacity: 0.55 },
-        lineStyle: { color: p.faint, width: 1, type: 'dashed', opacity: 0.5 },
+    baseOption: {
+      animationDuration: 900,
+      animationEasing: 'cubicOut',
+      color: [p.mint, p.signal],
+      legend: {
+        bottom: 0,
+        left: 'center',
+        itemWidth: 10,
+        itemHeight: 6,
+        itemGap: 18,
+        icon: 'rect',
+        textStyle: { color: p.muted, fontFamily: p.mono, fontSize: 10 },
+        data: ['TOKENS', 'COST ¥'],
       },
-      formatter(params: unknown) {
-        const items = Array.isArray(params) ? params : [params]
-        const first = items[0] as { axisValue?: string; dataIndex?: number }
-        const idx = first.dataIndex ?? 0
-        const row = daily[idx]
-        if (!row) return ''
-        return [
-          `<div style="opacity:.7;letter-spacing:.12em;margin-bottom:6px">DAY-${row.date}</div>`,
-          `IN  ${row.input_tokens.toLocaleString()} tok`,
-          `OUT ${row.output_tokens.toLocaleString()} tok`,
-          `Σ   ${row.total_tokens.toLocaleString()} tok`,
-          `¥   ${row.cost_cny.toFixed(4)}`,
-        ].join('<br/>')
-      },
-    },
-    grid: { left: 52, right: 52, top: 28, bottom: 48 },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: cats,
-      ...axis,
-      splitLine: { show: false },
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: 'tok',
-        nameTextStyle: { color: p.faint, fontFamily: p.mono, fontSize: 10, align: 'right', padding: [0, 6, 0, 0] },
-        ...axis,
-        splitNumber: 4,
-        axisLabel: {
-          ...axis.axisLabel,
-          formatter: (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)),
+      tooltip: {
+        ...tip,
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross',
+          crossStyle: { color: p.faint, width: 1, opacity: 0.55 },
+          lineStyle: { color: p.faint, width: 1, type: 'dashed', opacity: 0.5 },
+        },
+        formatter(params: unknown) {
+          const items = Array.isArray(params) ? params : [params]
+          const first = items[0] as { axisValue?: string; dataIndex?: number }
+          const idx = first.dataIndex ?? 0
+          const row = daily[idx]
+          if (!row) return ''
+          return [
+            `<div style="opacity:.7;letter-spacing:.12em;margin-bottom:6px">DAY-${row.date}</div>`,
+            `IN  ${row.input_tokens.toLocaleString()} tok`,
+            `OUT ${row.output_tokens.toLocaleString()} tok`,
+            `Σ   ${row.total_tokens.toLocaleString()} tok`,
+            `¥   ${row.cost_cny.toFixed(4)}`,
+          ].join('<br/>')
         },
       },
-      {
-        type: 'value',
-        name: '¥',
-        nameTextStyle: { color: p.faint, fontFamily: p.mono, fontSize: 10, align: 'left', padding: [0, 0, 0, 6] },
+      grid: { left: 44, right: 40, top: 28, bottom: 48 },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: cats,
         ...axis,
         splitLine: { show: false },
-        splitNumber: 4,
-        axisLabel: {
-          ...axis.axisLabel,
-          formatter: (v: number) => (v >= 1 ? v.toFixed(1) : v.toFixed(3)),
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: 'tok',
+          nameTextStyle: { color: p.faint, fontFamily: p.mono, fontSize: 10, align: 'right', padding: [0, 6, 0, 0] },
+          ...axis,
+          splitNumber: 4,
+          axisLabel: {
+            ...axis.axisLabel,
+            formatter: (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)),
+          },
+        },
+        {
+          type: 'value',
+          name: '¥',
+          nameTextStyle: { color: p.faint, fontFamily: p.mono, fontSize: 10, align: 'left', padding: [0, 0, 0, 6] },
+          ...axis,
+          splitLine: { show: false },
+          splitNumber: 4,
+          axisLabel: {
+            ...axis.axisLabel,
+            formatter: (v: number) => (v >= 1 ? v.toFixed(1) : v.toFixed(3)),
+          },
+        },
+      ],
+      series: [
+        {
+          name: 'TOKENS',
+          type: 'line',
+          yAxisIndex: 0,
+          data: tokens,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 5,
+          itemStyle: { color: p.mint, borderColor: p.mint, borderWidth: 1 },
+          lineStyle: { width: 1.75, color: p.mint, shadowBlur: 0 },
+          areaStyle: { color: 'transparent' },
+          emphasis: { scale: false, itemStyle: { color: p.page, borderColor: p.mint, borderWidth: 1.5 } },
+          animationDuration: 1100,
+        },
+        {
+          name: 'COST ¥',
+          type: 'line',
+          yAxisIndex: 1,
+          data: costs,
+          showSymbol: true,
+          symbol: 'emptyCircle',
+          symbolSize: 6,
+          itemStyle: { color: p.signal, borderColor: p.signal, borderWidth: 1.25 },
+          lineStyle: { width: 1.75, color: p.signal, type: 'solid', shadowBlur: 0 },
+          emphasis: { scale: false, itemStyle: { color: p.page, borderColor: p.signal, borderWidth: 1.5 } },
+          animationDuration: 1300,
+        },
+      ],
+    },
+    media: [
+      {
+        query: { maxWidth: 480 },
+        option: {
+          grid: { left: 34, right: 10 },
+          yAxis: [
+            { axisLabel: { inside: false, margin: 6 } },
+            { axisLabel: { inside: true, margin: 6 }, nameTextStyle: { align: 'right', padding: 0 } },
+          ],
         },
       },
-    ],
-    series: [
       {
-        name: 'TOKENS',
-        type: 'line',
-        yAxisIndex: 0,
-        data: tokens,
-        showSymbol: true,
-        symbol: 'circle',
-        symbolSize: 5,
-        itemStyle: { color: p.mint, borderColor: p.mint, borderWidth: 1 },
-        lineStyle: { width: 1.75, color: p.mint, shadowBlur: 0 },
-        areaStyle: { color: 'transparent' },
-        emphasis: { scale: false, itemStyle: { color: p.page, borderColor: p.mint, borderWidth: 1.5 } },
-        animationDuration: 1100,
-      },
-      {
-        name: 'COST ¥',
-        type: 'line',
-        yAxisIndex: 1,
-        data: costs,
-        showSymbol: true,
-        symbol: 'emptyCircle',
-        symbolSize: 6,
-        itemStyle: { color: p.signal, borderColor: p.signal, borderWidth: 1.25 },
-        lineStyle: { width: 1.75, color: p.signal, type: 'solid', shadowBlur: 0 },
-        emphasis: { scale: false, itemStyle: { color: p.page, borderColor: p.signal, borderWidth: 1.5 } },
-        animationDuration: 1300,
+        option: {
+          grid: { left: 44, right: 40 },
+          yAxis: [
+            { axisLabel: { inside: false, margin: 10 } },
+            { axisLabel: { inside: false, margin: 10 }, nameTextStyle: { align: 'left', padding: [0, 0, 0, 6] } },
+          ],
+        },
       },
     ],
   }

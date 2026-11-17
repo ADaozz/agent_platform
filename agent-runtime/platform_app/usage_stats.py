@@ -4,8 +4,8 @@ Usage events stream intermediate counts and may duplicate a completed call; mode
 is emitted once per generation. Cache-hit counts are taken from the paired usage event
 immediately before each metrics snapshot.
 
-DeepSeek Flash costs follow https://api-docs.deepseek.com/zh-cn/quick_start/pricing
-(cache hit/miss × peak/off-peak). Estimates are not provider invoices.
+Preset-model cost estimates (CNY / 1M tokens). DeepSeek uses peak/off-peak;
+Qwen/GLM use flat rates (peak == off_peak). Estimates are not provider invoices.
 """
 from __future__ import annotations
 
@@ -20,9 +20,16 @@ from . import itam_bridge
 
 _BJ = ZoneInfo('Asia/Shanghai')
 
-# 元 / 百万 tokens — DeepSeek 官方刊例（deepseek-flash / deepseek-v4-pro）
-# 空闲 = 高峰一半；高峰：北京时间周一至周五 9–12、14–18（不含法定节假日）
-_DEEPSEEK_RATES: dict[str, dict[str, dict[str, float]]] = {
+
+def _flat(cache_hit: float, cache_miss: float, output: float) -> dict[str, dict[str, float]]:
+    band = {'cache_hit': cache_hit, 'cache_miss': cache_miss, 'output': output}
+    return {'off_peak': dict(band), 'peak': dict(band)}
+
+
+# 元 / 百万 tokens — 仅收录设置页官方预设模型
+# DeepSeek：空闲 = 高峰一半；高峰北京时间周一至周五 9–12、14–18（不含法定节假日）
+# Qwen / GLM：无峰谷，peak 与 off_peak 相同
+_MODEL_RATES: dict[str, dict[str, dict[str, float]]] = {
     'deepseek-flash': {
         'off_peak': {'cache_hit': 0.02, 'cache_miss': 1.0, 'output': 4.0},
         'peak': {'cache_hit': 0.04, 'cache_miss': 2.0, 'output': 8.0},
@@ -31,9 +38,18 @@ _DEEPSEEK_RATES: dict[str, dict[str, dict[str, float]]] = {
         'off_peak': {'cache_hit': 0.15, 'cache_miss': 4.5, 'output': 13.5},
         'peak': {'cache_hit': 0.30, 'cache_miss': 9.0, 'output': 27.0},
     },
+    # 百炼：qwen3.8-flash / qwen3.7-plus(≤256K) / qwen4-max；隐式缓存命中价取官方或输入×20%
+    'qwen3.8-flash': _flat(0.16, 0.8, 2.7),
+    'qwen3.7-plus': _flat(0.4, 2.0, 8.0),
+    'qwen4-max': _flat(0.5, 10.0, 30.0),
+    # 智谱：官方刊例；flashx-legal 与 flashx 同价
+    'glm-5.3': _flat(2.0, 8.0, 28.0),
+    'glm-5.3-flash': _flat(0.23, 0.8, 2.8),
+    'glm-5.3-flashx': _flat(0.57, 2.0, 7.0),
+    'glm-5.3-flashx-legal': _flat(0.57, 2.0, 7.0),
 }
 
-# 未知模型兜底：按 Flash 空闲未命中 / 输出估算
+# 未知模型兜底：按 DeepSeek Flash 空闲未命中 / 输出估算
 _DEFAULT_RATES = {'cache_hit': 1.0, 'cache_miss': 1.0, 'output': 4.0}
 
 # 中国法定节假日（放假日）；未收录年份仅按工作日峰谷估算
@@ -85,18 +101,38 @@ def is_peak(occurred_at: str | None) -> bool:
 
 
 def _model_key(model: str | None) -> str:
-    key = (model or '').casefold()
-    if 'v4-pro' in key or 'v4_pro' in key or key.endswith('/deepseek-v4-pro'):
-        return 'deepseek-v4-pro'
-    if 'flash' in key or 'deepseek' in key:
-        # 旧名 deepseek-v4-flash 等按官方说明走 Flash 价
+    """Match preset model ids by exact leaf name; avoid broad substring false positives."""
+    raw = (model or '').casefold().strip()
+    if not raw:
+        return 'default'
+    leaf = raw.rsplit('/', 1)[-1]
+    if leaf in _MODEL_RATES:
+        return leaf
+    # DeepSeek 旧名仍按官方说明走 Flash
+    if leaf in {'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp'}:
         return 'deepseek-flash'
     return 'default'
 
 
+def _usage_identity(model: str | None) -> tuple[str, str]:
+    """Use recorded source ids; identify legacy bare preset names without session guesses."""
+    raw = (model or '').strip().casefold()
+    source, _, leaf = raw.rpartition('/')
+    leaf = leaf or 'unknown'
+    canonical = _model_key(leaf)
+    name = canonical if canonical != 'default' else leaf
+    if source:
+        return source.removeprefix('my-'), name
+    # Qwen's versioned model ids are qwen3.x/qwen4, without a separating dash.
+    if name.startswith('qwen') and name[4:5].isdigit():
+        return 'qwen', name
+    provider = next((provider for provider in ('deepseek', 'qwen', 'glm') if name.startswith(provider + '-')), 'other')
+    return provider, name
+
+
 def _rates_for(model: str | None, *, peak: bool) -> dict[str, float]:
     key = _model_key(model)
-    table = _DEEPSEEK_RATES.get(key)
+    table = _MODEL_RATES.get(key)
     if not table:
         return dict(_DEFAULT_RATES)
     return dict(table['peak' if peak else 'off_peak'])
@@ -163,10 +199,13 @@ def _generation_calls(owned: set[str], since: datetime) -> list[dict[str, Any]]:
             ('event', since_iso),
         ).fetchall()
 
+    return _calls_from_events((json.loads(raw) for (raw,) in rows), owned)
+
+
+def _calls_from_events(events, owned: set[str]) -> list[dict[str, Any]]:
     last_usage: dict[str, dict[str, Any]] = {}
     calls: list[dict[str, Any]] = []
-    for (raw,) in rows:
-        event = json.loads(raw)
+    for event in events:
         sid = event.get('session_id')
         if sid not in owned:
             continue
@@ -191,13 +230,75 @@ def _generation_calls(owned: set[str], since: datetime) -> list[dict[str, Any]]:
         calls.append({
             'session_id': sid,
             'occurred_at': event.get('occurred_at'),
-            'model': str(result.get('model') or '') or None,
+            'model': str(result.get('model_id') or result.get('model') or '') or None,
             'input_tokens': inn,
             'output_tokens': _count(result.get('output_tokens')),
             'cache_read_input_tokens': _count(cache) if cache is not None else 0,
             'peak': is_peak(event.get('occurred_at')),
         })
     return calls
+
+
+# Session cards poll frequently; only re-read the small event projection when
+# a session journal or status changes. No messages, credentials or files are read.
+_SESSION_TOTALS: dict[tuple[str, str], tuple[tuple, dict[str, Any]]] = {}
+
+
+def session_summaries(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for record in records:
+        sid = record['id']
+        key = (str(d.DATA.resolve()), sid)
+        revision = (record.get('event_seq'), record.get('status'), record.get('updated_at'))
+        cached = _SESSION_TOTALS.get(key)
+        if cached and cached[0] == revision:
+            record.update(cached[1])
+            continue
+        prefix = sid + ':'
+        with d.db() as connection:
+            rows = connection.execute(
+                "SELECT json_object('session_id',json_extract(data,'$.session_id'),"
+                "'type',json_extract(data,'$.type'),'occurred_at',json_extract(data,'$.occurred_at'),"
+                "'status',json_extract(data,'$.status'),'result',json(CASE WHEN "
+                "json_extract(data,'$.type') IN ('usage','model_metrics') THEN "
+                "coalesce(json_extract(data,'$.result'),'{}') ELSE '{}' END)) "
+                "FROM records WHERE kind=? AND id>? AND id<? AND json_extract(data,'$.type') "
+                "IN ('usage','model_metrics','status','result','error','compacted') ORDER BY id",
+                ('event', prefix, prefix + '~'),
+            ).fetchall()
+        events = [json.loads(row[0]) for row in rows]
+        calls = _calls_from_events(events, {sid})
+        cost = sum(cost_cny(call['model'], call['input_tokens'], call['output_tokens'],
+                            cache_read_input_tokens=call['cache_read_input_tokens'],
+                            occurred_at=call['occurred_at']) for call in calls)
+        duration = 0.0
+        started = None
+        last_at = None
+        has_run = False
+        for event in events:
+            at = _parse_occurred(event.get('occurred_at'))
+            if at is None:
+                continue
+            last_at = at
+            if event['type'] == 'status' and event.get('status') == 'running':
+                if started is None:
+                    started = at
+                has_run = True
+            elif event['type'] in ('result', 'error', 'compacted') or event['type'] == 'status':
+                if started is not None:
+                    duration += max(0, (at - started).total_seconds() * 1000)
+                    started = None
+        running_since = started if record.get('status') == 'running' else None
+        if started is not None and running_since is None and last_at is not None:
+            duration += max(0, (last_at - started).total_seconds() * 1000)
+        unstarted = record.get('status') in ('idle', 'queued') and not has_run
+        value = {
+            'task_duration_ms': round(duration) if has_run or unstarted else None,
+            'task_running_since': running_since.isoformat() if running_since else None,
+            'task_cost_cny': cost if calls else (0.0 if unstarted else None),
+        }
+        _SESSION_TOTALS[key] = (revision, value)
+        record.update(value)
+    return records
 
 
 def _empty_bucket() -> dict[str, Any]:
@@ -213,7 +314,7 @@ def _empty_bucket() -> dict[str, Any]:
     }
 
 
-def overview(*, days: int = 30) -> dict[str, Any]:
+def overview(*, days: int = 30, provider: str = '', model: str = '') -> dict[str, Any]:
     window = max(1, min(int(days or 30), 366))
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=window - 1)
@@ -221,6 +322,18 @@ def overview(*, days: int = 30) -> dict[str, Any]:
 
     sessions = _owned_sessions()
     calls = _generation_calls(set(sessions), since)
+
+    # Options come only from preset prices and this owner's calls in the time window.
+    choices = {_usage_identity(name) for name in _MODEL_RATES}
+    choices.update(_usage_identity(call['model']) for call in calls)
+    selected_provider, selected_model = provider.strip().casefold(), model.strip().casefold()
+    if selected_provider or selected_model:
+        calls = [call for call in calls if
+                 (not selected_provider or _usage_identity(call['model'])[0] == selected_provider)
+                 and (not selected_model or _usage_identity(call['model'])[1] == selected_model)]
+    priced_models = {name for source, name in choices
+                     if (not selected_provider or source == selected_provider)
+                     and (not selected_model or name == selected_model)}
 
     by_day: dict[str, dict[str, Any]] = defaultdict(_empty_bucket)
     by_session: dict[str, dict[str, Any]] = defaultdict(
@@ -287,7 +400,7 @@ def overview(*, days: int = 30) -> dict[str, Any]:
         session_rows.append({
             'session_id': sid,
             'title': _session_title(record),
-            'model_id': record.get('model_id') or row.get('model'),
+            'model_id': row.get('model') or record.get('model_id'),
             'input_tokens': row['input_tokens'],
             'output_tokens': row['output_tokens'],
             'cache_read_input_tokens': row['cache_read_input_tokens'],
@@ -315,21 +428,25 @@ def overview(*, days: int = 30) -> dict[str, Any]:
 
     return {
         'days': window,
+        'filters': {
+            'providers': sorted({source for source, _ in choices}),
+            'models': [{'provider': source, 'id': name} for source, name in sorted(choices)],
+        },
         'currency': 'CNY',
-        'cost_note': '按 DeepSeek 官方刊例估算（缓存命中×峰谷），非账单',
+        'cost_note': '按官方预设模型刊例估算（DeepSeek 含峰谷；Qwen/GLM 统一价），非账单',
         'pricing_source': 'https://api-docs.deepseek.com/zh-cn/quick_start/pricing',
         'rates_cny_per_m': {
             model: {
                 'off_peak': table['off_peak'],
                 'peak': table['peak'],
             }
-            for model, table in _DEEPSEEK_RATES.items()
+            for model, table in _MODEL_RATES.items() if model in priced_models
         },
         'peak_windows': {
             'timezone': 'Asia/Shanghai',
             'weekdays': 'Mon–Fri',
             'hours': ['09:00–12:00', '14:00–18:00'],
-            'note': '周末与中国法定节假日全天空闲；空闲价为高峰一半',
+            'note': '仅 DeepSeek 区分峰谷：周末与中国法定节假日全天空闲；空闲价为高峰一半。Qwen/GLM 无峰谷。',
         },
         'totals': totals,
         'daily': daily,

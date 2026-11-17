@@ -6,6 +6,7 @@ import base64
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, ClassVar, Iterator
+from urllib.parse import urlparse
 
 import httpx
 import openai
@@ -29,6 +30,69 @@ from platform_app.agent_core.llm_stream import (
     current_stream_owner,
     in_stream_loop_thread,
 )
+
+_THINKING_OFF = frozenset({'none', 'disabled', 'off', 'false', '0'})
+
+
+def _provider_host(base_url: str) -> str:
+    try:
+        return (urlparse(base_url).hostname or '').casefold()
+    except Exception:
+        return ''
+
+
+def _thinking_enabled(effort: str | None) -> bool:
+    if effort is None:
+        return True
+    return effort.casefold() not in _THINKING_OFF
+
+
+def provider_chat_extras(base_url: str, reasoning_effort: str | None) -> dict[str, Any]:
+    """Map reasoning_effort onto DeepSeek / Qwen / GLM Chat Completions extras."""
+    host = _provider_host(base_url)
+    enabled = _thinking_enabled(reasoning_effort)
+    if host.endswith('deepseek.com'):
+        extras: dict[str, Any] = {}
+        if reasoning_effort is not None:
+            extras['reasoning_effort'] = reasoning_effort
+        if enabled:
+            extras['extra_body'] = {'thinking': {'type': 'enabled'}}
+        else:
+            extras['extra_body'] = {'thinking': {'type': 'disabled'}}
+        return extras
+    if 'dashscope' in host or host.endswith('aliyuncs.com'):
+        extras = {'extra_body': {'enable_thinking': enabled}}
+        # 百炼主要靠 enable_thinking；仍透传 effort 以便兼容 Responses 风格网关
+        if reasoning_effort is not None and enabled:
+            extras['reasoning_effort'] = reasoning_effort
+        return extras
+    if host.endswith('bigmodel.cn') or host.endswith('zhipuai.cn'):
+        extras = {
+            'extra_body': {'thinking': {'type': 'enabled' if enabled else 'disabled'}},
+        }
+        if reasoning_effort is not None:
+            extras['reasoning_effort'] = reasoning_effort
+        return extras
+    if reasoning_effort is not None:
+        return {'reasoning_effort': reasoning_effort}
+    return {}
+
+
+def _cache_read_from_usage(raw_usage: dict[str, Any]) -> int | None:
+    """Normalize provider cache-hit fields into a single token count."""
+    prompt_tokens = raw_usage.get('prompt_tokens')
+    if type(prompt_tokens) is not int or prompt_tokens < 0:
+        return None
+    details = raw_usage.get('prompt_tokens_details') or raw_usage.get('input_tokens_details') or {}
+    details = details if isinstance(details, dict) else {}
+    for item in (
+        raw_usage.get('prompt_cache_hit_tokens'),
+        details.get('cached_tokens'),
+        details.get('cache_read'),
+    ):
+        if type(item) is int and 0 <= item <= prompt_tokens:
+            return item
+    return None
 
 
 @dataclass
@@ -475,8 +539,8 @@ class ChatCompletionsChatOpenAI(ProtocolChatOpenAI):
         if isinstance(raw_usage, dict) and (type(raw_usage.get("prompt_tokens")) is not int or raw_usage["prompt_tokens"] < 0):
             generation.message.usage_metadata = None
         elif isinstance(raw_usage, dict) and generation.message.usage_metadata is not None:
-            cached = raw_usage.get('prompt_cache_hit_tokens')
-            if type(cached) is int and 0 <= cached <= raw_usage['prompt_tokens']:
+            cached = _cache_read_from_usage(raw_usage)
+            if cached is not None:
                 generation.message.usage_metadata.setdefault('input_token_details', {})['cache_read'] = cached
         choices = chunk.get("choices") or (chunk.get("chunk") or {}).get("choices") or []
         if choices:
@@ -549,7 +613,7 @@ def build_chat_model(
         adapter = ChatCompletionsChatOpenAI
         protocol_kwargs = {
             "use_responses_api": False, "stream_usage": True,
-            **({"reasoning_effort": reasoning_effort} if reasoning_effort is not None else {}),
+            **provider_chat_extras(profile.base_url, reasoning_effort),
         }
     else:
         raise ValueError(f"Unsupported model API: {profile.api}")

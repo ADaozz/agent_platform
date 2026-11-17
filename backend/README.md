@@ -103,8 +103,8 @@ backend/
 ### KingbaseES（默认）
 
 1. JDK 1.8+、Maven 3.6+、KingbaseES、Redis、`lib/` 下 4 个 Kingbase JAR  
-2. 按顺序执行 SQL（见下节；已有库需跑 `23-user-email.sql`、`24-register-user-role.sql`）  
-3. 复制 `application-local.example.yml` 为 `application-local.yml`（已被 git 忽略），填写数据源、`jwt.secret` / `jwt.api.secret`（≥32 字符），以及 `spring.mail.username` / `password`（注册发信；也可用 `MAIL_USERNAME`、`MAIL_PASSWORD`）  
+2. 按顺序执行 SQL（见下节；已有库需跑 `23-user-email.sql`、`24-register-user-role.sql`，下线旧模块再跑 `25-retire-legacy-modules.sql`）  
+3. 复制 `application-local.example.yml` 为 `application-local.yml`（已被 git 忽略），填写数据源、`jwt.secret`（≥32 字符），以及 `spring.mail.username` / `password`（注册发信；也可用 `MAIL_USERNAME`、`MAIL_PASSWORD`）  
 4. **Rebuild Project** 后运行 `BackendApplication`
 
 ### 本地 SQLite（无需 KingbaseES）
@@ -121,8 +121,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=sqlite,dev
 
 | 用户 | 密码 | 说明 |
 |------|------|------|
-| admin | 123456 | 用户管理、仪表盘 all、资产 owner 虚机 |
-| user | 123456 | 资产 list、登录设备 list/kick、dashboard mine；**无** `system:user:*` |
+| admin | 123456 | 用户 / 角色 / 登录设备 / 证书管理全权限 |
+| user | 123456 | 登录设备 list/kick、我的证书；**无** `system:user:*` / `system:role:*` |
 
 ```bash
 curl --noproxy '*' -X POST http://172.21.16.1:8080/login \
@@ -141,28 +141,24 @@ curl --noproxy '*' -X POST http://172.21.16.1:8080/login \
 ```text
 01-create-tables.sql
 02-insert-data.sql
-04-asset-tables.sql
-05-insert-asset-data.sql      # 可选样例
-06-asset-permissions.sql      # 已有库增量
-07-scaffold-tables.sql
-10-api-token-ak-sk.sql       # 已有库启用 AK/SK Token 的增量脚本
-11-api-token-permissions.sql # 已有库补充 API Token 管理权限
-12-role-crud-permissions.sql # 已有库补充角色 CRUD 权限
-08-dashboard-permissions.sql  # 已有库增量
-09-fix-user-role-permissions.sql  # user 角色被误加 system:user:* 时执行
+12-role-crud-permissions.sql      # 已有库补充角色 CRUD 权限
+09-fix-user-role-permissions.sql # user 角色被误加 system:user:* 时执行
 21-login-session.sql              # 登录设备会话表与权限（已有库增量）
 23-user-email.sql                 # sys_user.email + 唯一索引（自助注册）
 24-register-user-role.sql         # 普通用户证书/设备权限与缺角色补齐
-03-verify.sql                 # 可选
+25-retire-legacy-modules.sql      # 下线仪表盘/资产/定时任务/API Token
+03-verify.sql                     # 可选
 ```
 
-本地 SQLite 不跑上述 Kingbase 脚本，改用 `sql/sqlite/schema.sql` / `data.sql`（已含 email 等字段）。
+历史增量脚本（`04`–`11`、`13`–`20` 等资产 / 仪表盘 / Job / Token）已由 `25` 退役，新环境不必再执行。
+
+本地 SQLite 不跑上述 Kingbase 脚本，改用 `sql/sqlite/schema.sql` / `data.sql`（已含 email 等字段；启动时会清理遗留权限）。
 
 ### 角色权限（seed）
 
 ```text
-admin: system:user:*, system:role:*, api:token:*, system:session:*, asset:*, dashboard:view:all
-user:  asset:vm:list, asset:vm:edit, asset:app:list, asset:app:edit, system:session:list/kick
+admin: system:user:*, system:role:*, system:session:*, system:cert:*
+user:  system:session:list/kick, system:cert:mine
 ```
 
 ---
@@ -174,47 +170,22 @@ user:  asset:vm:list, asset:vm:edit, asset:app:list, asset:app:edit, system:sess
 - **自助注册：** 邮箱验证码存 Redis（默认 5 分钟有效、60 秒重发、最多 5 次错误）；成功后绑定配置项 `register.default-role`（默认「普通用户」）
 - `POST /logout` 从 JWT 取 `jti`，删除 Redis 会话并将 DB 历史标为下线；`DELETE /system/session/{sessionId}` 使用同一吊销逻辑踢出设备
 - **单点登录：** 新登录自动吊销该用户全部旧会话（`createSingleLoginSession`）
-- **用户停用 / 删除：** `SysUserServiceImpl` 发布 `UserStatusChangedEvent`；Session、ApiToken、Cert、AuthCache 四个 Listener 在事务提交后级联吊销凭证（详见 [docs/SKELETON.md](./docs/SKELETON.md) §8.8）
+- **用户停用 / 删除：** `SysUserServiceImpl` 发布 `UserStatusChangedEvent`；Session、Cert、AuthCache Listener 在事务提交后级联吊销凭证（详见 [docs/SKELETON.md](./docs/SKELETON.md) §8.8）
 - 无 permission → HTTP **403**，`msg: 无权限访问`
 - 未登录 → HTTP **401**
 - **角色分配：** 勾选某模块的 `add` / `edit` / `delete` 时，后端自动补全同模块 `list`，保证菜单与列表 API 可用（详见 [docs/API.md](./docs/API.md) §4.2）
-- 外部业务查询也支持 AK/SK：
-  `X-Access-Key` + `X-Secret-Key`
-- AK/SK 仅允许 GET `/asset/vm`、`/asset/app`，并且 Token 必须授权对应
-  `asset`（`vm` 或 `app`）；写操作仍必须使用登录 JWT
 
 | 场景 | 规则 |
 |------|------|
 | `/user/info` | 任意登录用户 |
 | `/system/user/**` | 需 `system:user:*` |
-| GET `/asset/vm`、`/asset/app` | 登录即可，看全部 |
-| PUT `/asset/vm`、`/asset/app` | 登录 + 必须为虚机 **owner** |
-| GET `/dashboard?scope=mine` | 登录即可 |
-| GET `/dashboard?scope=all` | 需 `dashboard:view:all` |
+| `/system/role/**`、`/system/menu/permTree` | 需 `system:role:*`（树接口另校验 admin） |
+| `/system/session/**` | 需 `system:session:*` |
+| `/system/cert/mine/**` | 需 `system:cert:mine` |
+| `/system/cert/**` | 需 `system:cert:list/approve/revoke` |
+| `/agent-runtime/**` | 登录即可（JWT / Cookie） |
 
 **OptionVO：** 系统表返回 `{ id, label }`，入参传 id。详见 [docs/API.md](./docs/API.md)。
-
-### AK/SK 开放接口
-
-创建 API Token 后，外部系统使用响应中的 `accessKey` 和 `secretKey` 查询已授权业务资源：
-
-```http
-X-Access-Key: ak-xxxxxxxx
-X-Secret-Key: eyJhbGciOiJIUzI1NiJ9...
-```
-
-当前仅支持只读查询：
-
-```bash
-curl --noproxy '*' \
-  -H "X-Access-Key: ak-xxxxxxxx" \
-  -H "X-Secret-Key: eyJhbGciOiJIUzI1NiJ9..." \
-  "http://172.21.16.1:8080/asset/vm?pageNum=1&pageSize=10"
-```
-
-Token 创建时通过 `asset` 绑定业务资源，目前支持 `vm` 和 `app`。AK/SK
-只能使用 GET，不能调用资产修改接口。完整字段和鉴权流程见
-[docs/API.md](./docs/API.md)。
 
 ---
 

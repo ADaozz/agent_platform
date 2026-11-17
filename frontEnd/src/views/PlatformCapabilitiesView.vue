@@ -93,7 +93,7 @@ onMounted(load)
 
 <template>
   <div class="mx-auto max-w-4xl space-y-4">
-    <PageHeader :title="tr('平台能力')" :desc="tr('Agent 当前挂载的工具与 Skill；调整仅影响新建的对话')">
+    <PageHeader :title="tr('平台能力')">
       <span v-if="data" class="cap-summary">
         {{ tr('工具') }} <b>{{ mountedCount.tools }}</b> · Skill <b>{{ mountedCount.skills }}</b>
       </span>

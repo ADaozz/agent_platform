@@ -13,6 +13,8 @@ import { vPopoverPlacement } from './popoverPlacement'
 import { conversationTimeline } from './conversation'
 import { sessionOutputFiles } from './outputFiles'
 import { fileType } from './fileTypes'
+import { relativeCreation, creationDate, taskDuration, taskCost } from './sessionCard'
+import { sortReasoningEfforts } from '@/utils/reasoningEfforts'
 
 const artifactPanelOpen = ref(false), artifactContext = ref(null), featurePanels = ref(null), featuresList = ref([])
 function feedbackContext() { return artifactContext.value }
@@ -36,6 +38,8 @@ const providerForm = ref({ provider: 'deepseek', model: 'deepseek-flash', base_u
 const humanValues = ref({}), decisions = ref({}), mainView = ref('agents')
 const draftPermission = ref('ask'), allowConfirmation = ref('')
 const reasoningModelId = ref('')
+const cardNow = ref(Date.now())
+let cardClock
 let source, poll, noticeTimer, flushTimer = 0, pendingEvents = [], seenSeqs = new Set()
 
 const profile = computed(() => profiles.value.find(p => p.id === modelId.value))
@@ -166,15 +170,21 @@ const busy = computed(() => ['queued', 'running'].includes(selected.value?.statu
 const waiting = computed(() => ['waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'].includes(selected.value?.status))
 const modelLabel = computed(() => profile.value?.model || t('Select model'))
 function modelRates(model, peak = false) {
-  const key = String(model || '')
+  const leaf = String(model || '').toLowerCase().split('/').pop() || ''
   const band = peak ? 'peak' : 'off'
-  if (/v4-pro/i.test(key)) {
-    return band === 'peak' ? { hit: 0.3, miss: 9.0, out: 27.0 } : { hit: 0.15, miss: 4.5, out: 13.5 }
+  const table = {
+    'deepseek-flash': { off: { hit: 0.02, miss: 1.0, out: 4.0 }, peak: { hit: 0.04, miss: 2.0, out: 8.0 } },
+    'deepseek-v4-pro': { off: { hit: 0.15, miss: 4.5, out: 13.5 }, peak: { hit: 0.3, miss: 9.0, out: 27.0 } },
+    'qwen3.8-flash': { off: { hit: 0.16, miss: 0.8, out: 2.7 }, peak: { hit: 0.16, miss: 0.8, out: 2.7 } },
+    'qwen3.7-plus': { off: { hit: 0.4, miss: 2.0, out: 8.0 }, peak: { hit: 0.4, miss: 2.0, out: 8.0 } },
+    'qwen4-max': { off: { hit: 0.5, miss: 10.0, out: 30.0 }, peak: { hit: 0.5, miss: 10.0, out: 30.0 } },
+    'glm-5.3': { off: { hit: 2.0, miss: 8.0, out: 28.0 }, peak: { hit: 2.0, miss: 8.0, out: 28.0 } },
+    'glm-5.3-flash': { off: { hit: 0.23, miss: 0.8, out: 2.8 }, peak: { hit: 0.23, miss: 0.8, out: 2.8 } },
+    'glm-5.3-flashx': { off: { hit: 0.57, miss: 2.0, out: 7.0 }, peak: { hit: 0.57, miss: 2.0, out: 7.0 } },
+    'glm-5.3-flashx-legal': { off: { hit: 0.57, miss: 2.0, out: 7.0 }, peak: { hit: 0.57, miss: 2.0, out: 7.0 } },
   }
-  if (/deepseek|flash/i.test(key)) {
-    return band === 'peak' ? { hit: 0.04, miss: 2.0, out: 8.0 } : { hit: 0.02, miss: 1.0, out: 4.0 }
-  }
-  return { hit: 1.0, miss: 1.0, out: 4.0 }
+  const key = leaf === 'deepseek-v4-flash' || leaf === 'deepseek-v4-flash-vision-exp' ? 'deepseek-flash' : leaf
+  return table[key]?.[band] || { hit: 1.0, miss: 1.0, out: 4.0 }
 }
 function isPeakBj(iso) {
   if (!iso) return false
@@ -669,8 +679,8 @@ watch(() => [mainView.value, selected.value?.id], ([view, id]) => {
 }, { immediate: true })
 // Created after an await, so it is not bound to this component and must be stopped explicitly.
 let stopCommands = null, unmounted = false
-onMounted(() => { init().then(() => { if (!unmounted) stopCommands = watch(command, runCommand, { immediate: true }) }); document.addEventListener('keydown', keydown); poll = setInterval(() => refreshSessions().catch(() => {}), 3000) })
-onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearInterval(poll); clearTimeout(noticeTimer); clearTimeout(historyPullTimer); detachRecentPull?.(); document.removeEventListener('keydown', keydown); clearAttachments(); activeSessionId.value = null; workspaceView.value = 'agents' })
+onMounted(() => { cardClock = setInterval(() => { cardNow.value = Date.now() }, 1000); init().then(() => { if (!unmounted) stopCommands = watch(command, runCommand, { immediate: true }) }); document.addEventListener('keydown', keydown); poll = setInterval(() => refreshSessions().catch(() => {}), 3000) })
+onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearInterval(poll); clearInterval(cardClock); clearTimeout(noticeTimer); clearTimeout(historyPullTimer); detachRecentPull?.(); document.removeEventListener('keydown', keydown); clearAttachments(); activeSessionId.value = null; workspaceView.value = 'agents' })
 </script>
 
 <template>
@@ -742,7 +752,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
                   <template v-if="reasoningProfile">
                     <div class="model-reasoning-heading"><button type="button" class="icon-button" :aria-label="t('model.back')" @click="reasoningModelId = ''"><Icon name="ArrowLeft" :size="14" /></button><div><strong>{{ t('Reasoning effort') }}</strong><small>{{ reasoningProfile.model }}</small></div></div>
                     <button type="button" class="menu-row reasoning-option" @click="selectModel(reasoningProfile.id, '')"><span>{{ t('Default') }}</span><Icon v-if="!reasoningChoice" name="Check" :size="14" /></button>
-                    <button v-for="strength in reasoningProfile.reasoning_efforts" :key="strength" type="button" class="menu-row reasoning-option" @click="selectModel(reasoningProfile.id, strength)"><span>{{ strength }}</span><Icon v-if="reasoningChoice === strength" name="Check" :size="14" /></button>
+                    <button v-for="strength in sortReasoningEfforts(reasoningProfile.reasoning_efforts)" :key="strength" type="button" class="menu-row reasoning-option" @click="selectModel(reasoningProfile.id, strength)"><span>{{ strength }}</span><Icon v-if="reasoningChoice === strength" name="Check" :size="14" /></button>
                   </template>
                   <template v-else>
                     <div class="popover-heading">{{ t('Select model') }}</div><div v-if="!profiles.length" class="popover-empty">{{ t('Add a model provider to start.') }}</div>
@@ -762,7 +772,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
         <section v-if="!selected" class="recent-chats" :class="{ 'is-pulling': historyPulling }">
           <div ref="recentScroller" class="recent-chats-scroller">
             <div class="recent-chats-track" :style="historyTrackStyle">
-              <template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 6)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div><span class="status-dot" :class="s.status"></span><span>{{ s.model_id.split('/').at(-1) }}</span><span>{{ dateLabel(s) }}</span></div></div><Icon class="chat-arrow" name="ArrowUpRight" :size="15" /></button></template>
+              <template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 6)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div class="chat-run-meta"><span :title="t('task.duration')"><Icon name="Clock" :size="12" />{{ taskDuration(s, locale, cardNow) }}</span><span :title="t('usage.cost')"><Icon name="Coins" :size="12" />{{ taskCost(s, locale) }}</span></div></div><time class="chat-age" :datetime="s.created_at || undefined" :title="creationDate(s.created_at, locale)">{{ relativeCreation(s.created_at, locale, cardNow) }}</time></button></template>
               <div v-else-if="sessions.length" class="home-empty"><div class="empty-mark"><Icon name="History" :size="23" /></div><h3>{{ t("近 7 天没有对话") }}</h3><p>{{ t("更早的对话可以在历史对话中查看。") }}</p><button type="button" class="text-button home-history-link" @click="mainView = 'history'">{{ t("查看历史对话") }}<Icon name="ArrowRight" :size="13" /></button></div>
               <div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div>
             </div>

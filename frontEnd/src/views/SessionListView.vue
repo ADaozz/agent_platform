@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { listSessions, listSessionHistory, kickSession } from '@/api/session'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
+import { tr } from '@/composables/preferences'
 import { LOGIN_TYPE_TAGS, SESSION_STATUS_TAGS } from '@/constants'
 import { formatDateTime } from '@/utils/format'
 import type { LoginSessionVO } from '@/types'
@@ -120,7 +121,7 @@ async function confirmKick() {
   kicking.value = true
   try {
     await kickSession(kickTarget.value.sessionId)
-    toast.success('已踢出该设备')
+    toast.success(tr('已踢出该设备'))
     if (kickTarget.value.current) {
       kickTarget.value = null
       await auth.logout()
@@ -142,60 +143,55 @@ async function confirmKick() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader
-      title="登录设备管理"
-      :desc="canManage
-        ? '所有账号仅允许单点登录，新登录会自动下线其他设备；列表按用户汇总，展开可查看历史登录记录'
-        : '查看并管理本账号的登录设备；可踢出当前或其他历史会话，踢出当前设备后需重新登录'"
-    >
+    <PageHeader :title="tr('登录设备管理')">
       <button class="btn-ghost" :disabled="loading" @click="load">
         <AppIcon name="refresh" class="!text-[18px]" />
-        刷新
+        {{ tr('刷新') }}
       </button>
     </PageHeader>
 
     <div v-if="canManage" class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <div>
-          <label class="form-label" for="session-filter-name">用户名</label>
+          <label class="form-label" for="session-filter-name">{{ tr('用户名') }}</label>
           <input
             id="session-filter-name"
             v-model="filters.userName"
             class="input"
-            placeholder="搜索用户名…"
+            :placeholder="tr('搜索用户名…')"
             @keyup.enter="search"
           />
         </div>
         <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">查询</button>
-          <button class="btn-ghost" @click="resetFilters">重置</button>
+          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
         </div>
       </div>
     </div>
 
     <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="table-scroll">
+        <table>
           <thead>
-            <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-              <th class="w-10 px-2 py-2.5"><span class="sr-only">展开历史记录</span></th>
-              <th v-if="canManage" class="px-4 py-2.5">用户名</th>
-              <th class="px-4 py-2.5">设备名称</th>
-              <th class="px-4 py-2.5">IP</th>
-              <th class="px-4 py-2.5">登录时间</th>
-              <th class="px-4 py-2.5">登录方式</th>
-              <th class="px-4 py-2.5">状态</th>
-              <th class="px-4 py-2.5 text-right">操作</th>
+            <tr>
+              <th class="w-10"><span class="sr-only">{{ tr('展开历史记录') }}</span></th>
+              <th v-if="canManage">{{ tr('用户名') }}</th>
+              <th>{{ tr('设备名称') }}</th>
+              <th>IP</th>
+              <th>{{ tr('登录时间') }}</th>
+              <th>{{ tr('登录方式') }}</th>
+              <th>{{ tr('状态') }}</th>
+              <th class="col-end">{{ tr('操作') }}</th>
             </tr>
           </thead>
           <tbody>
             <template v-for="row in rows" :key="row.userId">
-              <tr class="border-b border-line transition-colors hover:bg-gray-50">
-                <td class="px-2 py-3 text-center">
+              <tr>
+                <td class="text-center">
                   <button
                     type="button"
                     class="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-gray-100 hover:text-ink"
-                    :title="isExpanded(row.userId) ? '收起历史记录' : '展开历史记录'"
+                    :title="isExpanded(row.userId) ? tr('收起历史记录') : tr('展开历史记录')"
                     @click.stop="toggleHistory(row)"
                   >
                     <AppIcon
@@ -205,43 +201,43 @@ async function confirmKick() {
                     />
                   </button>
                 </td>
-                <td v-if="canManage" class="px-4 py-3 font-medium">{{ row.userName || row.userId }}</td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
+                <td v-if="canManage" class="font-medium">{{ row.userName || row.userId }}</td>
+                <td>
+                  <div class="flex flex-nowrap items-center gap-2">
                     <span>{{ row.deviceName || '-' }}</span>
                     <span
                       v-if="row.current"
-                      class="rounded border border-primary/30 bg-primary-light px-1.5 py-0.5 text-[11px] font-medium text-primary"
+                      class="shrink-0 rounded border border-primary/30 bg-primary-light px-1.5 py-0.5 text-[11px] font-medium text-primary"
                     >
-                      本机
+                      {{ tr('本机') }}
                     </span>
                   </div>
                 </td>
-                <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">{{ row.loginIp || '-' }}</td>
-                <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">
+                <td class="font-mono text-[13px]">{{ row.loginIp || '-' }}</td>
+                <td class="font-mono text-[13px]">
                   {{ row.loginTime ? formatDateTime(row.loginTime) : '-' }}
                 </td>
-                <td class="px-4 py-3">
+                <td>
                   <StatusTag :value="row.loginType ?? '0'" :map="LOGIN_TYPE_TAGS" />
                 </td>
-                <td class="px-4 py-3">
+                <td>
                   <StatusTag :value="row.status" :map="SESSION_STATUS_TAGS" />
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="col-end">
                   <button
                     v-if="canKick && row.status === '0' && !row.current"
                     class="text-sm font-medium text-danger hover:underline"
                     @click="kickTarget = row"
                   >
-                    踢出
+                    {{ tr('踢出') }}
                   </button>
-                  <span v-else-if="row.current" class="text-xs text-ink-faint">当前设备</span>
+                  <span v-else-if="row.current" class="text-xs text-ink-faint">{{ tr('当前设备') }}</span>
                   <span v-else class="text-xs text-ink-faint">-</span>
                 </td>
               </tr>
               <tr v-if="isExpanded(row.userId) && historyLoading[userKey(row.userId)]" class="session-history-row border-b border-line">
-                <td class="px-2 py-3"></td>
-                <td :colspan="colSpan - 1" class="px-4 py-3 text-sm text-ink-faint">加载中…</td>
+                <td></td>
+                <td :colspan="colSpan - 1" class="text-sm text-ink-faint">{{ tr('加载中…') }}</td>
               </tr>
               <template v-if="isExpanded(row.userId)">
                 <tr
@@ -249,28 +245,28 @@ async function confirmKick() {
                   :key="item.sessionId"
                   class="session-history-row border-b border-line transition-colors"
                 >
-                  <td class="px-2 py-3"></td>
-                  <td v-if="canManage" class="px-4 py-3"></td>
-                  <td class="px-4 py-3">
+                  <td></td>
+                  <td v-if="canManage"></td>
+                  <td>
                     <span>{{ item.deviceName || '-' }}</span>
                   </td>
-                  <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">{{ item.loginIp || '-' }}</td>
-                  <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">
+                  <td class="font-mono text-[13px]">{{ item.loginIp || '-' }}</td>
+                  <td class="font-mono text-[13px]">
                     {{ item.loginTime ? formatDateTime(item.loginTime) : '-' }}
                   </td>
-                  <td class="px-4 py-3">
+                  <td>
                     <StatusTag :value="item.loginType ?? '0'" :map="LOGIN_TYPE_TAGS" />
                   </td>
-                  <td class="px-4 py-3">
+                  <td>
                     <StatusTag :value="item.status" :map="SESSION_STATUS_TAGS" />
                   </td>
-                  <td class="px-4 py-3 text-right">
+                  <td class="col-end">
                     <button
                       v-if="canKick && item.status === '0'"
                       class="text-sm font-medium text-danger hover:underline"
                       @click="kickTarget = item"
                     >
-                      踢出
+                      {{ tr('踢出') }}
                     </button>
                     <span v-else class="text-xs text-ink-faint">-</span>
                   </td>
@@ -280,13 +276,13 @@ async function confirmKick() {
                 v-if="isExpanded(row.userId) && !historyLoading[userKey(row.userId)] && expandedHistory(row).length === 0"
                 class="session-history-row border-b border-line"
               >
-                <td class="px-2 py-3"></td>
-                <td :colspan="colSpan - 1" class="px-4 py-3 text-sm text-ink-faint">暂无历史登录记录</td>
+                <td></td>
+                <td :colspan="colSpan - 1" class="text-sm text-ink-faint">{{ tr('暂无历史登录记录') }}</td>
               </tr>
             </template>
             <tr v-if="!loading && rows.length === 0">
-              <td :colspan="colSpan" class="px-4 py-16 text-center text-ink-faint">
-                暂无登录设备记录
+              <td :colspan="colSpan" class="table-empty">
+                {{ tr('暂无登录设备记录') }}
               </td>
             </tr>
           </tbody>
@@ -297,8 +293,8 @@ async function confirmKick() {
 
     <ConfirmModal
       :open="!!kickTarget"
-      title="踢出登录设备"
-      :message="`确定要踢出设备「${kickTarget?.deviceName || kickTarget?.loginIp}」吗？该设备上的会话将立即失效。`"
+      :title="tr('踢出登录设备')"
+      :message="tr('确定要踢出设备「{name}」吗？该设备上的会话将立即失效。', { name: kickTarget?.deviceName || kickTarget?.loginIp || '' })"
       :loading="kicking"
       danger
       @close="kickTarget = null"

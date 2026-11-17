@@ -372,7 +372,8 @@ code {
 }
 
 .input,
-.select {
+.select,
+.search-field {
   @apply h-9 w-full px-3 text-sm outline-none;
   border: 1px solid var(--color-line);
   border-radius: 8px;
@@ -392,11 +393,13 @@ textarea.input {
   color: var(--color-ink-faint);
 }
 .input:hover:not(:focus):not(:disabled),
-.select:hover:not(:focus):not(:disabled) {
+.select:hover:not(:focus):not(:disabled),
+.search-field:hover:not(:focus-within) {
   border-color: var(--color-ink-faint);
 }
 .input:focus,
-.select:focus {
+.select:focus,
+.search-field:focus-within {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 16%, transparent);
 }
@@ -406,6 +409,41 @@ textarea.input {
   opacity: 0.6;
 }
 
+/* 工具栏里的图标搜索框：与 .input / .select 同高、同边框 */
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 10px;
+  color: var(--color-ink-faint);
+}
+.search-field input,
+.search-field input[type='search'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+}
+.search-field input::placeholder {
+  color: var(--color-ink-faint);
+}
+.search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+.search-field .app-icon {
+  flex-shrink: 0;
+}
+
 .select {
   appearance: none;
   padding-right: 2rem;
@@ -413,9 +451,109 @@ textarea.input {
   background-repeat: no-repeat;
   background-position: right 0.625rem center;
 }
+.select-fit {
+  width: auto;
+  max-width: 100%;
+}
 .select option {
   background-color: var(--color-card);
   color: var(--color-ink);
+}
+
+/* 筛选条：搜索框 + 下拉始终并排，窄屏也不换行 */
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-line);
+}
+.filter-toolbar .search-field {
+  flex: 1 1 auto;
+  min-width: 0; /* 搜索框让出宽度，下拉按文案撑开 */
+}
+.filter-toolbar .select,
+.filter-toolbar .select-fit {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: none;
+  min-width: 8.5rem; /* 覆盖 “Global models” / 「全局模型」 */
+}
+.filter-toolbar .usage-model-filter {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+}
+
+/* Style the native popup as well as the closed field. Browsers without
+   customizable selects retain the accessible platform picker above. */
+@supports (appearance: base-select) {
+  .select,
+  .select::picker(select) {
+    appearance: base-select;
+  }
+  .select {
+    align-items: center;
+    gap: 0.75rem;
+    padding-right: 0.75rem;
+    background-image: none;
+  }
+  .select::picker-icon {
+    margin-left: auto;
+    color: var(--color-ink-muted);
+    transition: transform 0.16s;
+  }
+  .select:open::picker-icon {
+    transform: rotate(180deg);
+  }
+  .select::picker(select) {
+    margin-block: 6px;
+    padding: 4px;
+    max-height: min(320px, 60dvh);
+    overflow: auto;
+    border: 1px solid var(--color-line);
+    border-radius: 8px;
+    background: var(--color-card);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-panel);
+    font: inherit;
+    font-size: 13px;
+  }
+  .select option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-ink-secondary);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+  .select option:checked {
+    background: color-mix(in srgb, var(--color-signal) 10%, var(--color-card));
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+  .select option:is(:hover, :focus-visible) {
+    background: var(--color-hover);
+    color: var(--color-ink);
+    outline: none;
+  }
+  .select option::checkmark {
+    color: var(--color-primary);
+  }
+  .select option:disabled {
+    color: var(--color-ink-faint);
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .select::picker-icon { transition: none; }
+  }
 }
 
 .form-label {
@@ -441,26 +579,45 @@ input[type='radio'] {
 
 /* ───────── 数据表：档案清单 ───────── */
 
+.table-scroll {
+  overflow-x: auto;
+}
 .card table {
+  width: 100%;
   border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
 }
 .card thead tr {
   background-color: transparent;
   border-bottom: 1px solid var(--color-line);
 }
 .card thead th {
+  padding: 12px 16px;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
   color: var(--color-ink-faint);
   white-space: nowrap;
+  background: var(--color-page);
 }
 .card tbody tr {
   transition: background-color 0.16s;
 }
-.card tbody tr:last-child {
-  border-bottom-width: 0;
+.card tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-line);
+  vertical-align: middle;
+  color: var(--color-ink-secondary);
+  /* 有 table-scroll 横向滚动时保持横排，避免窄列把中文拆成竖排 */
+  white-space: nowrap;
+}
+.card tbody td.table-empty {
+  white-space: normal;
+}
+.card tbody tr:last-child td {
+  border-bottom: 0;
 }
 .card tbody td:first-child {
   position: relative;
@@ -485,6 +642,36 @@ input[type='radio'] {
 .card tbody tr:hover {
   background-color: var(--glass);
 }
+.card :is(th, td).col-end {
+  text-align: right;
+  white-space: nowrap;
+}
+.card td.align-top {
+  vertical-align: top;
+}
+.card .table-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--color-ink-faint);
+}
+.card .row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.card .row-actions button {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.card .row-actions button:hover {
+  text-decoration: underline;
+}
+.card .row-actions .danger {
+  color: var(--color-danger);
+}
 
 .session-history-row {
   background-color: var(--color-gray-50);
@@ -496,16 +683,21 @@ input[type='radio'] {
   background-color: inherit;
 }
 
-/* 触屏设备：只扩大命中区，不改变桌面端密度 */
-@media (pointer: coarse) {
+/* 窄屏触控命中区与密度：用宽度而不是 (pointer: coarse)。
+   Chrome DevTools 手机模式用「选择元素」时会反复切换 pointer 类型，
+   若用 coarse 改 min-height，按钮和页头边框会跟着抖。 */
+@media (max-width: 767px) {
   .btn-primary,
   .btn-ghost,
   .btn-danger,
   .input,
-  .select {
+  .select,
+  .search-field,
+  .filter-trigger {
     min-height: 44px;
   }
-  .card tbody td button {
+  .card tbody td button,
+  .card .row-actions button {
     min-height: 40px;
     padding-inline: 0.5rem;
   }
@@ -513,12 +705,38 @@ input[type='radio'] {
     height: 38px;
     padding-inline: 1rem;
   }
+  .filter-toolbar {
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .search-field {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+  .search-field .app-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .card thead th {
+    padding: 10px 12px;
+    letter-spacing: 0.06em;
+  }
+  .card tbody td {
+    padding: 12px;
+  }
+  .card .table-empty {
+    padding: 36px 12px;
+  }
 }
 
 /* 窄屏页头同时放了分段开关与操作按钮时，收紧内边距让两者保持同一行 */
 @media (max-width: 480px) {
   .page-head-actions .segmented button {
     padding-inline: 0.625rem;
+  }
+  .filter-toolbar {
+    gap: 6px;
+    padding: 10px 12px;
   }
 }
 

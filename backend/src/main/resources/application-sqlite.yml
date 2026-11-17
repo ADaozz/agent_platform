@@ -34,8 +34,6 @@ mybatis-plus:
 
 jwt:
   secret: ${JWT_SECRET:local-dev-jwt-secret-change-me-32chars-min}
-  api:
-    secret: ${JWT_API_SECRET:local-dev-api-jwt-secret-change-me-32c}
 
 cert:
   storage-base-path: ${CERT_STORAGE_BASE:${user.dir}/data/certs}

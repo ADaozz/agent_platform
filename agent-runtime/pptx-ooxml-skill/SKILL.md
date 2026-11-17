@@ -2,7 +2,7 @@
 name: pptx-ooxml-author
 description: Create editable PowerPoint presentations from a style-design Markdown document and reference images, with real native charts and tables. Edit existing PPTX files while preserving unaffected content. Supports standalone CLI use and optional platform versioning and previews; visual review is done by the main Agent on the formal renders.
 metadata:
-  version: "3.4.0"
+  version: "3.4.1"
   compatibility: "python-pptx, lxml, Pillow, PyMuPDF, openpyxl, latex2mathml, LibreOffice Impress and fonts"
 ---
 
@@ -19,11 +19,13 @@ metadata:
 
 ## 新建 PPT
 
-新建稿使用用户的**风格设计 MD＋参考图**确定视觉系统，不搜索或复用 PPT 模板库；PPTX 模板库保持为空；`templates/` 现在保存配对的风格 MD 与参考图。用户未指定风格时，先用 `office_pptx.py list-styles` 按分类筛选至多三套候选，再读取一套 `design.md`、查看其 `reference.jpg`；不要一次读取全部风格或混用多套视觉体系。用户明确提供的风格要求优先。参考图用于理解版式、字体层级、配色、留白与图表表达，不直接铺成整页截图。缺少其中一种输入时，先用已有要求提炼风格；确有关键歧义再询问，不寻找旧 PPT 模板兜底。
+**创建时机（硬性规则）。** 准备开始编写时才创建 `files/<名称>.pptx`。选风格、读参考图、查资料、写 `tmp/deck-plan.json` 都在文件还不存在时做完。`init` 或第一次 `deck_io.save_deck` 只作为动笔的起点：紧接着写入第一页真实内容，中间不再调研、写计划或长时间停顿。不要先放一份空白演示文稿在 `files/` 里，过很久才开始写。`files/` 里的文件用户马上看得到，空文件不能当占位。编辑用户已有的 PPT 不在此列，那份文件本来就在。
 
-先在 `tmp/deck-plan.json` 记录选定目录的完整 `style_id`（如 `consulting/red-black-growth`）及输出 `pptx` 路径、受众、叙事、页尺寸、统一字体/回退字体、色板、标题层级、边距、页脚、每页重点与统计图表数量。MD 与参考图冲突时以用户明确指令和 MD 为准，记录必要取舍。整稿沿用同一组设计参数，不能逐页重新配色或缩字。所有数字、单位、时间范围与来源须有依据。
+新建稿使用用户的**风格设计 MD＋参考图**确定视觉系统，不搜索或复用 PPT 模板库；PPTX 模板库保持为空；`templates/` 现在保存配对的风格 MD 与参考图。用户未指定风格时，先用 `office_pptx.py list-styles` 按分类筛选至多三套候选，再读取一套 `design.md`、查看其 `reference.jpg`；不要一次读取全部风格或混用多套视觉体系。用户明确提供的风格要求优先。参考图用于理解版式、字体层级、配色、留白与图表表达，不直接铺成整页截图。缺少其中一种输入时，先用已有要求提炼风格；确有关键歧义再询问，不寻找旧 PPT 模板兜底。以上全部做完之前，不要创建 `files/` 中的 PPTX。
 
-可使用原子接口创建页面与对象，也可写一个可重复运行的 Python 生成脚本。脚本调用 `style_library.apply_reference(prs, style_id, design=design_parameters)` 将风格来源及实际设计参数写入 PPT，原子初始化使用 `init ... --style-id <category/theme_id>`。界面据此显示真实风格文件夹名称，不将内部 profile 名称当成设计来源。脚本统一读取上述设计参数，用 `deck_io.save_deck` 写入 `files/` 中的目标 PPTX；可以分批生成并多次保存，每次保存平台都会登记版本并更新预览。平台仍会验证完整性，不会因无效文件覆盖已登记版本。
+先在 `tmp/deck-plan.json` 记录选定目录的完整 `style_id`（如 `consulting/red-black-growth`）及输出 `pptx` 路径、受众、叙事、页尺寸、统一字体/回退字体、色板、标题层级、边距、页脚、每页重点与统计图表数量。MD 与参考图冲突时以用户明确指令和 MD 为准，记录必要取舍。整稿沿用同一组设计参数，不能逐页重新配色或缩字。所有数字、单位、时间范围与来源须有依据。计划写在 `tmp/`，此时还没有交付文件。
+
+可使用原子接口创建页面与对象，也可写一个可重复运行的 Python 生成脚本。脚本调用 `style_library.apply_reference(prs, style_id, design=design_parameters)` 将风格来源及实际设计参数写入 PPT。准备写入第一页时才做原子初始化：`init ... --style-id <category/theme_id>`，并立刻写入第一页内容。界面据此显示真实风格文件夹名称，不将内部 profile 名称当成设计来源。脚本统一读取上述设计参数，第一次 `deck_io.save_deck` 就写入已经有第一页内容的 `files/` 目标 PPTX，不要先保存空白稿；之后可以分批生成并多次保存，每次保存平台都会登记版本并更新预览。平台仍会验证完整性，不会因无效文件覆盖已登记版本。
 
 审查依据依次为用户明确要求/调整、本稿实际参数、选中风格 MD。计划顶层记录 fonts、palette（或 theme）、type_scale、margins、user_requirements/user_overrides；传入 apply_reference 的 design 使用同样的参数。margins 必须写明 unit（fraction/in/pt）及 left/right/top/bottom。没有明确数值或单位的部分只做视觉建议，不套默认 profile 的配色、字号或 6% 安全边距。选定 style_id 只记录来源，不会自动把 MD 转成排版；生成脚本需实际应用参数。
 

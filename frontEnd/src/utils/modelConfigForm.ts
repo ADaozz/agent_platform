@@ -33,6 +33,17 @@ export interface ConfigForm {
 
 const SHARED_FIELDS = ['base_url', 'api_key', 'api', 'input', 'reasoning_efforts']
 const NAME_PATTERN = /^[A-Za-z0-9_.-]+$/
+/** 与 modelPresets 中的官方三家 id 保持一致 */
+const PRESET_SOURCE_NAMES = new Set(['deepseek', 'qwen', 'glm'])
+
+export function isPresetSourceName(name: string) {
+  return PRESET_SOURCE_NAMES.has(name.trim())
+}
+
+/** 预设卡未填 Key 时视为未启用，保存时跳过 */
+export function isSourceConfigured(source: SourceForm) {
+  return Boolean(source.apiKey.trim() || source.savedKeyAt)
+}
 
 export function emptySource(): SourceForm {
   return {
@@ -78,15 +89,21 @@ export function toForm(llm: LlmConfig): ConfigForm {
   return { sources, defaultModel, timeout: typeof timeout === 'number' ? timeout : null, extra }
 }
 
+export function activeSources(form: ConfigForm) {
+  return form.sources.filter((s) => !isPresetSourceName(s.name) || isSourceConfigured(s))
+}
+
 export function modelIds(form: ConfigForm) {
-  return form.sources.flatMap((s) => s.models.filter((m) => m.key.trim()).map((m) => `${s.name.trim()}/${m.key.trim()}`))
+  return activeSources(form).flatMap((s) => s.models.filter((m) => m.key.trim()).map((m) => `${s.name.trim()}/${m.key.trim()}`))
 }
 
 export function validateForm(form: ConfigForm, personal: boolean): string | null {
   const names = new Set<string>()
   for (const [index, s] of form.sources.entries()) {
-    const label = `来源 ${s.name || index + 1}`
+    const presetIdle = isPresetSourceName(s.name) && !isSourceConfigured(s)
+    if (presetIdle) continue
     const name = s.name.trim()
+    const label = isPresetSourceName(name) ? name : `来源 ${s.name || index + 1}`
     if (!NAME_PATTERN.test(name)) return `${label}：名称只能使用字母、数字、下划线、点或短横线`
     if (names.has(name)) return `${label}：来源名称重复`
     names.add(name)
@@ -110,13 +127,14 @@ export function validateForm(form: ConfigForm, personal: boolean): string | null
       if (m.contextWindow != null && (!Number.isInteger(m.contextWindow) || m.contextWindow < 0)) return `${label}：上下文窗口必须是非负整数`
     }
   }
-  if (form.sources.length && !modelIds(form).includes(form.defaultModel)) return '请选择默认模型'
+  const ids = modelIds(form)
+  if (ids.length && !ids.includes(form.defaultModel)) return '请选择默认模型'
   return null
 }
 
 export function toLlm(form: ConfigForm, personal: boolean): LlmConfig {
   const models: Record<string, any> = {}
-  for (const s of form.sources) {
+  for (const s of activeSources(form)) {
     const items: Record<string, any> = {}
     for (const m of s.models) {
       const item: Record<string, any> = { ...m.extra }
@@ -137,7 +155,8 @@ export function toLlm(form: ConfigForm, personal: boolean): LlmConfig {
   }
   // 个人配置只允许 default 与 models 两个字段
   const llm: LlmConfig = personal ? {} : { ...form.extra }
-  llm.default = form.sources.length ? form.defaultModel : ''
+  const ids = modelIds(form)
+  llm.default = ids.length ? (ids.includes(form.defaultModel) ? form.defaultModel : ids[0]) : ''
   llm.models = models
   if (!personal && form.timeout) llm.timeout = form.timeout
   return llm

@@ -296,7 +296,7 @@ function handleLogout() {
         </div>
         <TopbarControls />
       </header>
-      <main class="min-h-0 flex-1 overflow-y-auto" :class="route.path === '/agent' ? 'p-0' : 'page-canvas dot-grid'">
+      <main class="page-scroll min-h-0 flex-1 overflow-y-auto" :class="route.path === '/agent' ? 'p-0' : route.path === '/settings/models' ? 'page-canvas' : 'page-canvas dot-grid'">
         <RouterView />
       </main>
     </div>
@@ -608,8 +608,8 @@ function handleLogout() {
   }
 }
 
-/* 触屏：导航项保持控制台密度，但把命中区加到 44px */
-@media (pointer: coarse) {
+/* 窄屏加大侧栏命中区；不用 (pointer: coarse)，避免 DevTools 选元素时高度抖动 */
+@media (max-width: 767px) {
   .rail-item,
   .rail-flyout-item {
     height: 2.75rem;
@@ -621,12 +621,20 @@ function handleLogout() {
 }
 
 
+.page-scroll {
+  /* Avoid scrollbar show/hide flipping the 767px layout and sticky header height. */
+  scrollbar-gutter: stable;
+}
 .page-canvas {
-  padding: 1.75rem 2rem 2.5rem;
+  --page-gutter-y: 1.75rem;
+  --page-gutter-x: 2rem;
+  padding: var(--page-gutter-y) var(--page-gutter-x) 2.5rem;
 }
 @media (max-width: 767px) {
   .page-canvas {
-    padding: 1.25rem 1rem 2rem;
+    --page-gutter-y: 1.25rem;
+    --page-gutter-x: 1rem;
+    padding: var(--page-gutter-y) var(--page-gutter-x) 2rem;
   }
 }
 </style>

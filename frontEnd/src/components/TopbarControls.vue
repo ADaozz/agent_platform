@@ -96,9 +96,6 @@ onUnmounted(() => clearInterval(clockTimer))
   .topbar-clock {
     display: none;
   }
-}
-
-@media (pointer: coarse) {
   .topbar-toggle {
     height: 2.75rem;
     width: 2.75rem;

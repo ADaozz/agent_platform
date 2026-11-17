@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
           <button type="button" :disabled="loading || certLoading" @click="openRegister">{{ tr('注册账号') }}</button>
         </p>
 
-        <p class="login-foot">© 2026 Agent Workspace</p>
+        <p class="login-foot">Powered by @ADaozz</p>
       </div>
     </section>
 
@@ -463,7 +463,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem 1.5rem;
+  padding: 2.5rem 1.5rem 3.25rem;
 }
 :global(:root[data-theme='dark']) .login-pane {
   --login-glass: color-mix(in srgb, var(--color-page) 66%, transparent);
@@ -674,12 +674,17 @@ onBeforeUnmount(() => {
   }
 }
 .login-foot {
-  margin-top: 2.5rem;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.15rem;
+  margin: 0;
   text-align: center;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.12em;
   color: var(--color-ink-faint);
+  pointer-events: none;
 }
 
 @media (max-width: 1023px) {

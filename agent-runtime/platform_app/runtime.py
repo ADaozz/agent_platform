@@ -724,9 +724,9 @@ def capabilities():
 
 
 @router.get('/usage/overview')
-def usage_overview(days: int = 30):
+def usage_overview(days: int = 30, provider: str = '', model: str = ''):
     """Token / estimated-cost rollups by day and session for the current owner."""
-    return usage_stats.overview(days=days)
+    return usage_stats.overview(days=days, provider=provider, model=model)
 
 
 @router.get('/sessions')
@@ -743,7 +743,7 @@ def sessions(summary: bool = False):
         clause=" AND json_extract(data,'$.owner_user_id') IS ?" if itam_bridge.is_enabled() else ''
         with d.db() as connection:
             rows=connection.execute("SELECT json_object("+pairs+") FROM records WHERE kind=?"+clause+" ORDER BY id DESC",('session',owner) if clause else ('session',)).fetchall()
-        return [json.loads(row[0]) for row in rows]
+        return usage_stats.session_summaries([json.loads(row[0]) for row in rows])
     records = reversed(d.all_records('session'))
     if itam_bridge.is_enabled():
         records = (r for r in records if r.get('owner_user_id') == itam_bridge.owner())

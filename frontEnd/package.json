@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "test:e2e:models": "node tests/model-settings.e2e.mjs",
     "test:e2e:office": "node tests/office-review.e2e.mjs"
   },
   "dependencies": {

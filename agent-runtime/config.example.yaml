@@ -11,8 +11,39 @@ llm:
       base_url: https://api.deepseek.com/v1
       api_key: ${DEEPSEEK_API_KEY}
       api: chat_completions
+      input: [text, image]
       # The first supported reasoning effort is the default.
       reasoning_efforts: [high, low, max]
       models:
         deepseek-flash:
-          input: [text, image]
+          context_window: 1000000
+        deepseek-v4-pro:
+          context_window: 1000000
+    qwen:
+      base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: ${DASHSCOPE_API_KEY}
+      api: chat_completions
+      input: [text, image]
+      reasoning_efforts: [high, low]
+      models:
+        qwen3.8-flash:
+          context_window: 1000000
+        qwen3.7-plus:
+          context_window: 1000000
+        qwen4-max:
+          context_window: 1000000
+    glm:
+      base_url: https://open.bigmodel.cn/api/paas/v4
+      api_key: ${ZHIPU_API_KEY}
+      api: chat_completions
+      input: [text, image]
+      reasoning_efforts: [max, high, low]
+      models:
+        glm-5.3:
+          context_window: 1000000
+        glm-5.3-flash:
+          context_window: 1000000
+        glm-5.3-flashx:
+          context_window: 1000000
+        glm-5.3-flashx-legal:
+          context_window: 1000000

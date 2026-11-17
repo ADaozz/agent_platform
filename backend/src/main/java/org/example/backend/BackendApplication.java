@@ -12,14 +12,9 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
         "org.example.backend.system.role.mapper",
         "org.example.backend.system.permission.mapper",
         "org.example.backend.system.menu.mapper",
-        "org.example.backend.asset.host.mapper",
-        "org.example.backend.asset.app.mapper",
-        "org.example.backend.api.mapper",
         "org.example.backend.auth.session.mapper",
         "org.example.backend.auth.cert.mapper",
-        "org.example.backend.common.operlog.mapper",
-        "org.example.backend.quartz.mapper",
-        "org.example.backend.statistics.mapper"
+        "org.example.backend.common.operlog.mapper"
 })
 public class BackendApplication {
 

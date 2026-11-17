@@ -126,7 +126,6 @@ if [ ! -f "$ETC_ROOT/secrets.env" ]; then
 # 由 deploy/scripts/install-host.sh 生成，勿入库、勿丢失。
 # backend 与 runtime 必须使用同一个 AGENT_RUNTIME_SHARED_SECRET / ITAM_RUNTIME_SHARED_SECRET。
 JWT_SECRET=$(gen_secret)
-JWT_API_SECRET=$(gen_secret)
 AGENT_RUNTIME_SHARED_SECRET=$shared
 ITAM_RUNTIME_SHARED_SECRET=$shared
 REDIS_PASSWORD=$(gen_secret)

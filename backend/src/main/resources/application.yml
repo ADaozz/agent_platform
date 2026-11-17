@@ -66,9 +66,6 @@ jwt:
   secret: ${JWT_SECRET}
   # 过期时间（秒），默认 2 小时
   expire: 7200
-  api:
-    secret: ${JWT_API_SECRET}
-    expire: 604800
 
 # 客户端证书签发与存储
 cert:

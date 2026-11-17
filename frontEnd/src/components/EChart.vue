@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const el = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
+let observer: ResizeObserver | null = null
 
 function render() {
   if (!chart || !props.option) return
@@ -17,17 +18,36 @@ function render() {
 }
 
 function resize() {
+  hideTooltip()
   chart?.resize()
+}
+
+function hideTooltip() { chart?.dispatchAction({ type: 'hideTip' }) }
+function hideOutside(event: Event) {
+  if (!el.value?.contains(event.target as Node)) hideTooltip()
 }
 
 onMounted(() => {
   chart = echarts.init(el.value!)
   render()
-  window.addEventListener('resize', resize)
+  observer = new ResizeObserver(resize)
+  observer.observe(el.value!)
+  chart.getZr().on('globalout', hideTooltip)
+  document.addEventListener('pointerdown', hideOutside, true)
+  document.addEventListener('focusin', hideOutside, true)
+  window.addEventListener('scroll', hideTooltip, true)
+  window.addEventListener('touchmove', hideTooltip, { passive: true })
+  window.addEventListener('blur', hideTooltip)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', resize)
+  document.removeEventListener('pointerdown', hideOutside, true)
+  document.removeEventListener('focusin', hideOutside, true)
+  window.removeEventListener('scroll', hideTooltip, true)
+  window.removeEventListener('touchmove', hideTooltip)
+  window.removeEventListener('blur', hideTooltip)
+  observer?.disconnect()
+  observer = null
   chart?.dispose()
   chart = null
 })
@@ -36,5 +56,9 @@ watch(() => props.option, render, { deep: true })
 </script>
 
 <template>
-  <div ref="el" class="w-full" :style="{ height: height || '280px' }"></div>
+  <div ref="el" class="echart-host w-full" @mouseleave="hideTooltip" :style="{ height: height || '280px' }"></div>
 </template>
+
+<style scoped>
+.echart-host { isolation: isolate; }
+</style>

@@ -10,6 +10,7 @@ import {
 } from '@/api/cert'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
+import { tr } from '@/composables/preferences'
 import {
   CERT_APPLY_STATUS_TAGS,
   CERT_STATUS_TAGS,
@@ -175,9 +176,9 @@ function changeCertPage(p: number) {
 function groupStatusSummary(group: UserCertGroup) {
   const certs = [group.signCert, group.encryptCert].filter(Boolean) as UserCertVO[]
   if (certs.length === 0) return '-'
-  if (certs.every((c) => c.status === '0')) return '全部有效'
-  if (certs.every((c) => c.status === '1')) return '全部吊销'
-  return '部分有效'
+  if (certs.every((c) => c.status === '0')) return tr('全部有效')
+  if (certs.every((c) => c.status === '1')) return tr('全部吊销')
+  return tr('部分有效')
 }
 
 function latestNotAfter(group: UserCertGroup) {
@@ -209,7 +210,7 @@ async function confirmApprove() {
   try {
     const result = await approveCertApply(approveTarget.value.applyId, { ...approveForm })
     approveTarget.value = null
-    toast.success(result.message || '签发成功，请通知用户在「我的证书」查看 P12 密码')
+    toast.success(result.message || tr('签发成功，请通知用户在「我的证书」查看 P12 密码'))
     await loadApplies()
     await loadCerts()
     expandedUserIds.value = {}
@@ -230,7 +231,7 @@ async function confirmReject() {
   rejecting.value = true
   try {
     await rejectCertApply(rejectTarget.value.applyId, '管理员拒绝')
-    toast.success('已拒绝')
+    toast.success(tr('已拒绝'))
     rejectTarget.value = null
     await loadApplies()
   } finally {
@@ -246,7 +247,7 @@ async function confirmRevoke() {
   revoking.value = true
   try {
     await revokeCert(revokeTarget.value.certId)
-    toast.success('证书已吊销')
+    toast.success(tr('证书已吊销'))
     revokeTarget.value = null
     await loadCerts()
   } finally {
@@ -257,8 +258,9 @@ async function confirmRevoke() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="证书管理" desc="审批证书申请、查询与吊销已签发证书">
-      <div class="segmented" role="tablist" aria-label="证书管理范围">
+    <PageHeader :title="tr('证书管理')" />
+    <div class="filter-toolbar cert-toolbar">
+      <div class="segmented" role="tablist" :aria-label="tr('证书管理范围')">
         <button
           id="cert-tab-list"
           ref="certTab"
@@ -271,7 +273,7 @@ async function confirmRevoke() {
           @keydown.right.prevent="focusTab('apply')"
           @keydown.home.prevent="focusTab('cert')"
         >
-          证书列表
+          {{ tr('证书列表') }}
         </button>
         <button
           id="cert-tab-apply"
@@ -285,14 +287,14 @@ async function confirmRevoke() {
           @keydown.left.prevent="focusTab('cert')"
           @keydown.end.prevent="focusTab('apply')"
         >
-          申请审批
+          {{ tr('申请审批') }}
         </button>
       </div>
       <button class="btn-ghost" @click="loadActive">
         <AppIcon name="refresh" class="!text-[18px]" />
-        刷新
+        {{ tr('刷新') }}
       </button>
-    </PageHeader>
+    </div>
 
     <div
       v-show="tab === 'cert'"
@@ -304,7 +306,7 @@ async function confirmRevoke() {
       <div class="card p-4">
         <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
           <div>
-            <label class="form-label" for="cert-filter-name">用户名</label>
+            <label class="form-label" for="cert-filter-name">{{ tr('用户名') }}</label>
             <input
               id="cert-filter-name"
               v-model="certFilters.userName"
@@ -313,47 +315,47 @@ async function confirmRevoke() {
             />
           </div>
           <div>
-            <label class="form-label" for="cert-filter-type">类型</label>
+            <label class="form-label" for="cert-filter-type">{{ tr('类型') }}</label>
             <select id="cert-filter-type" v-model="certFilters.certType" class="select">
-              <option value="">全部</option>
-              <option value="sign">签名</option>
-              <option value="encrypt">加密</option>
+              <option value="">{{ tr('全部') }}</option>
+              <option value="sign">{{ tr('签名') }}</option>
+              <option value="encrypt">{{ tr('加密') }}</option>
             </select>
           </div>
           <div>
-            <label class="form-label" for="cert-filter-status">状态</label>
+            <label class="form-label" for="cert-filter-status">{{ tr('状态') }}</label>
             <select id="cert-filter-status" v-model="certFilters.status" class="select">
-              <option value="">全部</option>
-              <option value="0">有效</option>
-              <option value="1">已吊销</option>
+              <option value="">{{ tr('全部') }}</option>
+              <option value="0">{{ tr('有效') }}</option>
+              <option value="1">{{ tr('已吊销') }}</option>
             </select>
           </div>
           <div class="flex items-end">
-            <button class="btn-primary" @click="searchCerts">查询</button>
+            <button class="btn-primary" @click="searchCerts">{{ tr('查询') }}</button>
           </div>
         </div>
       </div>
       <div class="card overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="table-scroll">
+          <table>
             <thead>
-              <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-                <th class="w-10 px-2 py-2.5"><span class="sr-only">展开证书详情</span></th>
-                <th class="px-4 py-2.5">用户名</th>
-                <th class="px-4 py-2.5">签名证</th>
-                <th class="px-4 py-2.5">加密证</th>
-                <th class="px-4 py-2.5">整体状态</th>
-                <th class="px-4 py-2.5">最近有效期至</th>
+              <tr>
+                <th class="w-10"><span class="sr-only">{{ tr('展开证书详情') }}</span></th>
+                <th>{{ tr('用户名') }}</th>
+                <th>{{ tr('签名证') }}</th>
+                <th>{{ tr('加密证') }}</th>
+                <th>{{ tr('整体状态') }}</th>
+                <th>{{ tr('最近有效期至') }}</th>
               </tr>
             </thead>
             <tbody>
               <template v-for="group in certUserGroups" :key="group.userId">
-                <tr class="border-b border-line transition-colors hover:bg-gray-50">
-                  <td class="px-2 py-3 text-center">
+                <tr>
+                  <td class="text-center">
                     <button
                       type="button"
                       class="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-gray-100 hover:text-ink"
-                      :title="isExpanded(group.userId) ? '收起证书详情' : '展开证书详情'"
+                      :title="isExpanded(group.userId) ? tr('收起证书详情') : tr('展开证书详情')"
                       @click.stop="toggleExpand(group.userId)"
                     >
                       <AppIcon
@@ -363,80 +365,80 @@ async function confirmRevoke() {
                       />
                     </button>
                   </td>
-                  <td class="px-4 py-3 font-medium">{{ group.userName }}</td>
-                  <td class="px-4 py-3">
+                  <td>{{ group.userName }}</td>
+                  <td>
                     <StatusTag
                       v-if="group.signCert"
                       :value="group.signCert.status"
                       :map="CERT_STATUS_TAGS"
                     />
-                    <span v-else class="text-xs text-ink-faint">无</span>
+                    <span v-else class="text-xs text-ink-faint">{{ tr('无') }}</span>
                   </td>
-                  <td class="px-4 py-3">
+                  <td>
                     <StatusTag
                       v-if="group.encryptCert"
                       :value="group.encryptCert.status"
                       :map="CERT_STATUS_TAGS"
                     />
-                    <span v-else class="text-xs text-ink-faint">无</span>
+                    <span v-else class="text-xs text-ink-faint">{{ tr('无') }}</span>
                   </td>
-                  <td class="px-4 py-3 text-ink-secondary">{{ groupStatusSummary(group) }}</td>
-                  <td class="px-4 py-3 font-mono text-[13px] text-ink-muted">
+                  <td class="text-ink-secondary">{{ groupStatusSummary(group) }}</td>
+                  <td class="font-mono text-[13px]">
                     {{ latestNotAfter(group) ? formatDateTime(latestNotAfter(group)!) : '-' }}
                   </td>
                 </tr>
                 <tr v-if="isExpanded(group.userId)" class="session-history-row border-b border-line">
-                  <td class="px-2 py-3"></td>
-                  <td colspan="5" class="px-4 py-4">
-                    <div class="grid gap-4 md:grid-cols-2">
+                  <td></td>
+                  <td colspan="5" class="cert-expand-cell">
+                    <div class="cert-expand-grid">
                       <div
                         v-for="slot in [
                           { type: 'sign', cert: group.signCert },
                           { type: 'encrypt', cert: group.encryptCert },
                         ]"
                         :key="slot.type"
-                        class="rounded-lg border border-line bg-white p-4"
+                        class="card cert-detail-card p-4"
                       >
-                        <div class="mb-3 flex items-center justify-between gap-2">
-                          <h3 class="text-sm font-medium text-ink">
-                            {{ CERT_TYPE_LABELS[slot.type] }}
+                        <div class="mb-3 flex min-w-0 items-center justify-between gap-2">
+                          <h3 class="truncate text-sm font-medium text-ink">
+                            {{ tr(CERT_TYPE_LABELS[slot.type] || slot.type) }}
                           </h3>
                           <button
                             v-if="canRevoke && slot.cert && slot.cert.status === '0'"
-                            class="text-xs font-medium text-danger hover:underline"
+                            class="shrink-0 text-xs font-medium text-danger hover:underline"
                             @click="revokeTarget = slot.cert"
                           >
-                            吊销
+                            {{ tr('吊销') }}
                           </button>
                         </div>
                         <template v-if="slot.cert">
-                          <dl class="space-y-2 text-sm">
-                            <div class="flex justify-between gap-4">
-                              <dt class="text-ink-muted">序列号</dt>
-                              <dd class="font-mono text-xs">{{ slot.cert.certSerial }}</dd>
+                          <dl class="cert-detail-list">
+                            <div class="cert-detail-row">
+                              <dt>{{ tr('序列号') }}</dt>
+                              <dd class="font-mono" :title="slot.cert.certSerial">{{ slot.cert.certSerial }}</dd>
                             </div>
-                            <div class="flex justify-between gap-4">
-                              <dt class="text-ink-muted">主体</dt>
-                              <dd class="max-w-[60%] text-right text-xs">{{ slot.cert.subjectDn }}</dd>
+                            <div class="cert-detail-row">
+                              <dt>{{ tr('主体') }}</dt>
+                              <dd :title="slot.cert.subjectDn">{{ slot.cert.subjectDn }}</dd>
                             </div>
-                            <div class="flex justify-between gap-4">
-                              <dt class="text-ink-muted">有效期至</dt>
+                            <div class="cert-detail-row">
+                              <dt>{{ tr('有效期至') }}</dt>
                               <dd>{{ slot.cert.notAfter ? formatDateTime(slot.cert.notAfter) : '-' }}</dd>
                             </div>
-                            <div class="flex justify-between gap-4">
-                              <dt class="text-ink-muted">状态</dt>
+                            <div class="cert-detail-row">
+                              <dt>{{ tr('状态') }}</dt>
                               <dd><StatusTag :value="slot.cert.status" :map="CERT_STATUS_TAGS" /></dd>
                             </div>
                           </dl>
                         </template>
-                        <p v-else class="text-sm text-ink-faint">暂无{{ CERT_TYPE_LABELS[slot.type] }}</p>
+                        <p v-else class="text-sm text-ink-faint">{{ tr('暂无{name}', { name: tr(CERT_TYPE_LABELS[slot.type] || slot.type) }) }}</p>
                       </div>
                     </div>
                   </td>
                 </tr>
               </template>
               <tr v-if="!certLoading && certUserGroups.length === 0">
-                <td colspan="6" class="px-4 py-16 text-center text-ink-faint">暂无证书记录</td>
+                <td colspan="6" class="table-empty">{{ tr('暂无证书记录') }}</td>
               </tr>
             </tbody>
           </table>
@@ -460,50 +462,50 @@ async function confirmRevoke() {
       <div class="card p-4">
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div>
-            <label class="form-label" for="apply-filter-name">用户名</label>
+            <label class="form-label" for="apply-filter-name">{{ tr('用户名') }}</label>
             <input
               id="apply-filter-name"
               v-model="applyFilters.userName"
               class="input"
-              placeholder="搜索…"
+              :placeholder="tr('搜索…')"
               @keyup.enter="applyPageNum = 1; loadApplies()"
             />
           </div>
           <div>
-            <label class="form-label" for="apply-filter-status">状态</label>
+            <label class="form-label" for="apply-filter-status">{{ tr('状态') }}</label>
             <select id="apply-filter-status" v-model="applyFilters.status" class="select">
-              <option value="">全部</option>
-              <option value="pending">待审批</option>
-              <option value="approved">已通过</option>
-              <option value="rejected">已拒绝</option>
+              <option value="">{{ tr('全部') }}</option>
+              <option value="pending">{{ tr('待审批') }}</option>
+              <option value="approved">{{ tr('已通过') }}</option>
+              <option value="rejected">{{ tr('已拒绝') }}</option>
             </select>
           </div>
           <div class="flex items-end">
-            <button class="btn-primary" @click="applyPageNum = 1; loadApplies()">查询</button>
+            <button class="btn-primary" @click="applyPageNum = 1; loadApplies()">{{ tr('查询') }}</button>
           </div>
         </div>
       </div>
       <div class="card overflow-hidden">
-        <table class="w-full text-sm">
+        <table>
           <thead>
-            <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-              <th class="px-4 py-2.5">用户</th>
-              <th class="px-4 py-2.5">类型</th>
-              <th class="px-4 py-2.5">状态</th>
-              <th class="px-4 py-2.5">申请时间</th>
-              <th class="px-4 py-2.5 text-right">操作</th>
+            <tr>
+              <th>{{ tr('用户') }}</th>
+              <th>{{ tr('类型') }}</th>
+              <th>{{ tr('状态') }}</th>
+              <th>{{ tr('申请时间') }}</th>
+              <th class="col-end">{{ tr('操作') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in applyRows" :key="row.applyId" class="border-b border-line last:border-0">
-              <td class="px-4 py-3 font-medium">{{ row.userName }}</td>
-              <td class="px-4 py-3">{{ row.applyType === 'reissue' ? '重发' : '新申请' }}</td>
-              <td class="px-4 py-3"><StatusTag :value="row.status" :map="CERT_APPLY_STATUS_TAGS" /></td>
-              <td class="px-4 py-3 font-mono text-[13px]">{{ row.createTime ? formatDateTime(row.createTime) : '-' }}</td>
-              <td class="px-4 py-3 text-right space-x-2">
+              <td>{{ row.userName }}</td>
+              <td>{{ row.applyType === 'reissue' ? tr('重发') : tr('新申请') }}</td>
+              <td><StatusTag :value="row.status" :map="CERT_APPLY_STATUS_TAGS" /></td>
+              <td class="font-mono text-[13px]">{{ row.createTime ? formatDateTime(row.createTime) : '-' }}</td>
+              <td class="col-end space-x-2">
                 <template v-if="canApprove && row.status === 'pending'">
-                  <button class="text-sm font-medium text-primary hover:underline" @click="openApprove(row)">审批</button>
-                  <button class="text-sm font-medium text-danger hover:underline" @click="rejectTarget = row">拒绝</button>
+                  <button class="text-sm font-medium text-primary hover:underline" @click="openApprove(row)">{{ tr('审批') }}</button>
+                  <button class="text-sm font-medium text-danger hover:underline" @click="rejectTarget = row">{{ tr('拒绝') }}</button>
                 </template>
                 <span v-else class="text-xs text-ink-faint">-</span>
               </td>
@@ -514,36 +516,36 @@ async function confirmRevoke() {
       </div>
     </div>
 
-    <BaseModal :open="!!approveTarget" title="审批并签发证书" @close="closeApproveModal">
+    <BaseModal :open="!!approveTarget" :title="tr('审批并签发证书')" @close="closeApproveModal">
       <form class="space-y-3" @submit.prevent="confirmApprove">
         <div>
-          <label class="form-label">主体 CN</label>
+          <label class="form-label">{{ tr('主体 CN') }}</label>
           <input v-model="approveForm.subjectCn" class="input" required />
         </div>
         <div>
-          <label class="form-label">组织 O</label>
+          <label class="form-label">{{ tr('组织 O') }}</label>
           <input v-model="approveForm.subjectO" class="input" />
         </div>
         <div>
-          <label class="form-label">部门 OU</label>
+          <label class="form-label">{{ tr('部门 OU') }}</label>
           <input v-model="approveForm.subjectOu" class="input" />
         </div>
         <div>
-          <label class="form-label">有效期（天）</label>
+          <label class="form-label">{{ tr('有效期（天）') }}</label>
           <input v-model.number="approveForm.validDays" class="input" type="number" min="1" max="3650" required />
         </div>
-        <p class="text-xs text-ink-faint">签发后 P12 密码仅申请人可在「我的证书」查看一次，管理员不可见。</p>
+        <p class="text-xs text-ink-faint">{{ tr('签发后 P12 密码仅申请人可在「我的证书」查看一次，管理员不可见。') }}</p>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" class="btn-ghost" @click="closeApproveModal">取消</button>
-          <button type="submit" class="btn-primary" :disabled="approving">签发</button>
+          <button type="button" class="btn-ghost" @click="closeApproveModal">{{ tr('取消') }}</button>
+          <button type="submit" class="btn-primary" :disabled="approving">{{ tr('签发') }}</button>
         </div>
       </form>
     </BaseModal>
 
     <ConfirmModal
       :open="!!rejectTarget"
-      title="拒绝申请"
-      message="确定拒绝该证书申请吗？"
+      :title="tr('拒绝申请')"
+      :message="tr('确定拒绝该证书申请吗？')"
       :loading="rejecting"
       danger
       @close="rejectTarget = null"
@@ -552,8 +554,8 @@ async function confirmRevoke() {
 
     <ConfirmModal
       :open="!!revokeTarget"
-      title="吊销证书"
-      :message="`确定吊销「${revokeTarget?.userName}」的${CERT_TYPE_LABELS[revokeTarget?.certType || ''] || ''}吗？`"
+      :title="tr('吊销证书')"
+      :message="tr('确定吊销「{name}」的{type}吗？', { name: revokeTarget?.userName || '', type: tr(CERT_TYPE_LABELS[revokeTarget?.certType || ''] || revokeTarget?.certType || '') })"
       :loading="revoking"
       danger
       @close="revokeTarget = null"
@@ -561,3 +563,68 @@ async function confirmRevoke() {
     />
   </div>
 </template>
+
+<style scoped>
+.cert-toolbar {
+  justify-content: space-between;
+  padding: 0;
+  border-bottom: 0;
+}
+.cert-toolbar .segmented {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+/* 展开区不受表格 nowrap 影响，手机端与「我的证书」同一套详情卡 */
+.cert-expand-cell {
+  white-space: normal !important;
+  min-width: 0;
+  max-width: 0; /* 强制吃掉表格列宽算法，让内容按视口收缩 */
+  width: 100%;
+  padding: 14px 16px;
+  vertical-align: top;
+}
+.cert-expand-grid {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .cert-expand-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cert-expand-cell {
+    max-width: none;
+  }
+}
+.cert-detail-card {
+  min-width: 0;
+  overflow: hidden;
+}
+.cert-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+.cert-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+.cert-detail-row dt {
+  flex: 0 0 auto;
+  color: var(--color-ink-muted);
+}
+.cert-detail-row dd {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

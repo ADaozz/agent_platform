@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TagStyle } from '@/constants'
+import { tr } from '@/composables/preferences'
 
 const props = defineProps<{
   value: string
@@ -17,7 +18,7 @@ const tag = computed<TagStyle>(
   <!-- 状态牌：色块 + 标签 -->
   <span class="status-tag" :class="tag.cls">
     <span v-if="dot !== false" class="status-tag-lamp"></span>
-    {{ tag.label }}
+    {{ tr(tag.label) }}
   </span>
 </template>
 

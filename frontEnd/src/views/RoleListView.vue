@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { listRoles, addRole, editRole, authPerm, deleteRole, getPermTree } from '@/api/role'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/toast'
+import { tr } from '@/composables/preferences'
 import type { Id, PermTreeNode, SysRoleVO } from '@/types'
 import PaginationBar from '@/components/PaginationBar.vue'
 import BaseModal from '@/components/BaseModal.vue'
@@ -198,7 +199,7 @@ function openEdit(role: SysRoleVO) {
 
 async function saveForm() {
   if (!form.sysRole.trim()) {
-    toast.error('角色标识不能为空')
+    toast.error(tr('角色标识不能为空'))
     return
   }
   saving.value = true
@@ -207,13 +208,13 @@ async function saveForm() {
       await editRole({ roleId: editingRoleId.value!, sysRole: form.sysRole.trim() })
       // 编辑时同步覆盖权限（空数组表示清空）
       await authPerm(editingRoleId.value!, form.permissionIds)
-      toast.success('修改成功')
+      toast.success(tr('修改成功'))
     } else {
       await addRole({
         sysRole: form.sysRole.trim(),
         permissionIds: form.permissionIds,
       })
-      toast.success('新增成功')
+      toast.success(tr('新增成功'))
     }
     formOpen.value = false
     load()
@@ -233,7 +234,7 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await deleteRole(deleteTarget.value.roleId)
-    toast.success('删除成功')
+    toast.success(tr('删除成功'))
     deleteTarget.value = null
     load()
   } catch {
@@ -246,10 +247,10 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="角色管理" desc="维护系统角色并进行角色—权限绑定（仅管理员可操作）">
+    <PageHeader :title="tr('角色管理')">
       <button v-if="canAdd" class="btn-primary" @click="openAdd">
         <AppIcon name="add" class="!text-[18px]" />
-        添加角色
+        {{ tr('添加角色') }}
       </button>
     </PageHeader>
 
@@ -257,25 +258,25 @@ async function confirmDelete() {
     <div class="card p-4">
       <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <div>
-          <label class="form-label">角色标识</label>
-          <input v-model="filters.sysRole" class="input" placeholder="搜索角色标识…" @keyup.enter="search" />
+          <label class="form-label">{{ tr('角色标识') }}</label>
+          <input v-model="filters.sysRole" class="input" :placeholder="tr('搜索角色标识…')" @keyup.enter="search" />
         </div>
         <div class="flex items-end gap-2">
-          <button class="btn-primary" @click="search">查询</button>
-          <button class="btn-ghost" @click="resetFilters">重置</button>
+          <button class="btn-primary" @click="search">{{ tr('查询') }}</button>
+          <button class="btn-ghost" @click="resetFilters">{{ tr('重置') }}</button>
         </div>
       </div>
     </div>
 
     <!-- 表格 -->
     <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="table-scroll">
+        <table>
           <thead>
-            <tr class="bg-gray-50 text-left text-xs font-medium text-ink-muted">
-              <th class="px-4 py-2.5">角色</th>
-              <th class="px-4 py-2.5">已绑定权限</th>
-              <th class="px-4 py-2.5 text-right">操作</th>
+            <tr>
+              <th>{{ tr('角色') }}</th>
+              <th>{{ tr('已绑定权限') }}</th>
+              <th class="col-end">{{ tr('操作') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -284,7 +285,7 @@ async function confirmDelete() {
               :key="role.roleId"
               class="border-b border-line transition-colors last:border-0 hover:bg-gray-50"
             >
-              <td class="px-4 py-3 align-top">
+              <td>
                 <div class="flex items-center gap-3">
                   <div class="flex h-9 w-9 shrink-0 items-center justify-center id-chip">
                     <AppIcon name="shield_person" class="!text-[20px]" />
@@ -295,7 +296,7 @@ async function confirmDelete() {
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3">
+              <td>
                 <div class="flex max-w-3xl flex-wrap gap-1.5">
                   <span
                     v-for="perm in role.permissions ?? []"
@@ -304,28 +305,28 @@ async function confirmDelete() {
                   >
                     {{ perm.label }}
                   </span>
-                  <span v-if="!role.permissions?.length" class="text-xs text-ink-faint">未绑定权限</span>
+                  <span v-if="!role.permissions?.length" class="text-xs text-ink-faint">{{ tr('未绑定权限') }}</span>
                 </div>
               </td>
-              <td class="px-4 py-3 text-right align-top whitespace-nowrap">
+              <td class="col-end">
                 <button
                   v-if="canEdit"
                   class="text-sm font-medium text-primary hover:underline"
                   @click="openEdit(role)"
                 >
-                  编辑
+                  {{ tr('编辑') }}
                 </button>
                 <button
                   v-if="canDelete"
                   class="ml-3 text-sm font-medium text-danger hover:underline"
                   @click="deleteTarget = role"
                 >
-                  删除
+                  {{ tr('删除') }}
                 </button>
               </td>
             </tr>
             <tr v-if="!loading && rows.length === 0">
-              <td colspan="3" class="px-4 py-16 text-center text-ink-faint">暂无数据</td>
+              <td colspan="3" class="table-empty">{{ tr('暂无数据') }}</td>
             </tr>
           </tbody>
         </table>
@@ -334,26 +335,26 @@ async function confirmDelete() {
     </div>
 
     <!-- 新增 / 编辑弹窗 -->
-    <BaseModal :open="formOpen" :title="isEdit ? '编辑角色' : '添加角色'" width="560px" @close="formOpen = false">
+    <BaseModal :open="formOpen" :title="isEdit ? tr('编辑角色') : tr('添加角色')" width="560px" @close="formOpen = false">
       <div class="space-y-4">
         <div>
-          <label class="form-label">角色标识 <span class="text-danger">*</span></label>
-          <input v-model="form.sysRole" class="input" maxlength="64" placeholder="如 ops、readonly" />
+          <label class="form-label">{{ tr('角色标识') }} <span class="text-danger">*</span></label>
+          <input v-model="form.sysRole" class="input" maxlength="64" :placeholder="tr('如 ops、readonly')" />
         </div>
         <div v-if="auth.isAdmin">
           <div class="flex items-center justify-between">
             <label class="form-label">
-              绑定权限（覆盖式，已选 {{ form.permissionIds.length }} / {{ allPermIds.length }} 项）
+              {{ tr('绑定权限（覆盖式，已选 {selected} / {total} 项）', { selected: form.permissionIds.length, total: allPermIds.length }) }}
             </label>
             <div v-if="!editingAdminRole" class="flex gap-2 text-xs">
-              <button type="button" class="font-medium text-primary hover:underline" @click="selectAllPerms">全选</button>
-              <button type="button" class="font-medium text-ink-muted hover:underline" @click="clearPerms">清空</button>
+              <button type="button" class="font-medium text-primary hover:underline" @click="selectAllPerms">{{ tr('全选') }}</button>
+              <button type="button" class="font-medium text-ink-muted hover:underline" @click="clearPerms">{{ tr('清空') }}</button>
             </div>
           </div>
           <div class="max-h-72 overflow-y-auto rounded-md border border-line">
-            <div v-if="permTreeLoading" class="px-3 py-8 text-center text-xs text-ink-faint">加载中…</div>
+            <div v-if="permTreeLoading" class="px-3 py-8 text-center text-xs text-ink-faint">{{ tr('加载中…') }}</div>
             <div v-else-if="permGroups.length === 0" class="px-3 py-8 text-center text-xs text-ink-faint">
-              暂无可分配权限
+              {{ tr('暂无可分配权限') }}
             </div>
             <div v-for="group in permGroups" :key="group.key" class="border-b border-line last:border-0">
               <label class="flex cursor-pointer items-center gap-2 bg-gray-50 px-3 py-2 text-sm font-medium text-ink">
@@ -387,15 +388,15 @@ async function confirmDelete() {
                   {{ perm.name }}
                 </label>
               </div>
-              <div v-else class="px-3 py-2 text-xs text-ink-faint">该菜单暂无权限项</div>
+              <div v-else class="px-3 py-2 text-xs text-ink-faint">{{ tr('该菜单暂无权限项') }}</div>
             </div>
           </div>
         </div>
       </div>
       <template #footer>
-        <button class="btn-ghost" @click="formOpen = false">取消</button>
+        <button class="btn-ghost" @click="formOpen = false">{{ tr('取消') }}</button>
         <button class="btn-primary" :disabled="saving" @click="saveForm">
-          {{ saving ? '保存中…' : '保存' }}
+          {{ saving ? tr('保存中…') : tr('保存') }}
         </button>
       </template>
     </BaseModal>
@@ -403,8 +404,8 @@ async function confirmDelete() {
     <!-- 删除确认 -->
     <ConfirmModal
       :open="!!deleteTarget"
-      title="删除角色"
-      :message="`确定要删除角色「${deleteTarget?.sysRole}」吗？仅允许删除未绑定用户的角色，该操作不可恢复。`"
+      :title="tr('删除角色')"
+      :message="tr('确定要删除角色「{name}」吗？仅允许删除未绑定用户的角色，该操作不可恢复。', { name: deleteTarget?.sysRole || '' })"
       :loading="deleting"
       danger
       @close="deleteTarget = null"

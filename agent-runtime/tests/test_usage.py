@@ -43,6 +43,11 @@ def test_deepseek_streaming_cache_usage_survives_conversion():
     assert usage['input_tokens'] == 1000
     assert usage['cache_read_input_tokens'] == 800
     assert usage['cache_hit_rate'] == .8
+    # OpenAI-compatible / 百炼 / 智谱：prompt_tokens_details.cached_tokens
+    compat = model._convert_chunk_to_generation_chunk({'choices': [], 'usage': {
+        'prompt_tokens': 1000, 'completion_tokens': 20, 'total_tokens': 1020,
+        'prompt_tokens_details': {'cached_tokens': 600}}}, AIMessageChunk, None)
+    assert message_usage(compat.message)['cache_read_input_tokens'] == 600
     # Every request computes its own cache stats, including real zero hits.
     assert message_usage(AIMessage(content='', usage_metadata={
         'input_tokens': 1000, 'output_tokens': 20, 'total_tokens': 1020}))['cache_hit_rate'] is None

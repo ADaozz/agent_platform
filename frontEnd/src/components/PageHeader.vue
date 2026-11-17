@@ -20,30 +20,45 @@ const eyebrow = computed(() => props.eyebrow ?? (route.meta.eyebrow as string | 
 
 <template>
   <!-- 功能卡片式标题栏（参考 LONETRAIL 功能卡片）：同心环徽标 + 标题 + 说明，底边信号橙结构线；右侧为操作位 -->
-  <header class="page-head">
-    <div v-if="emblem" class="page-head-emblem" aria-hidden="true">
-      <span class="page-head-rings"></span>
-      <span class="page-head-disc"><AppIcon :name="emblem" /></span>
-    </div>
-    <div class="page-head-text">
-      <span v-if="eyebrow" class="page-head-eyebrow">{{ eyebrow }}</span>
-      <h1 class="page-head-title">{{ title }}</h1>
-      <p v-if="desc || $slots.desc" class="page-head-desc">
-        <slot name="desc">{{ desc }}</slot>
-      </p>
-    </div>
-    <div v-if="$slots.default" class="page-head-actions">
-      <slot />
-    </div>
-    <span class="page-head-strip" aria-hidden="true"></span>
-  </header>
+  <div class="page-head-sticky">
+    <header class="page-head">
+      <div v-if="emblem" class="page-head-emblem" aria-hidden="true">
+        <span class="page-head-rings"></span>
+        <span class="page-head-disc"><AppIcon :name="emblem" /></span>
+      </div>
+      <div class="page-head-text">
+        <span v-if="eyebrow" class="page-head-eyebrow">{{ eyebrow }}</span>
+        <h1 class="page-head-title">{{ title }}</h1>
+        <p v-if="desc || $slots.desc" class="page-head-desc">
+          <slot name="desc">{{ desc }}</slot>
+        </p>
+      </div>
+      <div v-if="$slots.default" class="page-head-actions">
+        <slot />
+      </div>
+      <span class="page-head-strip" aria-hidden="true"></span>
+    </header>
+  </div>
 </template>
 
 <style scoped>
-.page-head {
+/* Cover the scrollport padding and the card's rounded corners with an opaque
+   theme surface. Keep decorations inside the card, outside the sticky layer. */
+.page-head-sticky {
   position: sticky;
   top: 0;
   z-index: 20;
+  isolation: isolate;
+}
+.page-head-sticky::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--page-gutter-y, 0px)) calc(-1 * var(--page-gutter-x, 0px)) 0;
+  z-index: -1;
+  background: var(--color-page);
+}
+.page-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -135,5 +150,37 @@ const eyebrow = computed(() => props.eyebrow ?? (route.meta.eyebrow as string | 
   inset: auto 0 0 0;
   height: 4px;
   background: var(--color-signal);
+}
+/* Keep the title card compact on phones, but do not fight global button heights
+   (h-9 / coarse min-height 44px) or force a second row — those conflicts make the
+   sticky header border jump when DevTools device mode reflows on click. */
+@media (max-width: 767px) {
+  .page-head {
+    flex-wrap: nowrap;
+    gap: 8px 10px;
+    padding: 12px 14px 15px;
+    border-radius: 10px;
+  }
+  .page-head-emblem,
+  .page-head-disc { width: 36px; height: 36px; }
+  .page-head-disc .app-icon { font-size: 20px; }
+  .page-head-rings { width: 10rem; height: 10rem; }
+  .page-head-text { flex: 1 1 auto; min-width: 0; }
+  .page-head-eyebrow { font-size: 8px; letter-spacing: 0.12em; margin-bottom: 2px; }
+  .page-head-title {
+    font-size: 19px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-head-desc { margin-top: 3px; font-size: 12px; line-height: 1.4; text-wrap: pretty; }
+  .page-head-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .page-head-strip { height: 3px; }
 }
 </style>

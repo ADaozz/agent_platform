@@ -1,4 +1,5 @@
 {
+  "task.duration": { "zh": "任务耗时", "en": "Task duration" },
   "展开或收起侧栏": {
     "zh": "展开或收起侧栏",
     "en": "Toggle sidebar"
