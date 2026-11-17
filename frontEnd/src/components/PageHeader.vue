@@ -41,7 +41,9 @@ const eyebrow = computed(() => props.eyebrow ?? (route.meta.eyebrow as string | 
 
 <style scoped>
 .page-head {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

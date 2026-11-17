@@ -53,7 +53,7 @@ watch(
   { immediate: true },
 )
 
-/** 平台外壳（菜单、页头、面包屑）的英文文案；管理页面正文暂未翻译 */
+/** 平台外壳与已接入 i18n 的设置页英文文案 */
 const EN: Record<string, string> = {
   'Agent 对话': 'Agent Chat',
   平台设置: 'Platform Settings',
@@ -61,6 +61,59 @@ const EN: Record<string, string> = {
   平台能力: 'Capabilities',
   打开导航: 'Open navigation',
   用量仪表盘: 'Usage Dashboard',
+  // 平台能力
+  'Agent 当前挂载的工具与 Skill；调整仅影响新建的对话':
+    'Tools and skills mounted for agents; changes apply only to new chats',
+  工具: 'Tools',
+  '正在加载平台能力…': 'Loading capabilities…',
+  '只读视图：仅管理员可以调整挂载': 'Read-only: only administrators can change mounts',
+  内核工具: 'Core tools',
+  '平台内置，具有副作用的操作仍按会话权限请求审批':
+    'Built into the platform; side-effecting actions still require session approval',
+  扩展工具: 'Additional tools',
+  平台注册的结构化工具: 'Structured tools registered by the platform',
+  'Agent 按需加载的能力包，例如 Word 与 PPT 文档生成':
+    'On-demand capability packs for agents, such as Word and PowerPoint generation',
+  '暂无已安装的 Skill': 'No skills installed',
+  内置扩展: 'Built-in',
+  已安装: 'Installed',
+  所属扩展功能已停用: 'Parent feature is disabled',
+  '需同时挂载「子 Agent 委派」才会生效': 'Also mount “Delegate to subagent” for this to take effect',
+  '{n} 项未保存的变更': '{n} unsaved change(s)',
+  '变更仅对新建对话生效，进行中的对话保留创建时的配置':
+    'Changes apply to new chats only; in-progress chats keep their original mounts',
+  重置: 'Reset',
+  '保存中…': 'Saving…',
+  保存挂载: 'Save mounts',
+  '平台能力已更新，新建对话生效': 'Capabilities updated; applies to new chats',
+  列出文件: 'List files',
+  列出线程工作区中的目录内容: 'List directory contents in the thread workspace',
+  读取文件: 'Read files',
+  按行读取工作区文件: 'Read workspace files by line',
+  写入文件: 'Write files',
+  创建或覆盖工作区文件: 'Create or overwrite workspace files',
+  编辑文件: 'Edit files',
+  对文件做精确的字符串替换: 'Exact string replacement in files',
+  删除文件: 'Delete files',
+  删除工作区中的文件: 'Delete files in the workspace',
+  文件匹配: 'Find files',
+  按通配符查找文件路径: 'Find file paths by glob pattern',
+  搜索内容: 'Search contents',
+  在文件中按正则搜索文本: 'Search file text with regular expressions',
+  执行命令: 'Run commands',
+  '在 Bubblewrap 沙箱内运行 Shell 命令': 'Run shell commands inside the Bubblewrap sandbox',
+  '子 Agent 委派': 'Delegate to subagent',
+  '派生隔离的子 Agent 并等待其结果': 'Spawn an isolated subagent and wait for its result',
+  后台子任务: 'Background subagent',
+  '在后台运行子 Agent，完成后自动回报结果': 'Run a subagent in the background and report when done',
+  子任务日志: 'Subagent logs',
+  查看委派任务的执行摘要: 'View execution summaries for delegated tasks',
+  向用户提问: 'Ask the user',
+  暂停执行并请求用户补充信息: 'Pause execution and ask the user for more information',
+  联网搜索: 'Web search',
+  通过搜索引擎检索公开信息: 'Search public information via search engines',
+  抓取网页: 'Fetch web page',
+  读取指定网址的页面内容: 'Read the content of a given URL',
   '按天 / 会话统计模型 Tokens 与估算费用，数据来自会话生成指标。':
     'Token and estimated cost by day or session, from generation metrics.',
   '按天统计模型 Tokens 与估算费用，数据来自会话生成指标。':

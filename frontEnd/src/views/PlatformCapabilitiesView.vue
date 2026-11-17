@@ -324,14 +324,11 @@ onMounted(load)
   flex-shrink: 0;
 }
 .cap-actions {
-  position: sticky;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.75rem 0;
-  background: linear-gradient(transparent, var(--color-page) 35%);
 }
 .cap-actions span {
   margin-right: auto;
