@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
 
 async function handleLogin() {
   if (!userName.value.trim() || !passWord.value) {
-    toast.error(tr('请输入用户名和密码'))
+    toast.error(tr('请输入用户名/邮箱和密码'))
     return
   }
   loading.value = true
@@ -98,6 +98,13 @@ const regForm = reactive({
 })
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** 注册密码：6-12 位，大小写字母 + 数字 + 符号 */
+const REGISTER_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,12}$/
+const REGISTER_PASSWORD_HINT = '6-12位，需含大小写字母、数字与符号'
+
+function isValidRegisterPassword(pwd: string) {
+  return REGISTER_PASSWORD_RE.test(pwd)
+}
 
 function openRegister() {
   regSuccess.value = false
@@ -148,8 +155,8 @@ async function handleRegister() {
     toast.error(tr('邮箱格式不正确'))
     return
   }
-  if (pwd.length < 6) {
-    toast.error(tr('密码至少6位'))
+  if (!isValidRegisterPassword(pwd)) {
+    toast.error(tr(REGISTER_PASSWORD_HINT))
     return
   }
   if (pwd !== confirmPassWord) {
@@ -226,14 +233,14 @@ onBeforeUnmount(() => {
 
         <form class="mt-8 space-y-4" @submit.prevent="handleLogin">
           <div>
-            <label class="form-label" for="username">{{ tr('用户名') }}</label>
+            <label class="form-label" for="username">{{ tr('用户名 / 邮箱') }}</label>
             <input
               id="username"
               v-model="userName"
               class="input login-input"
               type="text"
-              :placeholder="tr('请输入用户名')"
-              maxlength="64"
+              :placeholder="tr('请输入用户名或邮箱')"
+              maxlength="128"
               autocomplete="username"
             />
           </div>
@@ -320,8 +327,8 @@ onBeforeUnmount(() => {
                 v-model="regForm.passWord"
                 class="input reg-input"
                 type="password"
-                :placeholder="tr('至少 6 位')"
-                maxlength="128"
+                :placeholder="tr(REGISTER_PASSWORD_HINT)"
+                maxlength="12"
                 autocomplete="new-password"
               />
             </div>
@@ -333,7 +340,7 @@ onBeforeUnmount(() => {
                 class="input reg-input"
                 type="password"
                 :placeholder="tr('再输入一次')"
-                maxlength="128"
+                maxlength="12"
                 autocomplete="new-password"
               />
             </div>

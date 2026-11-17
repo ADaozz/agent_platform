@@ -39,9 +39,9 @@ public class AuthServiceImpl implements AuthService {
     private JwtUtils jwtUtils;
 
     @Override
-    // 用户名密码登录
+    // 用户名或邮箱 + 密码登录
     public LoginVO login(LoginDTO dto, HttpServletRequest request) {
-        SysUserEntity user = sysUserService.getByUserName(dto.getUserName());
+        SysUserEntity user = findByUserNameOrEmail(dto.getUserName());
         if (user == null) {
             throw new BusinessException(Module.ModuleType.AUTH, "用户不存在", null);
         }
@@ -55,6 +55,19 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return issueLoginSuccess(user.getUserId(), user.getUserName(), request, CertConstants.LOGIN_TYPE_PASSWORD);
+    }
+
+    /** 优先按用户名查找，未命中再按邮箱（忽略大小写）查找 */
+    private SysUserEntity findByUserNameOrEmail(String account) {
+        if (!StringUtils.hasText(account)) {
+            return null;
+        }
+        String trimmed = account.trim();
+        SysUserEntity user = sysUserService.getByUserName(trimmed);
+        if (user != null) {
+            return user;
+        }
+        return sysUserService.getByEmail(trimmed.toLowerCase());
     }
 
     @Override

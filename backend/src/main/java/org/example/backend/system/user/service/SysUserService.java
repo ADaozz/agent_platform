@@ -14,6 +14,9 @@ public interface SysUserService extends IService<SysUserEntity> {
 
     SysUserEntity getByUserName(String userName);
 
+    /** 按邮箱精确查询（调用方需先规范化邮箱） */
+    SysUserEntity getByEmail(String email);
+
     void createUser(SysUserCreateDTO dto);
 
     void updateUser(SysUserUpdateDTO dto);

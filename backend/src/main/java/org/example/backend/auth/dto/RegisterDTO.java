@@ -21,7 +21,11 @@ public class RegisterDTO {
     private String email;
 
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 128, message = "密码长度需为6-128字符")
+    @Size(min = 6, max = 12, message = "密码长度需为6-12位，且需同时包含大小写字母、数字与符号")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{6,12}$",
+            message = "密码长度需为6-12位，且需同时包含大小写字母、数字与符号"
+    )
     private String passWord;
 
     @NotBlank(message = "确认密码不能为空")
