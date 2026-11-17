@@ -26,6 +26,18 @@
   --border-subtle: #34312b;
   --warning-subtle: #29251d;
   --ws-glass-panel: rgb(36 35 32 / 0.94);
+  --scrollbar: rgb(245 237 220 / 0.16);
+  --scrollbar-hover: rgb(245 237 220 / 0.28);
+}
+.dap-root.agent-host[data-theme='dark'],
+.dap-root.agent-host[data-theme='dark'] * {
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.dap-root.agent-host[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+}
+.dap-root.agent-host[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
 }
 
 .dap-root.agent-host {
@@ -336,6 +348,16 @@
   /* 任务日志：最近对话卡片 */
   .recent-chats {
     margin-top: 44px;
+  }
+  .history-pull span {
+    font-family: var(--mono);
+    color: var(--signal-text);
+  }
+  .history-pull-track {
+    background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  }
+  .history-pull-track > i {
+    background: var(--signal);
   }
   .chat-row {
     position: relative;
@@ -1069,8 +1091,11 @@
 
 @media (max-width: 767px) {
   .dap-root.agent-host .chat-thumbnail {
-    width: 76px;
-    height: 60px;
+    width: 104px;
+    height: 64px;
+  }
+  .dap-root.agent-host .recent-chats {
+    margin-top: 20px;
   }
 }
 
@@ -1118,6 +1143,11 @@
   .dap-root.agent-host .chat-row .chat-thumbnail,
   .dap-root.agent-host .chat-row .chat-thumbnail::after {
     animation: none !important;
+  }
+  .dap-root.agent-host .recent-chats-track,
+  .dap-root.agent-host .history-pull,
+  .dap-root.agent-host .history-pull-track > i {
+    transition: none;
   }
 }
 

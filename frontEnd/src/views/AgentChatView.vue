@@ -51,6 +51,12 @@ import WorkspaceBackdrop from '@/components/WorkspaceBackdrop.vue'
 .agent-host :deep(.agent-main:has(> .chat-page:not(.has-session))) {
   overflow: hidden;
 }
+/* History and files: the title and filters stay put; only the list scrolls. */
+.agent-host :deep(.agent-main:has(> .history-view)) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 /* Match existing content gutters and preview bounds without changing either. */
 .agent-host :deep(.agent-main.session-layout),
 .agent-host :deep(.document-open > .agent-main) {

@@ -53,6 +53,109 @@ const historyCounts = computed(() => Object.fromEntries([['all', searchedSession
 const visibleSessions = computed(() => historyStatus.value === 'all' ? searchedSessions.value : searchedSessions.value.filter(s => STATUS_GROUPS[historyStatus.value].includes(s.status)))
 const historyFiltered = computed(() => !!search.value.trim() || historyStatus.value !== 'all' || historyRange.value !== 'all')
 function resetHistoryFilters() { search.value = ''; historyStatus.value = 'all'; historyRange.value = 'all' }
+// Home lists six chats. Pulling past the end is resisted, then fills a bar that opens history.
+const recentScroller = ref(null)
+const historyBar = ref(0)
+const historyShift = ref(0)
+const historyPulling = ref(false)
+const historyTrackStyle = computed(() => ({ transform: `translate3d(0, ${(-historyShift.value).toFixed(2)}px, 0)` }))
+const HISTORY_LEAD = 28
+const HISTORY_FILL = 150
+const HISTORY_PULL_MAX = HISTORY_LEAD + HISTORY_FILL
+const historyMotion = typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches
+let historyPullInput = 0, historyPullToken = 0, historyPullTimer = 0, detachRecentPull = null
+function syncHistoryPull() {
+  historyBar.value = Math.min(1, Math.max(0, (historyPullInput - HISTORY_LEAD) / HISTORY_FILL))
+  historyShift.value = historyMotion ? Math.min(24, historyPullInput * 0.42) : 0
+}
+function releaseHistoryPull() {
+  const token = ++historyPullToken
+  clearTimeout(historyPullTimer)
+  historyPulling.value = false
+  requestAnimationFrame(() => {
+    if (token !== historyPullToken) return
+    historyPullInput = 0
+    syncHistoryPull()
+  })
+}
+function openHistoryFromPull() {
+  ++historyPullToken
+  clearTimeout(historyPullTimer)
+  historyPullInput = 0
+  historyBar.value = 0
+  historyShift.value = 0
+  historyPulling.value = false
+  mainView.value = 'history'
+}
+function nudgeHistoryPull(delta) {
+  if (!delta) return
+  ++historyPullToken
+  clearTimeout(historyPullTimer)
+  historyPulling.value = true
+  const gain = delta > 0 ? 0.3 + (1 - historyPullInput / HISTORY_PULL_MAX) * 0.38 : 0.92
+  historyPullInput = Math.max(0, Math.min(HISTORY_PULL_MAX, historyPullInput + delta * gain))
+  syncHistoryPull()
+  if (historyPullInput >= HISTORY_PULL_MAX - 0.5) {
+    openHistoryFromPull()
+    return
+  }
+  historyPullTimer = window.setTimeout(releaseHistoryPull, 170)
+}
+function recentAtBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= 2
+}
+function bindRecentPull(el) {
+  const onWheel = (event) => {
+    if (event.ctrlKey || event.metaKey || !recentSessions.value.length) return
+    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? el.clientHeight : 1
+    const delta = event.deltaY * scale
+    if (Math.abs(delta) < Math.abs(event.deltaX) * scale) return
+    if (delta > 0 && recentAtBottom(el)) {
+      event.preventDefault()
+      nudgeHistoryPull(delta)
+    } else if (delta < 0 && historyPullInput > 0) {
+      event.preventDefault()
+      nudgeHistoryPull(delta)
+    }
+  }
+  let touchY = 0
+  const onTouchStart = (event) => { touchY = event.touches[0]?.clientY ?? 0 }
+  const onTouchMove = (event) => {
+    if (!recentSessions.value.length) return
+    const y = event.touches[0]?.clientY ?? touchY
+    const delta = touchY - y
+    touchY = y
+    if (delta > 0 && (recentAtBottom(el) || historyPullInput > 0)) {
+      event.preventDefault()
+      nudgeHistoryPull(delta)
+    } else if (delta < 0 && historyPullInput > 0) {
+      event.preventDefault()
+      nudgeHistoryPull(delta)
+    }
+  }
+  const onTouchEnd = () => { if (historyPullInput > 0) releaseHistoryPull() }
+  el.addEventListener('wheel', onWheel, { passive: false })
+  el.addEventListener('touchstart', onTouchStart, { passive: true })
+  el.addEventListener('touchmove', onTouchMove, { passive: false })
+  el.addEventListener('touchend', onTouchEnd)
+  el.addEventListener('touchcancel', onTouchEnd)
+  return () => {
+    el.removeEventListener('wheel', onWheel)
+    el.removeEventListener('touchstart', onTouchStart)
+    el.removeEventListener('touchmove', onTouchMove)
+    el.removeEventListener('touchend', onTouchEnd)
+    el.removeEventListener('touchcancel', onTouchEnd)
+  }
+}
+watch(recentScroller, (el) => {
+  detachRecentPull?.()
+  detachRecentPull = null
+  historyPullInput = 0
+  historyBar.value = 0
+  historyShift.value = 0
+  historyPulling.value = false
+  if (el) detachRecentPull = bindRecentPull(el)
+})
 const FILE_KINDS = { word: '文档', slides: '演示', sheet: '表格', pdf: 'PDF', image: '图片', code: '代码', text: '文本', archive: '压缩包', media: '音视频', other: '其他' }
 const searchedFiles = computed(() => allFiles.value.filter(f => matches(fileSearch.value, f.path, f.session_title) && inRange(f.modified_at * 1000, fileRange.value)))
 const fileKinds = computed(() => { const counts = {}; for (const f of searchedFiles.value) { const tone = fileType(f.path).tone; counts[tone] = (counts[tone] || 0) + 1 } return Object.keys(FILE_KINDS).filter(key => counts[key]).map(key => ({ key, label: FILE_KINDS[key], count: counts[key] })) })
@@ -567,7 +670,7 @@ watch(() => [mainView.value, selected.value?.id], ([view, id]) => {
 // Created after an await, so it is not bound to this component and must be stopped explicitly.
 let stopCommands = null, unmounted = false
 onMounted(() => { init().then(() => { if (!unmounted) stopCommands = watch(command, runCommand, { immediate: true }) }); document.addEventListener('keydown', keydown); poll = setInterval(() => refreshSessions().catch(() => {}), 3000) })
-onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearInterval(poll); clearTimeout(noticeTimer); document.removeEventListener('keydown', keydown); clearAttachments(); activeSessionId.value = null; workspaceView.value = 'agents' })
+onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearInterval(poll); clearTimeout(noticeTimer); clearTimeout(historyPullTimer); detachRecentPull?.(); document.removeEventListener('keydown', keydown); clearAttachments(); activeSessionId.value = null; workspaceView.value = 'agents' })
 </script>
 
 <template>
@@ -578,25 +681,25 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
            否则会盖住弹层选项，导致模型/权限无法点击 -->
       <div v-if="popup" class="popover-backdrop" @click="popup = ''"></div>
       <slot v-if="mainView === 'agents'" name="backdrop" />
-      <header v-if="selected || mainView !== 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ mainView === 'files' ? t('全局文件') : selected ? sessionTitle(selected) : t('All chats') }}</span><button v-if="selected && mainView === 'agents' && latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
+      <header v-if="selected && mainView === 'agents'" class="page-header"><button @click="newChat" class="text-button"><Icon name="ArrowLeft" :size="15" /> {{ t("Agents") }}</button><span class="header-title">{{ sessionTitle(selected) }}</span><button v-if="latestFile" type="button" class="icon-button header-preview" :title="t('预览最新文件')" :aria-label="t('预览最新文件')" @click="featurePanels?.openFile(latestFile.path)"><Icon name="FileText" :size="17" /></button></header>
 
       <div v-if="loading" class="loading"><Icon name="LoaderCircle" class="spin" /> {{ t("Loading…") }}</div>
-      <div v-else-if="mainView === 'history'" class="history-view"><div class="section-eyebrow">{{ t("YOUR CHATS") }}</div><h1>{{ t("Chats") }}</h1>
+      <div v-else-if="mainView === 'history'" class="history-view"><div class="history-head"><div class="section-eyebrow">{{ t("YOUR CHATS") }}</div><h1>{{ t("Chats") }}</h1>
         <div class="list-filter" role="search">
           <label class="filter-search"><Icon name="Search" :size="15" /><input v-model="search" type="search" :placeholder='t("搜索标题或模型…")' :aria-label='t("搜索对话")'><button v-if="search" type="button" class="icon-button" :aria-label="t('清空搜索')" @click="search = ''"><Icon name="X" :size="13" /></button></label>
           <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range" :class="{ active: historyRange !== 'all', open: popup === 'historyRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'historyRange'" @click.stop="toggle('historyRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(historyRange)) }}</span><Icon name="ChevronDown" :size="14" class="filter-range-chevron" /></button><div v-if="popup === 'historyRange'" v-popover-placement class="popover range-popover" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="menu-row" :class="{ selected: historyRange === key }" :aria-selected="historyRange === key" @click="historyRange = key; popup = ''"><span>{{ t(label) }}</span><Icon v-if="historyRange === key" name="Check" :size="14" /></button></div></div>
           <div class="filter-chips" role="radiogroup" :aria-label="t('状态筛选')"><button v-for="(label, key) in { all: t('全部'), active: t('进行中'), waiting: t('待处理'), completed: t('已完成'), failed: t('失败 / 中断') }" :key="key" type="button" role="radio" class="filter-chip" :class="{ active: historyStatus === key }" :aria-checked="historyStatus === key" :disabled="key !== 'all' && !historyCounts[key]" @click="historyStatus = key">{{ label }}<span>{{ historyCounts[key] }}</span></button></div>
         </div>
-        <div v-if="historyFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个对话', { n: visibleSessions.length }) }}</span><button type="button" class="text-button" @click="resetHistoryFilters">{{ t('清除筛选') }}</button></div>
-        <button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon :name="s.branched_from ? 'GitBranch' : 'MessageSquare'" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length && historyFiltered" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的对话") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetHistoryFilters">{{ t("清除筛选") }}</button></div><div v-else-if="!visibleSessions.length" class="empty-state"><Icon name="MessagesSquare" :size="28" /><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div>
-      <div v-else-if="mainView === 'files'" class="history-view"><div class="section-eyebrow">{{ t("ALL FILES") }}</div><h1>{{ t("全局文件") }}</h1>
+        <div v-if="historyFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个对话', { n: visibleSessions.length }) }}</span><button type="button" class="text-button" @click="resetHistoryFilters">{{ t('清除筛选') }}</button></div></div>
+        <div class="history-list"><button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon :name="s.branched_from ? 'GitBranch' : 'MessageSquare'" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length && historyFiltered" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的对话") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetHistoryFilters">{{ t("清除筛选") }}</button></div><div v-else-if="!visibleSessions.length" class="empty-state"><Icon name="MessagesSquare" :size="28" /><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div></div>
+      <div v-else-if="mainView === 'files'" class="history-view"><div class="history-head"><div class="section-eyebrow">{{ t("ALL FILES") }}</div><h1>{{ t("全局文件") }}</h1>
         <div v-if="allFiles.length" class="list-filter" role="search">
           <label class="filter-search"><Icon name="Search" :size="15" /><input v-model="fileSearch" type="search" :placeholder='t("搜索文件名、路径或所属对话…")' :aria-label='t("搜索文件")'><button v-if="fileSearch" type="button" class="icon-button" :aria-label="t('清空搜索')" @click="fileSearch = ''"><Icon name="X" :size="13" /></button></label>
           <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range" :class="{ active: fileRange !== 'all', open: popup === 'fileRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'fileRange'" @click.stop="toggle('fileRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(fileRange)) }}</span><Icon name="ChevronDown" :size="14" class="filter-range-chevron" /></button><div v-if="popup === 'fileRange'" v-popover-placement class="popover range-popover" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="menu-row" :class="{ selected: fileRange === key }" :aria-selected="fileRange === key" @click="fileRange = key; popup = ''"><span>{{ t(label) }}</span><Icon v-if="fileRange === key" name="Check" :size="14" /></button></div></div>
           <div class="filter-chips" role="radiogroup" :aria-label="t('类型筛选')"><button type="button" role="radio" class="filter-chip" :class="{ active: fileKind === 'all' }" :aria-checked="fileKind === 'all'" @click="fileKind = 'all'">{{ t('全部') }}<span>{{ searchedFiles.length }}</span></button><button v-for="kind in fileKinds" :key="kind.key" type="button" role="radio" class="filter-chip" :class="{ active: fileKind === kind.key }" :aria-checked="fileKind === kind.key" @click="fileKind = kind.key"><i class="file-kind-dot" :class="'file-tone-' + kind.key"></i>{{ t(kind.label) }}<span>{{ kind.count }}</span></button></div>
         </div>
-        <div v-if="filesFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个文件', { n: visibleFiles.length }) }}</span><button type="button" class="text-button" @click="resetFileFilters">{{ t('清除筛选') }}</button></div>
-        <button v-for="f in visibleFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.branched_from ? branchFileName(f.path.split('/').pop()) : f.path.split('/').pop() }}</strong><small>{{ f.branched_from ? t('分支') + '·' : '' }}{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && allFiles.length && !visibleFiles.length" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的文件") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetFileFilters">{{ t("清除筛选") }}</button></div><div v-if="!filesLoading && !allFiles.length" class="empty-state"><h3>{{ t("暂无文件") }}</h3><p>{{ t("files.emptyHint") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div>
+        <div v-if="filesFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个文件', { n: visibleFiles.length }) }}</span><button type="button" class="text-button" @click="resetFileFilters">{{ t('清除筛选') }}</button></div></div>
+        <div class="history-list"><button v-for="f in visibleFiles" :key="f.session_id + '/' + f.path" class="history-row" :title="f.path" @click="openSessionFile(f)"><Icon :name="fileType(f.path).icon" :class="['file-icon', 'file-tone-' + fileType(f.path).tone]" /><div><strong>{{ f.branched_from ? branchFileName(f.path.split('/').pop()) : f.path.split('/').pop() }}</strong><small>{{ f.branched_from ? t('分支') + '·' : '' }}{{ f.session_title || t('New chat') }} · {{ fileTime(f) }} · {{ fileSize(f.size) }}</small></div><Icon name="ChevronRight" /></button><div v-if="!filesLoading && allFiles.length && !visibleFiles.length" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的文件") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetFileFilters">{{ t("清除筛选") }}</button></div><div v-if="!filesLoading && !allFiles.length" class="empty-state"><h3>{{ t("暂无文件") }}</h3><p>{{ t("files.emptyHint") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div></div>
 
 
       <div v-else class="chat-page" :class="{ 'has-session': selected }">
@@ -656,7 +759,16 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
           <div v-if="error && !modal" role="alert" class="error-inline"><Icon name="CircleAlert" :size="14" />{{ t(error) }}<button @click="error = ''" class="icon-button" :aria-label='t("关闭错误")'><Icon name="X" :size="13" /></button></div>
         </div>
 
-        <section v-if="!selected" class="recent-chats"><template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 12)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div><span class="status-dot" :class="s.status"></span><span>{{ s.model_id.split('/').at(-1) }}</span><span>{{ dateLabel(s) }}</span></div></div><Icon class="chat-arrow" name="ArrowUpRight" :size="15" /></button></template><div v-else-if="sessions.length" class="home-empty"><div class="empty-mark"><Icon name="History" :size="23" /></div><h3>{{ t("近 7 天没有对话") }}</h3><p>{{ t("更早的对话可以在历史对话中查看。") }}</p><button type="button" class="text-button home-history-link" @click="mainView = 'history'">{{ t("查看历史对话") }}<Icon name="ArrowRight" :size="13" /></button></div><div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div></section>
+        <section v-if="!selected" class="recent-chats" :class="{ 'is-pulling': historyPulling }">
+          <div ref="recentScroller" class="recent-chats-scroller">
+            <div class="recent-chats-track" :style="historyTrackStyle">
+              <template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 6)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div><span class="status-dot" :class="s.status"></span><span>{{ s.model_id.split('/').at(-1) }}</span><span>{{ dateLabel(s) }}</span></div></div><Icon class="chat-arrow" name="ArrowUpRight" :size="15" /></button></template>
+              <div v-else-if="sessions.length" class="home-empty"><div class="empty-mark"><Icon name="History" :size="23" /></div><h3>{{ t("近 7 天没有对话") }}</h3><p>{{ t("更早的对话可以在历史对话中查看。") }}</p><button type="button" class="text-button home-history-link" @click="mainView = 'history'">{{ t("查看历史对话") }}<Icon name="ArrowRight" :size="13" /></button></div>
+              <div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div>
+            </div>
+          </div>
+          <div v-if="recentSessions.length" class="history-pull" :class="{ visible: historyBar > 0.01 }" :style="{ '--pull': historyBar }" aria-hidden="true"><span>{{ t('查看历史') }}</span><div class="history-pull-track"><i></i></div></div>
+        </section>
       </div>
       <div v-if="error && mainView === 'history'" class="error-inline">{{ t(error) }}</div>
     </div>
