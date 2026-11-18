@@ -18,7 +18,7 @@ const icon=computed(()=>props.process.active?'LoaderCircle':props.process.backgr
 <template>
  <section class="work-process" :class="{'is-finished':process.finished}" :data-task-finished="process.finished" :aria-label="t('process.title')">
   <button type="button" class="process-task-summary" :class="{done:!process.active&&['completed','segment_completed'].includes(process.status)}" :aria-expanded="!collapsed" @click="toggleTask">
-   <Icon :name="icon" :size="15" :class="{spin:process.active}"/><span class="process-task-state">{{ stateLabel }}</span><span class="process-count">{{ t('process.steps',{count:process.stepCount}) }}</span><time>{{ duration }}</time><Icon name="ChevronDown" :size="13" class="process-chevron" :class="{expanded:!collapsed}"/>
+   <Icon :name="icon" :size="15" :class="{spin:process.active}"/><span class="process-task-state">{{ stateLabel }}</span><span class="process-count">{{ t('process.steps',{count:process.stepCount}) }}</span><time>{{ duration }}</time>
   </button>
   <div class="process-task-fold" :class="{expanded:!collapsed}" :inert="collapsed" :aria-hidden="collapsed"><div class="process-task-fold-inner">
    <ol v-if="!collapsed || !process.finished" class="process-timeline"><template v-for="step in process.steps" :key="step.key"><li v-if="step.kind==='steer'" class="process-node process-steer" :data-step-id="step.key"><span class="process-node-icon"><Icon name="CornerDownRight" :size="15"/></span><div class="process-node-body"><span class="process-steer-label">{{ step.name==='follow_up'?t('后续任务'):t('追加指令') }}</span><span class="process-steer-text">{{ step.content }}</span></div></li><ProcessStep v-else :step="step" :now="now" :action-label="actionLabel" :collapse-epoch="collapseEpoch"/></template></ol>

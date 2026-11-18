@@ -969,6 +969,31 @@ class WorkspaceCompositeBackend(CompositeBackend, SandboxBackendProtocol):
     async def aread(self, file_path: str, offset: int = 0, limit: int = 2000) -> ReadResult:
         return await asyncio.to_thread(self.read, file_path, offset, limit)
 
+    def file_mutation_snapshot(self, file_path: str, max_bytes: int) -> bytes | None:
+        """Capture a small regular file through the same mount rules as its edit."""
+        if self._protection_error(file_path, write=False) is not None:
+            return None
+        plan = self._mutation_plan(file_path)
+        if isinstance(plan, str):
+            return None
+        backend, key = plan
+        if not isinstance(backend, FilesystemBackend):
+            return None
+        try:
+            path = backend._resolve_path(key)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, "rb") as file:
+                info = os.fstat(file.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
+                    return None
+                contents = file.read(max_bytes + 1)
+                current = os.fstat(file.fileno())
+                if len(contents) <= max_bytes and (info.st_size, info.st_mtime_ns) == (current.st_size, current.st_mtime_ns):
+                    return contents
+        except (OSError, ValueError):
+            pass
+        return None
+
     def write(self, file_path: str, content: str) -> WriteResult:
         plan = self._mutation_plan(file_path)
         if isinstance(plan, str):

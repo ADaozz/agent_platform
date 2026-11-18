@@ -1,9 +1,90 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { conversationTimeline } from '../../frontEnd/src/agent-platform/conversation.js'
-import { stepBody, elapsed } from '../../frontEnd/src/agent-platform/processView.js'
+import { compactToolSummary, stepBody, elapsed } from '../../frontEnd/src/agent-platform/processView.js'
 const processOf = (events, status='running') => conversationTimeline(events,status).find(block=>block.kind==='process')
 const at=(second)=>`2026-10-29T14:00:${String(second).padStart(2,'0')}.000Z`
+
+test('collapsed file tools summarize names and reliable diffs while retaining raw details', () => {
+  const t = (key, { n } = {}) => n == null ? key : `${n} more`
+  const summarize = (name, args, result = {}) => {
+    const events = [
+      { seq: 1, type: 'tool_started', name, tool_call_id: 'a', arguments: args },
+      { seq: 2, type: 'tool_completed', name, tool_call_id: 'a', ...result },
+    ]
+    const step = processOf(events).steps[0]
+    return [compactToolSummary(step, t), stepBody(step, t)]
+  }
+  assert.deepEqual(summarize('read_file', { file_path: '/tmp/report.md' }, { content: 'private file body' }),
+    [{ text: 'report.md', title: '/tmp/report.md' }, 'process.input\n{\n  "file_path": "/tmp/report.md"\n}\n\nprocess.result\nprivate file body'])
+  const listing = { entries: ['/tmp/report.md', '/tmp/notes.md', '/tmp/assets/'], total: 6 }
+  assert.deepEqual(summarize('ls', { path: '/tmp' }, { artifact: { file_summary: listing } })[0],
+    { text: 'report.md, notes.md, assets/', title: listing.entries.join('\n'), more: '3 more' })
+  assert.equal(summarize('ls', { path: '/tmp' }, { artifact: { file_summary: { entries: [], total: 0 } } })[0].text, 'process.emptyListing')
+  const args = { file_path: 'a/report.md', content: 'first\r\nsecond\r\n' }
+  assert.deepEqual(summarize('write_file', args, { artifact: { operation: 'create' } })[0],
+    { text: 'report.md', title: 'a/report.md', added: 2 })
+  assert.deepEqual(summarize('write_file', args, { artifact: { operation: 'create', file_summary: {} } })[0],
+    { text: 'report.md', title: 'a/report.md' })
+  const diff = { artifact: { file_summary: { added: 1, removed: 1 } } }
+  assert.deepEqual(summarize('edit_file', args, diff)[0],
+    { text: 'report.md', title: 'a/report.md', removed: 1, added: 1 })
+  assert.deepEqual(summarize('edit_file', args, { ...diff, is_error: true })[0],
+    { text: 'report.md', title: 'a/report.md' })
+})
+
+test('collapsed execute rows use the submitted command during and after execution', () => {
+  const command = 'echo  first\nprintf second'
+  const start = { seq: 1, type: 'tool_started', name: 'execute', tool_call_id: 'a', arguments: { command } }
+  const end = { seq: 2, type: 'tool_completed', name: 'execute', tool_call_id: 'a', is_error: true, content: 'command failed' }
+  const t = key => key
+  for (const events of [[start], [start, end]]) {
+    const step = processOf(events).steps[0]
+    assert.deepEqual(compactToolSummary(step, t), { text: 'echo  first printf second', command: true })
+    assert.equal(step.arguments.command, command)
+  }
+  const step = processOf([start, end]).steps[0]
+  assert.match(stepBody(step, t), /command failed/)
+})
+
+test('execute summaries and details shorten only the platform data prefix', () => {
+  const workspace = '/workspaces/ws_53c7b8e029414d3ead6b25d230504bdf'
+  const paths = [
+    `/home/neo/project/agent_platform/agent-runtime/.platform-itam${workspace}`,
+    `/var/lib/agent-platform/runtime${workspace}`,
+    '$PLATFORM_DATA_DIR/workspaces',
+    '${PLATFORM_DATA_DIR}/runtime.log',
+    '/home/neo/workspaces/notes',
+  ]
+  const command = `cd ${paths[0]} && printf '%s' ${paths.slice(1).join(' ')}`
+  const step = { kind: 'tool', name: 'execute', arguments: { command } }
+  const t = key => key
+  const displayed = `cd ~/···${workspace} && printf '%s' ~/···${workspace} ~/···/workspaces ~/···/runtime.log /home/neo/workspaces/notes`
+  assert.equal(compactToolSummary(step, t).text, displayed)
+  assert.ok(stepBody(step, t).includes(displayed))
+  assert.ok(!stepBody(step, t).includes(paths[0]))
+  assert.equal(step.arguments.command, command)
+})
+
+test('delete and web calls summarize their input without replacing raw tool results', () => {
+  const cases = [
+    ['delete', { file_path: '/files/stale.md' }, 'stale.md'],
+    ['web_search', { query: 'DOCX table layout' }, 'DOCX table layout'],
+    ['web_fetch', { url: 'https://example.com/article' }, 'https://example.com/article'],
+  ]
+  const t = key => key
+  for (const [name, args, expected] of cases) {
+    const events = [
+      { seq: 1, type: 'tool_started', name, tool_call_id: 'a', arguments: args },
+      { seq: 2, type: 'tool_completed', name, tool_call_id: 'a', content: 'raw tool result' },
+    ]
+    for (const count of [1, 2]) {
+      const step = processOf(events.slice(0, count)).steps[0]
+      assert.equal(compactToolSummary(step, t).text, expected)
+      if (count === 2) assert.match(stepBody(step, t), /raw tool result/)
+    }
+  }
+})
 
 test('interim text splits execution into segments that keep occurrence order',()=>{
  const events=[
@@ -64,6 +145,29 @@ test('all tool rows completing never finishes a task while the Agent is still ru
  events.push({seq:5,type:'assistant_completed',content:'All done'},{seq:6,type:'result',status:'completed'})
  process=processOf(events,'completed');assert.equal(process.finished,true)
  assert(process.steps.every(step=>step.status==='completed'))
+})
+
+test('the active process clock advances between events after a tool completes', () => {
+  const events = [
+    { seq: 1, type: 'operation', operation: 'message', text: 'Inspect files', occurred_at: at(0) },
+    { seq: 2, type: 'tool_started', name: 'read_file', tool_call_id: 'read', occurred_at: at(1) },
+    { seq: 3, type: 'tool_completed', tool_call_id: 'read', content: 'Done', occurred_at: at(4) },
+  ]
+  const durationAt = (process, second) => elapsed(process.startedAt, process.endedAt, process.durationMs, Date.parse(at(second)))
+  const active = processOf(events)
+  assert.equal(active.active, true)
+  assert.equal(active.steps[0].durationMs, 3000)
+  assert.equal(durationAt(active, 5), 5000)
+  assert.equal(durationAt(active, 8), 8000)
+
+  const answering = processOf([...events, { seq: 4, type: 'assistant_delta', content: 'Here is what I found.', occurred_at: at(9) }])
+  assert.equal(answering.active, false)
+  assert.equal(durationAt(answering, 10), 9000)
+
+  const finished = processOf([...events, { seq: 4, type: 'result', status: 'completed', occurred_at: at(9) }], 'completed')
+  assert.equal(finished.active, false)
+  assert.equal(durationAt(finished, 10), 9000)
+  assert.equal(durationAt(finished, 12), 9000)
 })
 
 test('parallel calls retain independent status, outputs and stable keys',()=>{

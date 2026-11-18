@@ -25,13 +25,15 @@ export function shortResult(value) {
 }
 function timeSpan(start, end) { return start != null && end != null ? Math.max(0, end - start) : null }
 /** Wall-clock bounds for a process segment; never drop known step times when hints are missing. */
-function processTiming(group, startHint, endHint) {
+function processTiming(group, startHint, endHint, active) {
   let start = startHint ?? null, end = endHint ?? null
   for (const step of group) {
     if (step.startedAt != null) start = start == null ? step.startedAt : Math.min(start, step.startedAt)
     const stepEnd = step.endedAt ?? (step.startedAt != null && typeof step.durationMs === 'number' ? step.startedAt + step.durationMs : null)
     if (stepEnd != null) end = end == null ? stepEnd : Math.max(end, stepEnd)
   }
+  // A completed step cannot supply the end of a still-running segment.
+  if (active) end = null
   return { startedAt: start, endedAt: end, durationMs: timeSpan(start, end) }
 }
 function compactionStep(event, index, status = 'running') {
@@ -213,6 +215,7 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
         step.streams.push({ stream: event.stream || 'stdout', content })
       } else if (['tool_completed', 'tool_failed', 'tool_cancelled'].includes(event.type)) {
         const finalOutput = event.content != null ? rawText(event.content) : rawText(event.result)
+        if (event.artifact != null) step.artifact = event.artifact
         if (terminalStatuses.has(step.status)) { if (!step.finalOutput) step.finalOutput = finalOutput; continue }
         const refused = SUBAGENT_TOOLS.has(step.name) && /^subagent (failed|cancelled)/i.test(finalOutput.trim())
         if (step.name === BACKGROUND_START && event.type === 'tool_completed' && !event.is_error && !refused) {
@@ -304,20 +307,22 @@ export function conversationTimeline(events, sessionStatus = 'idle', { backgroun
     segments.forEach((group, position) => {
       const final = position === segments.length - 1
       const followedByText = !final || answers.length > 0
-      if (group.length || (final && live && !followedByText)) {
+      const active = final && live && !followedByText
+      if (group.length || active) {
         const previousText = texts[position - 1]
         const startHint = position === 0
           ? item.startedAt ?? group[0]?.startedAt
           : group[0]?.startedAt ?? previousText?.endedAt ?? previousText?.startedAt ?? item.startedAt
-        const endHint = final && !followedByText
-          ? endedAt ?? group.at(-1)?.endedAt
-          : group.at(-1)?.endedAt ?? texts[position]?.startedAt ?? endedAt
-        const timing = processTiming(group, startHint, endHint)
+        const nextTextAt = final ? answers[0]?.contentAt : texts[position]?.startedAt
+        const endHint = followedByText
+          ? nextTextAt ?? group.at(-1)?.endedAt ?? endedAt
+          : endedAt ?? group.at(-1)?.endedAt
+        const timing = processTiming(group, startHint, endHint, active)
         blocks.push({
           kind: 'process', key: `process-${item.key}-${position}`, steps: group,
           // Individual tool errors are routine mid-run; only the last segment carries the run's outcome.
           status: final && (ended || !followedByText) ? currentStatus : 'segment_completed',
-          active: final && live && !followedByText,
+          active,
           finished: followedByText || (ended && group.every(step => settledStatuses.has(step.status))),
           background: group.some(step => step.backgroundLive),
           stepCount: group.filter(step => !['steer', 'notice'].includes(step.kind)).length, actionCount: group.filter(step => step.kind === 'tool').length,

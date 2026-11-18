@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import {t} from './preferences'
 import {settledStatuses,subagentResult} from './conversation'
-import {stepBody,elapsed,formatDuration} from './processView'
+import {compactToolSummary,stepBody,elapsed,formatDuration} from './processView'
 const props=defineProps({step:Object,actionLabel:Function,now:Number,collapseEpoch:Number})
 const cancelBackground=inject('cancelBackground',null)
 const complete=computed(()=>settledStatuses.has(props.step.status))
@@ -21,6 +21,7 @@ const label=computed(()=>props.step.kind==='compaction'?t('process.compaction'):
 const icon=computed(()=>props.step.status==='failed'?'CircleAlert':props.step.status==='cancelled'||props.step.status==='interrupted'?'X':props.step.kind==='compaction'?'Minimize2':props.step.kind==='reasoning'?'Brain':props.step.kind==='notice'?'CornerDownRight':props.step.kind==='tool'?(TOOL_ICONS[props.step.name]||'Wrench'):'FileText')
 const statusText=computed(()=>props.step.backgroundLive||(background.value&&props.step.status==='running')?t('process.status.background'):t('process.status.'+props.step.status))
 const duration=computed(()=>formatDuration(elapsed(props.step.startedAt,props.step.endedAt,props.step.durationMs,props.now,!complete.value),t))
+const compactSummary=computed(()=>compactToolSummary(props.step,t))
 const resultSummary=computed(()=>{
   if (props.step.kind!=='compaction') return props.step.resultSummary
   if (props.step.status==='running') return ''
@@ -43,10 +44,20 @@ onMounted(tail)
 </script>
 <template>
  <li class="process-node" :class="{'process-node-error':step.status==='failed','process-node-background':step.backgroundLive}" :data-step-id="step.key" :data-step-status="step.status">
-  <span class="process-node-icon"><Icon :name="icon" :size="15" :class="{spin:step.status==='running'&&step.kind==='reasoning'}"/></span>
+  <button type="button" class="process-node-icon" :class="{expanded}" :aria-expanded="expanded" :aria-label="label" @click="expanded=!expanded">
+   <Icon :name="icon" :size="15" class="process-step-glyph" :class="{spin:step.status==='running'&&step.kind==='reasoning'}"/>
+   <Icon name="ChevronDown" :size="12" class="process-chevron process-step-toggle" :class="{expanded}"/>
+  </button>
   <div class="process-node-body">
    <button class="process-step-heading" type="button" :aria-expanded="expanded" @click="expanded=!expanded">
-    <span class="process-step-name" :title="label">{{ label }}</span><span class="process-step-status" :class="[step.status,{background:step.backgroundLive}]"><i v-if="step.backgroundLive" class="background-pulse" aria-hidden="true"></i>{{ statusText }}</span><time class="process-step-duration">{{ duration }}</time><span class="process-step-result" :title="step.subject||resultSummary">{{ resultSummary }}</span><Icon name="ChevronDown" :size="12" class="process-chevron" :class="{expanded}"/>
+    <span class="process-step-name" :title="label">{{ label }}</span><span class="process-step-status" :class="[step.status,{background:step.backgroundLive}]"><i v-if="step.backgroundLive" class="background-pulse" aria-hidden="true"></i>{{ statusText }}</span><time class="process-step-duration">{{ duration }}</time>
+    <span v-if="compactSummary" class="process-step-result compact-tool-summary" :title="compactSummary.title">
+     <span class="compact-tool-text" :class="{ 'compact-tool-command': compactSummary.command }">{{ compactSummary.text }}</span>
+     <span v-if="compactSummary.more" class="compact-tool-count">{{ compactSummary.more }}</span>
+     <span v-if="compactSummary.removed" class="compact-tool-count removed">−{{ compactSummary.removed }}</span>
+     <span v-if="compactSummary.added" class="compact-tool-count added">+{{ compactSummary.added }}</span>
+    </span>
+    <span v-else class="process-step-result" :title="step.subject||resultSummary">{{ resultSummary }}</span>
    </button>
    <div class="process-step-fold" :class="{expanded}" :inert="!expanded" :aria-hidden="!expanded"><div class="process-step-fold-inner">
     <div v-if="expanded&&delegation" class="subagent-detail">
@@ -59,3 +70,56 @@ onMounted(tail)
   </div>
  </li>
 </template>
+
+<style scoped>
+.compact-tool-summary { display: flex; align-items: baseline; gap: .5em; }
+.compact-tool-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.compact-tool-command { white-space: pre; font-family: 'SFMono-Regular', Consolas, monospace; }
+.compact-tool-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.compact-tool-count.removed { color: var(--error-text); }
+.compact-tool-count.added { color: var(--success-text); }
+.process-node-icon {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  padding: 8px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.process-node-icon .process-step-glyph,
+.process-node-icon .process-step-toggle {
+  transition: opacity .14s ease, transform .18s ease;
+}
+.process-node-icon .process-step-toggle {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(-90deg);
+}
+.process-node-icon.expanded .process-step-toggle,
+.process-node-icon:hover .process-step-toggle,
+.process-node-icon:focus-visible .process-step-toggle {
+  opacity: 1;
+}
+.process-node-icon.expanded .process-step-toggle {
+  transform: translateX(-50%) rotate(0);
+}
+.process-node-icon.expanded .process-step-glyph,
+.process-node-icon:hover .process-step-glyph,
+.process-node-icon:focus-visible .process-step-glyph {
+  opacity: 0;
+}
+.process-node-icon:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-primary));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+</style>

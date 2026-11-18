@@ -1500,6 +1500,14 @@
     "zh": "执行摘要",
     "en": "Execution summary"
   },
+  "process.emptyListing": {
+    "zh": "空目录",
+    "en": "Empty directory"
+  },
+  "process.moreFiles": {
+    "zh": "另 {n} 项",
+    "en": "{n} more"
+  },
   "process.input": {
     "zh": "输入",
     "en": "Input"
