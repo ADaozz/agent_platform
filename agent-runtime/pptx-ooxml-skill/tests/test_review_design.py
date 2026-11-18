@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 
+import pytest
 from pptx import Presentation
 from pptx.util import Inches
 
@@ -13,6 +14,30 @@ spec=importlib.util.spec_from_file_location('review_design_engine',ROOT/'scripts
 engine=importlib.util.module_from_spec(spec);spec.loader.exec_module(engine)
 design=engine.review_design
 STYLE='consulting/red-black-growth'
+
+
+@pytest.mark.parametrize('from_script', [False, True])
+def test_custom_style_has_no_library_reference(tmp_path, from_script):
+    files = tmp_path / 'files'
+    files.mkdir()
+    path = files / 'custom.pptx'
+    store = engine.PresentationStore(path)
+    params = {'style_source': 'custom'}
+    if from_script:
+        prs = Presentation()
+        prs.slides.add_slide(prs.slide_layouts[6])
+        design.embed(prs, params)
+        prs.save(path)
+        store.track_external('custom')
+    else:
+        tmp = tmp_path / 'tmp'
+        tmp.mkdir()
+        (tmp / 'deck-plan.json').write_text(json.dumps({'pptx': 'files/custom.pptx', **params}))
+        store.init('custom')
+    manifest = store.status()['manifest']
+    assert manifest['style_reference'] is None
+    assert manifest['review_design']['source'] == 'explicit_design'
+    assert manifest['review_design']['parameters'] == params
 
 
 def make_prs(parameters=None):

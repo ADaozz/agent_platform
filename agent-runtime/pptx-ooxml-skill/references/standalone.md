@@ -95,7 +95,7 @@ python "$PPTX_SKILL_DIR/scripts/office_pptx.py" review-status files/demo.pptx
 
 默认状态保存在 `files/.pptx-state/demo.pptx/`；渲染结果位于其中 `tmp/render-*`，可打开 PDF / PNG 查看。设置 OFFICE_RENDER_TMP 后渲染位置会变化，可从 Python 的 `store.render_directory(store.status()['revision'])` 获取实际目录。不要删除状态目录来绕过检查。
 
-可在自动检查通过后用当前 revision 执行 finalize。它表示满足脚本交付条件，不代表视觉审查通过，更不代表已在 Microsoft PowerPoint 中测试编辑性。
+交付时提供当前 PPTX、自动检查结果和实际视觉审查状态。自动检查未通过时标为可编辑草稿，并列明剩余问题。原生图表或公式的 PowerPoint 实机验证状态单独说明。
 
 ## 6. 修改已有 PPT 与独立模式边界
 

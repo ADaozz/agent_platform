@@ -62,7 +62,8 @@ watch(()=>props.session?.id,async id=>{decks.value={};identity.value='';opened.v
 watch(()=>props.events.at(-1)?.seq,()=>{const batch=props.events.filter(e=>e.seq>cursor);cursor=props.events.at(-1)?.seq||cursor;receive(batch.filter(e=>e.type.startsWith('presentation_')))})
 watch(()=>[deck.value?.revision,slide.value?.slide_id,props.active],()=>{emit('context',deck.value&&slide.value?{feature:'pptx',presentation_id:identity.value,slide_id:slide.value.slide_id,revision:deck.value.revision}:null)})
 const styleReference=computed(()=>deck.value?.manifest?.style_reference||null)
-const profileName=computed(()=>styleReference.value?.folder_name||t('pptx.styleUnspecified'))
+const profileName=computed(()=>styleReference.value?.folder_name||
+ (deck.value?.manifest?.review_design?.source==='explicit_design'?t('pptx.styleCustom'):t('pptx.styleUnspecified')))
 const reviewView=computed(()=>pptxReviews(deck.value,slide.value))
 const review=computed(()=>slide.value?.review||{})
 const issues=computed(()=>review.value.layout_issues||[])

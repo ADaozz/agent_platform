@@ -23,11 +23,11 @@ metadata:
 
 新建稿使用用户的**风格设计 MD＋参考图**确定视觉系统，不搜索或复用 PPT 模板库；PPTX 模板库保持为空；`templates/` 现在保存配对的风格 MD 与参考图。用户未指定风格时，先用 `office_pptx.py list-styles` 按分类筛选至多三套候选，再读取一套 `design.md`、查看其 `reference.jpg`；不要一次读取全部风格或混用多套视觉体系。用户明确提供的风格要求优先。参考图用于理解版式、字体层级、配色、留白与图表表达，不直接铺成整页截图。缺少其中一种输入时，先用已有要求提炼风格；确有关键歧义再询问，不寻找旧 PPT 模板兜底。以上全部做完之前，不要创建 `files/` 中的 PPTX。
 
-先在 `tmp/deck-plan.json` 记录选定目录的完整 `style_id`（如 `consulting/red-black-growth`）及输出 `pptx` 路径、受众、叙事、页尺寸、统一字体/回退字体、色板、标题层级、边距、页脚、每页重点与统计图表数量。MD 与参考图冲突时以用户明确指令和 MD 为准，记录必要取舍。整稿沿用同一组设计参数，不能逐页重新配色或缩字。所有数字、单位、时间范围与来源须有依据。计划写在 `tmp/`，此时还没有交付文件。
+先在 `tmp/deck-plan.json` 记录输出 `pptx` 路径、受众、叙事、页尺寸、统一字体/回退字体、色板、标题层级、边距、页脚、每页重点与统计图表数量。使用库内风格时写完整 `style_id`（如 `consulting/red-black-growth`）。用户自带风格设计时，直接使用其设计，在计划中写 `"style_source": "custom"`，省略 `style_id`，界面显示「自定义」。MD 与参考图冲突时以用户明确指令和 MD 为准，记录必要取舍。整稿沿用同一组设计参数，不能逐页重新配色或缩字。所有数字、单位、时间范围与来源须有依据。计划写在 `tmp/`，此时还没有交付文件。
 
-可使用原子接口创建页面与对象，也可写一个可重复运行的 Python 生成脚本。脚本调用 `style_library.apply_reference(prs, style_id, design=design_parameters)` 将风格来源及实际设计参数写入 PPT。准备写入第一页时才做原子初始化：`init ... --style-id <category/theme_id>`，并立刻写入第一页内容。界面据此显示真实风格文件夹名称，不将内部 profile 名称当成设计来源。脚本统一读取上述设计参数，第一次 `deck_io.save_deck` 就写入已经有第一页内容的 `files/` 目标 PPTX，不要先保存空白稿；之后可以分批生成并多次保存，每次保存平台都会登记版本并更新预览。平台仍会验证完整性，不会因无效文件覆盖已登记版本。
+可使用原子接口创建页面与对象，也可写一个可重复运行的 Python 生成脚本。库内风格用 `style_library.apply_reference(prs, style_id, design=design_parameters)` 写入来源和参数。自定义风格直接用 `review_design.embed(prs, design_parameters)`，参数中保留 `style_source: "custom"`。准备写入第一页时才做原子初始化，库内风格用 `init ... --style-id <category/theme_id>`，自定义风格依据已写好的计划执行 `init`，省略 `--style-id`。随后立刻写入第一页内容。脚本统一读取上述设计参数，第一次 `deck_io.save_deck` 就写入已经有第一页内容的 `files/` 目标 PPTX；之后可以分批生成并多次保存，每次保存平台都会登记版本并更新预览。平台仍会验证完整性，不会因无效文件覆盖已登记版本。
 
-审查依据依次为用户明确要求/调整、本稿实际参数、选中风格 MD。计划顶层记录 fonts、palette（或 theme）、type_scale、margins、user_requirements/user_overrides；传入 apply_reference 的 design 使用同样的参数。margins 必须写明 unit（fraction/in/pt）及 left/right/top/bottom。没有明确数值或单位的部分只做视觉建议，不套默认 profile 的配色、字号或 6% 安全边距。选定 style_id 只记录来源，不会自动把 MD 转成排版；生成脚本需实际应用参数。
+审查依据依次为用户明确要求/调整、本稿实际参数、选中风格 MD。计划顶层记录 fonts、palette（或 theme）、type_scale、margins、user_requirements/user_overrides；写入 PPT 的设计参数与计划一致。margins 必须写明 unit（fraction/in/pt）及 left/right/top/bottom。没有明确数值或单位的部分只做视觉建议，不套默认 profile 的配色、字号或 6% 安全边距。选定 style_id 只记录来源，不会自动把 MD 转成排版；生成脚本需实际应用参数。
 
 ## 统计图表优先用 PPT 原生 chart，仅缺少图型时自绘
 
@@ -50,7 +50,7 @@ ChartEx 高级图表、曲面和量价股票图需要 PowerPoint 核对，LibreO
 
 ## 修改已有 PPT
 
-仅在用户要求编辑已有 PPT 时使用导入、页面复制、`slot.fill`、局部换图与数据替换。保留未涉及页面和原有背景/母版/字体体系，按修改范围操作。`slot.fill` 仅更新已有文字；新文字使用 `element.add_text`。导入源文件与路径规则见 [template-rules.md](references/template-rules.md)，参数见 [operations.md](references/operations.md)。这些兼容能力不是新建稿的默认流程。
+编辑整份原稿时，用 `init files/edit.pptx --presentation-id edit --template files/source.pptx` 从全部原稿页面开始编辑。只需要原稿的指定页面时，先用 `import-template` 获得源页 ID，再初始化目标稿，通过 `apply-one` 提交 `slide.import`。两条路线的完整命令和路径规则见 [template-rules.md](references/template-rules.md)。保留未涉及页面和原有背景、母版、字体体系。`slot.fill` 更新已有文字，新文字使用 `element.add_text`。参数见 [operations.md](references/operations.md)。
 
 ## 整稿完成后检查，局部修复
 
@@ -68,6 +68,8 @@ ChartEx 高级图表、曲面和量价股票图需要 PowerPoint 核对，LibreO
 4. 当前模型无法读取图片时，对相应页面提交 `{"slide_id":"…","unavailable":"原因"}`，如实说明视觉审查不可用，不得伪造结论。
 
 **所有视觉结果（包括 critical）只给建议，禁止据此自动修改；用户明确要求修复后才局部修改。** 用 review-status 汇总建议并在交付时说明。手动 check-slide 仅用于指定页面诊断，不是默认生成流程。
+
+文件保存后即可下载。交付时提供当前 PPTX 和检查结果，注明尚未解决的问题及实际视觉审查状态。自动检查未通过时，将文件标为可编辑草稿。
 
 ## 文件保存与可选平台集成
 

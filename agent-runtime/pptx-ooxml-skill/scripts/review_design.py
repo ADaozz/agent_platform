@@ -15,6 +15,8 @@ FIELDS=('fonts','font_family','palette','theme','type_scale','margins','footer',
 def parameters(value):
     if not isinstance(value,dict):raise ValueError('Design parameters must be an object')
     result={key:copy.deepcopy(value[key]) for key in FIELDS if key in value}
+    if value.get('style_source') == 'custom':
+        result['style_source'] = 'custom'
     if len(json.dumps(result,ensure_ascii=False,allow_nan=False))>24000:raise ValueError('Design parameters exceed 24000 characters')
     return result
 

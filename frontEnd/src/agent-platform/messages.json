@@ -1252,6 +1252,10 @@
     "zh": "未指定",
     "en": "Not specified"
   },
+  "pptx.styleCustom": {
+    "zh": "自定义",
+    "en": "Custom"
+  },
   "pptx.profile": {
     "zh": "设计风格",
     "en": "Profile"

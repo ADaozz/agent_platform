@@ -22,7 +22,7 @@
 
 ## 平台集成是可选项
 
-平台负责检测脚本覆盖、自动登记版本、后台生成预览、通知前端及只保留两版快照；平台后台通过独立模型 API 请求执行视觉审查。没有可用视觉 API 不阻止生成和交付，也不能声称视觉通过。独立 CLI 不自动启动这些后台服务。详见 [platform-integration.md](references/platform-integration.md)。
+平台负责检测脚本覆盖、自动登记版本、后台生成预览、通知前端及保留最近两版快照。主 Agent 亲自查看正式渲染图并提交视觉审查，平台记录并核验提交结果。视觉审查未完成或不可用时仍可交付，并如实记录审查状态。详见 [platform-integration.md](references/platform-integration.md)。
 
 ## 开发验证
 

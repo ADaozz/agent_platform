@@ -2,7 +2,16 @@
 
 此文仅用于编辑用户已有 PPT。新建演示文稿依据风格设计 MD 和参考图，不从 PPT 模板库选页；内置模板已经清空。
 
-用户已有文件留在授权工作区。`init files/edit.pptx --template /path/to/existing.pptx` 保留原稿全部页面作为编辑起点；修改已有页用 slot.fill、element.update、chart.replace_data；仅在修改需求确实需要复制原稿页面时用 slide.import。用户原稿不写回技能目录。
+## 整份原稿作为编辑起点
+
+原稿留在授权工作区。以下命令会创建包含原稿全部页面的工作稿。
+
+```sh
+python "$PPTX_SKILL_DIR/scripts/office_pptx.py" init files/edit.pptx --presentation-id edit --template files/source.pptx
+python "$PPTX_SKILL_DIR/scripts/office_pptx.py" status files/edit.pptx
+```
+
+按 `status` 返回的实际页面、元素 ID 或文字槽编辑。可用 `slot.fill` 更新已有文字、`chart.replace_data` 更新原生图表。后续请求使用 `presentation_id: "edit"` 以及返回的当前版本。
 
 ## Manifest
 
@@ -21,7 +30,7 @@ The heuristic is a draft. A `manifest.json` beside the PPTX overrides role and s
 
 `match-template --template-id <installed-id> --role comparison` searches installed templates without a working PPTX. This compatibility command is for an explicitly supplied existing deck, not the new-deck workflow. Match category and exact slide size before combining pages; portrait infographics and print assets should use their own deck.
 
-## Importing a user file or an unregistered local template
+## 只导入用户指定的页面
 
 `import-template` analyzes a source file; it neither copies it nor registers it in `list-templates`. Registered library imports use `template_id` without `template_path`. For other files, stage a copy inside the working PPTX's parent directory (`asset_root`), then import by path. The CLI resolves `template_path` from that parent, regardless of the request JSON's location or the shell's current directory. If the working file is `output/deck.pptx`, `inputs/template.pptx` means `output/inputs/template.pptx`.
 
@@ -30,7 +39,7 @@ Example, run from the current task workspace root, with each shell command in a 
 ```bash
 mkdir -p files/inputs tmp
 cp "<uploaded-pptx>" files/inputs/template.pptx
-python "$PPTX_SKILL_DIR/scripts/office_pptx.py" import-template --template files/inputs/template.pptx --template-id user-brand --output files/inputs/manifest.json --license-note "working copy, not redistributed"
+python "$PPTX_SKILL_DIR/scripts/office_pptx.py" import-template --template files/inputs/template.pptx --template-id user-brand --output tmp/template-manifest.json --license-note "working copy, not redistributed"
 python "$PPTX_SKILL_DIR/scripts/office_pptx.py" init files/project-report.pptx --presentation-id project-report
 ```
 
@@ -86,4 +95,4 @@ Prefer the primary template's own cover, section, content, chart, process and cl
 
 The first imported template with a recorded `visual_system` establishes the working palette and primary font. Explicit user recolouring remains authoritative; importing another family does not reset that choice. `status.template_visual_system` records the reference style; `effective_palette` records current colours. Profile changes do not replace them. Imported backgrounds, fonts, chart styles and object geometry are preserved.
 
-For figures built from shapes, changing text alone does not update bar lengths, segments or axes. Change the complete native representation consistently, choose an actual chart page, or choose a non-quantitative layout when data is unavailable. Keep meaning-to-colour mappings, units, number precision, footers, title positions and source conventions consistent across pages. Review the real whole-deck contact sheet before finalization.
+For figures built from shapes, changing text alone does not update bar lengths, segments or axes. Change the complete native representation consistently, choose an actual chart page, or choose a non-quantitative layout when data is unavailable. Keep meaning-to-colour mappings, units, number precision, footers, title positions and source conventions consistent across pages. Use the rendered contact sheet for whole-deck visual review.

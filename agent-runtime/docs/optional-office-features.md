@@ -46,7 +46,7 @@ npm --prefix ../frontEnd run build
 
 Agent 设置的「技能」页显示 Word / PowerPoint 内置技能，可分别启用或停用；保存后用于新会话。DeepAgents 原生 Skills 中间件解析只读 `/agent-skills/<skill-name>/SKILL.md`。其中说明本技能 `scripts/` 的命令行入口、操作请求和校验流程。每次 execute 只执行一个有界修改，在 ask 模式下逐条审批；联网仍需申请 network=true。没有 `docx_*` / `pptx_*` 模型工具或额外的文档授权模型。
 
-Python 依赖环境以只读方式提供给沙箱；用户级便携 LibreOffice 可同样以只读方式使用。渲染缓存通过 `OFFICE_RENDER_TMP` 写入当前 Thread 的临时目录。宿主扩展同步脚本产生的版本事件，并通过专用接口提供只读预览。PPTX 的视觉审查由平台单独调用模型 API，缺少可用 API 不阻塞交付；界面提供问题建议和交给 Agent 修复，不提供人工通过、不通过或单页重新审查。
+Python 依赖环境以只读方式提供给沙箱；用户级便携 LibreOffice 可同样以只读方式使用。渲染缓存通过 `OFFICE_RENDER_TMP` 写入当前 Thread 的临时目录。宿主扩展同步脚本产生的版本事件，并通过专用接口提供只读预览。PPTX 的正式渲染图由主 Agent 亲自查看并提交视觉审查，宿主记录并核验提交结果。视觉审查未完成或不可用时仍可交付。界面提供问题建议和交给 Agent 修复的入口。
 
 ## 验证
 

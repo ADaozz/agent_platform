@@ -66,6 +66,6 @@ python "$PPTX_SKILL_DIR/scripts/office_pptx.py" audit-charts files/deck.pptx --r
 
 资料库由 `templates/catalog.json` 与本地 `index.html` 索引。先按受众/主题筛选，再只读选定的 design.md 并查看 reference.jpg。参考图片仅作视觉依据，不直接铺成整页截图。MD 中的示例数据和绘图建议不覆盖用户的数据要求与技能的原生优先规则。
 
-设计来源使用完整 style_id 并写入 PPT 元数据。前端显示其真实目录名；多个输出文件共用工作区时，每份计划必须指定 pptx 输出路径，以免将某份风格误标到其它 PPT。
+库内设计使用完整 style_id 并写入 PPT 元数据，前端显示其真实目录名。用户自带设计时，在计划中写 `"style_source": "custom"`，省略 style_id，并调用 `review_design.embed(prs, {"style_source": "custom", **STYLE})` 写入实际参数，前端显示「自定义」。多个输出文件共用工作区时，每份计划必须指定 pptx 输出路径，以免将某份风格误标到其它 PPT。
 
 审查会读取随 PPT 保存的参数和选中风格的 design.md。嵌入参数优先于旁边的计划文件；修改全局设计时同时更新嵌入参数。user_requirements 可记录用户要求的文字或列表；user_overrides 可记录配色、字体、边距等显式调整，优先于原风格。没有明确单位的旧 margins 仅传给视觉模型参考，不生成强制安全边距规则。

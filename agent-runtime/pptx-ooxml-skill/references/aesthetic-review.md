@@ -55,7 +55,7 @@ Each applied review is stored in the presentation state with a generated `review
 - All visual findings are advice, including critical ones. Reviews carry `auto_repair: false, advisory_only: true`. Only a user repair request authorizes edits based on these suggestions.
 - A slide shows `needs_attention` only while a critical finding is open. That status is informational.
 - Slide creation/import/clone has no intermediate check gate, including strict mode. Check after the whole deck is ready.
-- `finalize` needs automatic and content checks per slide. Visual review, deck review, `uncertain` and `unavailable` never block it; the finalize event lists outstanding critical findings and suggestion counts for the delivery message. On the platform the host then checks that every claimed verdict was really submitted through `submit-review` and publishes `finalize_verified`.
+- Use `review-status` to report outstanding critical findings, suggestions and the actual visual review status at delivery. If automatic checks still fail, deliver the editable file as a draft and report the remaining findings.
 - There is no human accept or reject UI/API. Issue dismissal and sending a suggestion to the Agent remain; dismissal never converts a verdict into acceptance.
 
 ## Deck review
