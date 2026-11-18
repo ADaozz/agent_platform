@@ -100,7 +100,7 @@ const regForm = reactive({
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** 注册密码：6-12 位，大小写字母 + 数字 + 符号 */
 const REGISTER_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,12}$/
-const REGISTER_PASSWORD_HINT = '6-12位，需含大小写字母、数字与符号'
+const REGISTER_PASSWORD_HINT = '密码需6-12位，含大小写字母、数字与符号'
 
 function isValidRegisterPassword(pwd: string) {
   return REGISTER_PASSWORD_RE.test(pwd)
@@ -225,7 +225,6 @@ onBeforeUnmount(() => {
           <BrandMark :size="40" />
         </div>
         <h1 class="login-title">Agent Platform</h1>
-        <p class="login-sub">{{ tr('使用平台账号或客户端证书进入工作区') }}</p>
         <p v-if="regSuccess" class="login-reg-success" role="status">
           <AppIcon name="check_circle" class="!text-[17px]" />
           {{ tr('注册成功，请使用新账号登录') }}
@@ -289,8 +288,6 @@ onBeforeUnmount(() => {
       @close="regOpen = false"
     >
       <form class="reg-form" @submit.prevent="handleRegister">
-        <p class="reg-lead">{{ tr('填写账号与邮箱，验证后即可进入工作区') }}</p>
-
         <div class="reg-section">
           <div class="reg-field">
             <label class="form-label" for="reg-username">{{ tr('用户名') }}</label>
@@ -510,11 +507,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.01em;
   color: var(--color-ink);
 }
-.login-sub {
-  margin-top: 0.5rem;
-  font-size: 13px;
-  color: var(--color-ink-muted);
-}
 .login-reg-success {
   display: flex;
   align-items: center;
@@ -581,12 +573,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1.15rem;
-}
-.reg-lead {
-  margin: -0.25rem 0 0.15rem;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-ink-muted);
 }
 .reg-section {
   display: flex;

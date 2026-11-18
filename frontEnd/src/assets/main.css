@@ -449,7 +449,8 @@ textarea.input {
 
 .select {
   appearance: none;
-  padding-right: 2rem;
+  padding-inline-end: 2rem;
+  color-scheme: var(--dropdown-scheme);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23908a7b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.625rem center;
@@ -457,6 +458,13 @@ textarea.input {
 .select-fit {
   width: auto;
   max-width: 100%;
+}
+.select.select-compact {
+  width: auto;
+  height: 28px;
+  padding-block: 0;
+  padding-inline-start: 8px;
+  font-size: 12px;
 }
 .select option {
   background-color: var(--color-card);
@@ -501,8 +509,165 @@ textarea.input {
   flex: 0 0 auto;
 }
 
-/* Style the native popup as well as the closed field. Browsers without
-   customizable selects retain the accessible platform picker above. */
+/* Shared by native pickers, single menus and both model cascades. */
+:root {
+  --dropdown-scheme: light;
+  --dropdown-width: 408px;
+  --dropdown-bg: var(--color-card);
+  --dropdown-divider: color-mix(in srgb, var(--color-line) 64%, var(--dropdown-bg));
+  --dropdown-hover: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  --dropdown-selected: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  --dropdown-padding: 5px;
+  --dropdown-radius: 10px;
+  --dropdown-row-radius: 6px;
+  --dropdown-row-height: 32px;
+}
+:root[data-theme='dark'] {
+  --dropdown-scheme: dark;
+}
+.dropdown-surface {
+  padding: var(--dropdown-padding);
+  border: 1px solid var(--color-line);
+  border-radius: var(--dropdown-radius);
+  background: var(--dropdown-bg);
+  box-shadow: var(--shadow-panel);
+  color: var(--color-ink);
+  overscroll-behavior: contain;
+}
+.dropdown-surface.dropdown-cascade {
+  display: flex;
+  flex-direction: column;
+  width: var(--dropdown-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, 65dvh);
+  padding: 0;
+  overflow: hidden;
+}
+.dropdown-columns {
+  display: grid;
+  grid-template-columns: clamp(88px, 36%, 146px) minmax(0, 1fr);
+  min-height: 0;
+}
+.dropdown-columns > :only-child {
+  grid-column: 1 / -1;
+}
+.dropdown-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--dropdown-padding);
+  overflow: hidden;
+}
+.dropdown-column > [role='menu'] {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.dropdown-branches {
+  border-inline-end: 1px solid var(--dropdown-divider);
+  background: color-mix(in srgb, var(--color-ink) 3.5%, var(--dropdown-bg));
+}
+.dropdown-branches:only-child {
+  border-inline-end: 0;
+}
+.dropdown-heading {
+  min-width: 0;
+  padding: 6px 8px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-column > .dropdown-heading {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--dropdown-divider);
+}
+.dropdown-surface .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: var(--dropdown-row-height);
+  padding: 5px 8px;
+  border-radius: var(--dropdown-row-radius);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  text-align: start;
+}
+.dropdown-item > .dropdown-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-cascade .dropdown-column:not(.dropdown-branches) .dropdown-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dropdown-surface .dropdown-item:is([aria-selected='true'], [aria-checked='true'], [aria-current='page']) {
+  background: var(--dropdown-selected);
+  color: var(--color-ink);
+}
+.dropdown-surface .dropdown-branches .dropdown-item[aria-expanded='true'] {
+  background: var(--dropdown-hover);
+  color: var(--color-ink);
+}
+.dropdown-surface .dropdown-item:is(:hover, :focus-visible, .focused) {
+  background: var(--dropdown-hover);
+  color: var(--color-ink);
+}
+.dropdown-surface .dropdown-item:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: -1px;
+}
+.dropdown-item > :is(.dropdown-branch-arrow, .dropdown-check) {
+  width: 14px;
+  height: 14px;
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+.dropdown-item > .dropdown-branch-arrow {
+  color: var(--color-ink-muted);
+}
+.dropdown-item > .dropdown-check {
+  color: var(--color-primary);
+}
+.dropdown-trigger .dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+  transition: transform 0.16s;
+}
+.dropdown-trigger[aria-expanded='true'] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+@media (max-width: 380px) {
+  .dropdown-columns {
+    grid-template-columns: 40% minmax(0, 1fr);
+  }
+  .dropdown-cascade .dropdown-branches .dropdown-item {
+    gap: 4px;
+    padding-inline: 5px;
+  }
+  .dropdown-branches .dropdown-branch-arrow {
+    width: 11px;
+    height: 11px;
+  }
+}
+@media (pointer: coarse) {
+  :root { --dropdown-row-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-trigger .dropdown-chevron { transition: none; }
+}
+
+/* Keep the platform picker when customizable selects aren't supported. */
 @supports (appearance: base-select) {
   .select,
   .select::picker(select) {
@@ -510,12 +675,12 @@ textarea.input {
   }
   .select {
     align-items: center;
-    gap: 0.75rem;
-    padding-right: 0.75rem;
+    gap: 8px;
+    padding-inline-end: 10px;
     background-image: none;
   }
   .select::picker-icon {
-    margin-left: auto;
+    margin-inline-start: auto;
     color: var(--color-ink-muted);
     transition: transform 0.16s;
   }
@@ -524,24 +689,25 @@ textarea.input {
   }
   .select::picker(select) {
     margin-block: 6px;
-    padding: 4px;
+    padding: var(--dropdown-padding);
     max-height: min(320px, 60dvh);
     overflow: auto;
     border: 1px solid var(--color-line);
-    border-radius: 8px;
-    background: var(--color-card);
+    border-radius: var(--dropdown-radius);
+    background: var(--dropdown-bg);
     color: var(--color-ink);
     box-shadow: var(--shadow-panel);
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
+    overscroll-behavior: contain;
   }
   .select option {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 36px;
-    padding: 8px 10px;
-    border-radius: 4px;
+    gap: 7px;
+    min-height: var(--dropdown-row-height);
+    padding: 5px 8px;
+    border-radius: var(--dropdown-row-radius);
     background: transparent;
     color: var(--color-ink-secondary);
     white-space: normal;
@@ -549,16 +715,21 @@ textarea.input {
     cursor: pointer;
   }
   .select option:checked {
-    background: color-mix(in srgb, var(--color-signal) 10%, var(--color-card));
+    background: var(--dropdown-selected);
     color: var(--color-ink);
-    font-weight: 500;
   }
   .select option:is(:hover, :focus-visible) {
-    background: var(--color-hover);
+    background: var(--dropdown-hover);
     color: var(--color-ink);
     outline: none;
   }
+  .select option:focus-visible {
+    outline: 1px solid var(--color-primary);
+    outline-offset: -1px;
+  }
   .select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
     color: var(--color-primary);
   }
   .select option:disabled {

@@ -1,7 +1,3 @@
-import copy
-import importlib
-import zipfile
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,44 +15,34 @@ def client(tmp_path, monkeypatch):
 def test_global_settings_conflict_and_removed_workspace_routes(client):
     config = client.get('/api/settings').json()
     config['system_prompt'] = 'Global instructions'
-    config['tools'][0]['description'] = 'Custom docstring'
     assert client.put('/api/settings', json=config).status_code == 200
     assert client.put('/api/settings', json=config).status_code == 409
     saved = client.get('/api/settings').json()
     assert saved['system_prompt'] == 'Global instructions'
-    assert saved['tools'][0]['description'] == 'Custom docstring'
     assert d.all_records('workspace') == []
     assert client.get('/api/workspaces').status_code == 404
     assert client.post('/api/workspaces', json={'name': 'Removed'}).status_code == 404
     assert client.put('/api/workspaces/office', json=config).status_code == 404
 
 
-def test_snapshot_and_tool_scoping(client):
-    source = d.get('settings', 'global')
-    adapter = d.ToolAdapter(source, 'test')
-    source['tools'][0]['enabled'] = False
-    assert adapter.config['tools'][0]['enabled']
-    other = d.ToolAdapter(d.get('settings', 'global'), 'test')
-    with pytest.raises(ValueError):
-        other.execute('create_docx', {'title':'x','paragraphs':[]})
+def test_retired_spreadsheet_tool_is_removed_from_saved_settings(client):
+    saved = d.get('settings', 'global')
+    saved['tools'] = [{'name': 'create_xlsx', 'description': 'Legacy spreadsheet tool', 'enabled': True}]
+    d.put('settings', saved)
 
-
-@pytest.mark.parametrize('name,args,entry', [
-    ('create_xlsx', {'title':'预算','rows':[['费用',100],['=1+1',200]]}, 'xl/worksheets/sheet1.xml'),
-])
-def test_office_files(client, name, args, entry):
-    adapter = d.ToolAdapter(d.get('settings', 'global'), 'files')
-    result = adapter.execute(name, args)
-    with zipfile.ZipFile(adapter.root / result['filename']) as archive:
-        assert entry in archive.namelist()
-        assert '内容' in archive.read(entry).decode() if name != 'create_xlsx' else '<f>' not in archive.read(entry).decode()
+    assert client.get('/api/tool-catalog').json() == []
+    assert client.get('/api/settings').json()['tools'] == []
+    assert client.get('/api/platform/capabilities').json()['tools'] == []
+    assert 'create_xlsx' in d.hidden_tools(saved)
+    assert client.put('/api/settings', json=saved).status_code == 200
+    assert d.get('settings', 'global')['tools'] == []
 
 
 def test_validation_and_missing_provider(client, monkeypatch):
     monkeypatch.delenv('PLATFORM_API_KEY', raising=False)
     assert client.post('/api/agent/sessions',json={}).status_code == 503
     config = d.get('settings', 'global')
-    config['tools'][0]['name'] = 'execute'
+    config['tools'] = [{'name': 'execute'}]
     assert client.put('/api/settings',json=config).status_code == 422
     assert client.get('/api/tasks/nonexistent/artifacts/a.docx').status_code == 404
 

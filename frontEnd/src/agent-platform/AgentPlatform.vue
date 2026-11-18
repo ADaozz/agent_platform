@@ -1,6 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, provide } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, provide, useId } from 'vue'
 import { API_BASE, ensureRuntimeCookie, runtimeFetch } from './runtime'
 import { sessions, recentSessions, activeSessionId, workspaceView, command, sessionTitle, sessionTime, deletable, removeSession, loadSessions } from './workspace'
 import MarkdownContent from './MarkdownContent.vue'
@@ -14,21 +13,20 @@ import { conversationTimeline } from './conversation'
 import { sessionOutputFiles } from './outputFiles'
 import { fileType } from './fileTypes'
 import { relativeCreation, creationDate, taskDuration, taskCost } from './sessionCard'
-import { sortReasoningEfforts } from '@/utils/reasoningEfforts'
+import ProviderIcon from '@/components/ProviderIcon.vue'
+import ModelPicker from './ModelPicker.vue'
 
 const artifactPanelOpen = ref(false), artifactContext = ref(null), featurePanels = ref(null), featuresList = ref([])
 function feedbackContext() { return artifactContext.value }
 async function showFeatures() { await guard(async () => { featuresList.value = await api('/features'); modal.value = 'features' }) }
 async function setFeature(feature,enabled,uninstall=false) { await guard(async () => { featuresList.value = await api('/features/' + feature.id, {method:uninstall?'DELETE':'PUT', ...(uninstall?{}:{body:{enabled}})}); featurePanels.value?.reload() }) }
 const profiles = ref([])
-const toolCatalog = ref([])
 const modelId = ref(''), effort = ref('')
 const selected = ref(null), events = ref([]), draft = ref(''), search = ref('')
 // The brand toggle is removed in ITAM, so the panel always starts expanded (Ctrl+Alt+B still toggles it).
 const sidebar = ref(true), popup = ref(''), modal = ref(''), configTab = ref('general')
 const loading = ref(true), sending = ref(false), saving = ref(false), error = ref(''), notice = ref('')
-const dismissed = ref(sessionStorage.getItem('notice-dismissed') === 'true')
-const settingsEdit = ref(null), toolSchemas = ref({}), rulesText = ref(''), fileList = ref([])
+const settingsEdit = ref(null), rulesText = ref(''), fileList = ref([])
 const mcpJson = ref('')
 const modelConfig = ref(null), modelJson = ref(''), advanced = ref(false), attachments = ref([]), fileInput = ref(null)
 const uploading = ref(false)
@@ -36,8 +34,7 @@ const fileDragDepth = ref(0)
 const uploadDisabled = computed(() => uploading.value || sending.value || busy.value || waiting.value)
 const providerForm = ref({ provider: 'deepseek', model: 'deepseek-flash', base_url: 'https://api.deepseek.com/v1', api_key: '', api: 'chat_completions', efforts: 'high, low, max', image: false })
 const humanValues = ref({}), decisions = ref({}), mainView = ref('agents')
-const draftPermission = ref('ask'), allowConfirmation = ref('')
-const reasoningModelId = ref('')
+const draftPermission = ref('ask'), allowConfirmed = ref(false)
 const cardNow = ref(Date.now())
 let cardClock
 let source, poll, noticeTimer, flushTimer = 0, pendingEvents = [], seenSeqs = new Set()
@@ -169,6 +166,10 @@ function resetFileFilters() { fileSearch.value = ''; fileKind.value = 'all'; fil
 const busy = computed(() => ['queued', 'running'].includes(selected.value?.status))
 const waiting = computed(() => ['waiting_confirmation', 'waiting_human', 'paused', 'runtime_config_boundary'].includes(selected.value?.status))
 const modelLabel = computed(() => profile.value?.model || t('Select model'))
+const modelProviderId = computed(() => String(profile.value?.id || modelId.value || '').split('/')[0] || '')
+const modelPopupId = useId()
+const permissionPopupId = useId()
+const modelTrigger = ref(null)
 function modelRates(model, peak = false) {
   const leaf = String(model || '').toLowerCase().split('/').pop() || ''
   const band = peak ? 'peak' : 'off'
@@ -264,8 +265,6 @@ function formatLongDuration(ms) {
   const seconds = totalSec % 60
   return t('process.minutesSeconds', { minutes, seconds })
 }
-const reasoningProfile = computed(() => profiles.value.find(p => p.id === reasoningModelId.value))
-const reasoningChoice = computed(() => reasoningModelId.value === modelId.value ? effort.value : reasoningProfile.value?.default_reasoning_effort || '')
 const effectivePermission = computed(() => selected.value?.permission_mode || draftPermission.value)
 const pendingPermission = computed(() => selected.value?.pending_permission_mode)
 const chatHome = computed(() => mainView.value === 'agents' && !selected.value)
@@ -454,7 +453,6 @@ function runCommand(cmd) {
 async function init() {
   await guard(async () => {
     await ensureRuntimeCookie()
-    toolCatalog.value = await api('/tool-catalog')
     await Promise.all([refreshModels(), refreshSessions()])
     const id = new URL(location.href).searchParams.get('session'); if (id) await openSession(id)
   }); loading.value = false
@@ -517,7 +515,6 @@ async function selectModel(id, strength) {
     modelId.value = id; effort.value = strength; popup.value = ''; if (busy.value) toast('模型配置已排队，将在内核安全边界生效')
   })
 }
-function dismissBanner() { dismissed.value = true; sessionStorage.setItem('notice-dismissed', 'true') }
 function keydown(e) {
   if (e.key === 'Escape') { popup.value = ''; closeModal() }
   if (e.ctrlKey && e.altKey && e.code === 'KeyB') { e.preventDefault(); sidebar.value = !sidebar.value }
@@ -573,26 +570,21 @@ async function openAgentSettings(tab = 'general') {
   await guard(async () => {
     settingsEdit.value = await api('/settings')
     settingsEdit.value.skill_bindings ||= {}; settingsEdit.value.native_skills ||= []
-    settingsEdit.value.core_tools ||= {}; rulesText.value = settingsEdit.value.rules.join('\n'); toolSchemas.value = {}
+    settingsEdit.value.core_tools ||= {}; rulesText.value = settingsEdit.value.rules.join('\n')
     mcpJson.value = JSON.stringify(settingsEdit.value.mcp || { enabled: false, servers: {} }, null, 2)
-    for (const t of settingsEdit.value.tools) toolSchemas.value[t.name] = JSON.stringify(t.schema, null, 2)
     configTab.value = tab; modal.value = 'agent-settings'; popup.value = ''; error.value = ''
   })
 }
-function addTool(tool) { const item = JSON.parse(JSON.stringify(tool)); settingsEdit.value.tools.push(item); toolSchemas.value[item.name] = JSON.stringify(item.schema, null, 2) }
 async function saveSettings() {
   saving.value = true
   await guard(async () => {
     const data = JSON.parse(JSON.stringify(settingsEdit.value)); data.rules = rulesText.value.split('\n').filter(Boolean)
     data.mcp = JSON.parse(mcpJson.value)
-    for (const t of data.tools) t.schema = JSON.parse(toolSchemas.value[t.name])
     await api('/settings', { method: 'PUT', body: data })
     modal.value = ''; toast('设置已保存；新会话使用新配置')
   }); saving.value = false
 }
-const router = useRouter()
 // Model configuration lives on the ITAM platform settings page.
-function openModels() { popup.value = ''; router.push('/settings/models') }
 async function saveModels() {
   saving.value = true
   await guard(async () => {
@@ -618,7 +610,7 @@ async function showFiles() { await guard(async () => { fileList.value = selected
 async function permission(mode, confirmation = null) {
   error.value = ''
   if (mode === 'allow' && (pendingPermission.value || effectivePermission.value) !== 'allow' && confirmation !== 'ALLOW') {
-    allowConfirmation.value = ''; modal.value = 'permission'; popup.value = ''; return
+    allowConfirmed.value = false; modal.value = 'permission'; popup.value = ''; return
   }
   saving.value = true
   await guard(async () => {
@@ -628,6 +620,9 @@ async function permission(mode, confirmation = null) {
     if (selected.value) toast(pendingPermission.value ? '权限配置已交给内核，将在安全边界生效' : 'permission.saved')
   })
   saving.value = false
+}
+function confirmAllow() {
+  if (allowConfirmed.value && !saving.value) return permission('allow', 'ALLOW')
 }
 function approval() { return action('approve', { decisions: selected.value.pending_tool_calls.map(p => ({ tool_call_id: p.toolCallId, decision: decisions.value[p.toolCallId] || 'approve' })) }) }
 const humanOtherValues = ref({}), humanSubmitting = ref(false)
@@ -668,7 +663,6 @@ function selectHumanOption(field, value, checked) {
   }
 }
 watch(sidebar, value => localStorage.setItem('sidebar', value))
-watch(popup, value => { if (value !== 'model') reasoningModelId.value = '' })
 watch(() => selected.value?.id, () => { humanOtherValues.value = {} })
 watch(() => selected.value?.status, () => { humanValues.value = {}; humanOtherValues.value = {}; decisions.value = {} })
 watch(() => selected.value?.id, id => { activeSessionId.value = id ?? null }, { immediate: true })
@@ -697,15 +691,15 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
       <div v-else-if="mainView === 'history'" class="history-view"><div class="history-head"><div class="section-eyebrow">{{ t("YOUR CHATS") }}</div><h1>{{ t("Chats") }}</h1>
         <div class="list-filter" role="search">
           <label class="filter-search"><Icon name="Search" :size="15" /><input v-model="search" type="search" :placeholder='t("搜索标题或模型…")' :aria-label='t("搜索对话")'><button v-if="search" type="button" class="icon-button" :aria-label="t('清空搜索')" @click="search = ''"><Icon name="X" :size="13" /></button></label>
-          <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range" :class="{ active: historyRange !== 'all', open: popup === 'historyRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'historyRange'" @click.stop="toggle('historyRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(historyRange)) }}</span><Icon name="ChevronDown" :size="14" class="filter-range-chevron" /></button><div v-if="popup === 'historyRange'" v-popover-placement class="popover range-popover" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="menu-row" :class="{ selected: historyRange === key }" :aria-selected="historyRange === key" @click="historyRange = key; popup = ''"><span>{{ t(label) }}</span><Icon v-if="historyRange === key" name="Check" :size="14" /></button></div></div>
+          <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range dropdown-trigger" :class="{ active: historyRange !== 'all', open: popup === 'historyRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'historyRange'" @click.stop="toggle('historyRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(historyRange)) }}</span><Icon name="ChevronDown" :size="14" class="dropdown-chevron" /></button><div v-if="popup === 'historyRange'" v-popover-placement class="popover range-popover dropdown-surface" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="dropdown-item" :aria-selected="historyRange === key" @click="historyRange = key; popup = ''"><span class="dropdown-label">{{ t(label) }}</span><Icon v-if="historyRange === key" name="Check" class="dropdown-check" /></button></div></div>
           <div class="filter-chips" role="radiogroup" :aria-label="t('状态筛选')"><button v-for="(label, key) in { all: t('全部'), active: t('进行中'), waiting: t('待处理'), completed: t('已完成'), failed: t('失败 / 中断') }" :key="key" type="button" role="radio" class="filter-chip" :class="{ active: historyStatus === key }" :aria-checked="historyStatus === key" :disabled="key !== 'all' && !historyCounts[key]" @click="historyStatus = key">{{ label }}<span>{{ historyCounts[key] }}</span></button></div>
         </div>
         <div v-if="historyFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个对话', { n: visibleSessions.length }) }}</span><button type="button" class="text-button" @click="resetHistoryFilters">{{ t('清除筛选') }}</button></div></div>
-        <div class="history-list"><button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon :name="s.branched_from ? 'GitBranch' : 'MessageSquare'" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length && historyFiltered" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的对话") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetHistoryFilters">{{ t("清除筛选") }}</button></div><div v-else-if="!visibleSessions.length" class="empty-state"><Icon name="MessagesSquare" :size="28" /><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div></div>
+        <div class="history-list"><button v-for="s in visibleSessions" :key="s.id" class="history-row" @click="openSession(s.id)"><Icon :name="s.branched_from ? 'GitBranch' : 'MessageSquare'" /><div><strong>{{ sessionTitle(s) }}</strong><small>{{ s.model_id }} · {{ dateLabel(s) }}</small></div><span class="status-tag" :class="s.status">{{ statusLabels[s.status] }}</span><span v-if="deletable(s)" class="session-delete" role="button" tabindex="0" :title="t('删除对话')" :aria-label="t('删除对话')" @click.stop="deleteSession(s)" @keydown.enter.stop.prevent="deleteSession(s)"><Icon name="Trash2" :size="15" /></span><Icon name="ChevronRight" /></button><div v-if="!visibleSessions.length && historyFiltered" class="empty-state"><Icon name="SearchX" :size="28" /><h3>{{ t("没有符合条件的对话") }}</h3><p>{{ t("换个关键词或放宽筛选条件试试。") }}</p><button class="secondary" @click="resetHistoryFilters">{{ t("清除筛选") }}</button></div><div v-else-if="!visibleSessions.length" class="empty-state"><h3>{{ t("No chats yet") }}</h3><p>{{ t("Start a new chat to bring your ideas to life.") }}</p><button class="primary" @click="newChat">{{ t("New chat") }}</button></div></div></div>
       <div v-else-if="mainView === 'files'" class="history-view"><div class="history-head"><div class="section-eyebrow">{{ t("ALL FILES") }}</div><h1>{{ t("全局文件") }}</h1>
         <div v-if="allFiles.length" class="list-filter" role="search">
           <label class="filter-search"><Icon name="Search" :size="15" /><input v-model="fileSearch" type="search" :placeholder='t("搜索文件名、路径或所属对话…")' :aria-label='t("搜索文件")'><button v-if="fileSearch" type="button" class="icon-button" :aria-label="t('清空搜索')" @click="fileSearch = ''"><Icon name="X" :size="13" /></button></label>
-          <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range" :class="{ active: fileRange !== 'all', open: popup === 'fileRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'fileRange'" @click.stop="toggle('fileRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(fileRange)) }}</span><Icon name="ChevronDown" :size="14" class="filter-range-chevron" /></button><div v-if="popup === 'fileRange'" v-popover-placement class="popover range-popover" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="menu-row" :class="{ selected: fileRange === key }" :aria-selected="fileRange === key" @click="fileRange = key; popup = ''"><span>{{ t(label) }}</span><Icon v-if="fileRange === key" name="Check" :size="14" /></button></div></div>
+          <div class="popover-anchor filter-range-anchor"><button type="button" class="filter-range dropdown-trigger" :class="{ active: fileRange !== 'all', open: popup === 'fileRange' }" :aria-label="t('时间范围')" aria-haspopup="listbox" :aria-expanded="popup === 'fileRange'" @click.stop="toggle('fileRange')"><Icon name="Clock" :size="14" /><span>{{ t(rangeLabel(fileRange)) }}</span><Icon name="ChevronDown" :size="14" class="dropdown-chevron" /></button><div v-if="popup === 'fileRange'" v-popover-placement class="popover range-popover dropdown-surface" role="listbox" :aria-label="t('时间范围')" @click.stop><button v-for="[key, label] in RANGE_OPTIONS" :key="key" type="button" role="option" class="dropdown-item" :aria-selected="fileRange === key" @click="fileRange = key; popup = ''"><span class="dropdown-label">{{ t(label) }}</span><Icon v-if="fileRange === key" name="Check" class="dropdown-check" /></button></div></div>
           <div class="filter-chips" role="radiogroup" :aria-label="t('类型筛选')"><button type="button" role="radio" class="filter-chip" :class="{ active: fileKind === 'all' }" :aria-checked="fileKind === 'all'" @click="fileKind = 'all'">{{ t('全部') }}<span>{{ searchedFiles.length }}</span></button><button v-for="kind in fileKinds" :key="kind.key" type="button" role="radio" class="filter-chip" :class="{ active: fileKind === kind.key }" :aria-checked="fileKind === kind.key" @click="fileKind = kind.key"><i class="file-kind-dot" :class="'file-tone-' + kind.key"></i>{{ t(kind.label) }}<span>{{ kind.count }}</span></button></div>
         </div>
         <div v-if="filesFiltered" class="filter-summary"><span>{{ t('筛选出 {n} 个文件', { n: visibleFiles.length }) }}</span><button type="button" class="text-button" @click="resetFileFilters">{{ t('清除筛选') }}</button></div></div>
@@ -713,10 +707,6 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
 
 
       <div v-else class="chat-page" :class="{ 'has-session': selected }">
-        <div v-if="!selected" class="home-content">
-          <div v-if="!dismissed && !profiles.some(p => p.configured)" class="setup-banner"><Icon name="TriangleAlert" :size="15" /><div><strong>{{ t("Connect a model to get started") }}</strong><span>{{ t("配置模型，即可使用 Deep Agent 的完整能力") }}</span></div><button @click="openModels">{{ t("Set up model") }}</button><button class="icon-button" :aria-label='t("关闭提示")' @click="dismissBanner"><Icon name="X" :size="13" /></button></div>
-        </div>
-
         <div v-if="selected" ref="transcriptEl" class="transcript" @scroll.passive="updateScrollState">
           <template v-for="b in timeline" :key="b.key">
             <div v-if="b.lead" class="message-label agent-label"><img class="mark-light" src="/deep-agent-mark-light.svg" alt=""><img class="mark-dark" src="/deep-agent-mark-dark.svg" alt=""> {{ t("Agent") }}</div>
@@ -733,7 +723,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
             <div class="output-files-heading"><Icon name="FileBox" :size="14" />{{ t("artifacts.title") }}</div>
             <FileBlock v-for="file in unclaimedFiles" :key="file.url" :path="file.path" :size="file.size" :modified-at="file.modified_at" :download-url="file.url" @preview="featurePanels?.openFile($event)" />
           </section>
-          <section v-if="selected.status === 'waiting_confirmation'" class="approval-panel"><div class="panel-title"><Icon name="ShieldCheck" />{{ t("Review tool calls") }}</div><p>{{ t("Agent 请求执行以下操作，请逐项确认。") }}</p><div v-for="call in selected.pending_tool_calls" :key="call.toolCallId" class="approval-call"><div><strong>{{ actionLabel(call.name) }}</strong><select v-model="decisions[call.toolCallId]" :aria-label="t('reviewTool', { name: actionLabel(call.name) })"><option :value="undefined">{{ t("Approve") }}</option><option value="approve">{{ t("Approve") }}</option><option value="reject">{{ t("Reject") }}</option></select></div><dl class="approval-details"><div v-for="(field, index) in approvalFields(call)" :key="index"><dt>{{ field.label }}</dt><dd><pre>{{ field.content }}</pre></dd></div></dl></div><button class="primary" @click="approval">{{ t("Submit decisions") }} <Icon name="ArrowUpRight" :size="14" /></button></section>
+          <section v-if="selected.status === 'waiting_confirmation'" class="approval-panel"><div class="panel-title"><Icon name="ShieldCheck" />{{ t("Review tool calls") }}</div><p>{{ t("Agent 请求执行以下操作，请逐项确认。") }}</p><div v-for="call in selected.pending_tool_calls" :key="call.toolCallId" class="approval-call"><div><strong>{{ actionLabel(call.name) }}</strong><select v-model="decisions[call.toolCallId]" class="select select-compact" :aria-label="t('reviewTool', { name: actionLabel(call.name) })"><option :value="undefined">{{ t("Approve") }}</option><option value="approve">{{ t("Approve") }}</option><option value="reject">{{ t("Reject") }}</option></select></div><dl class="approval-details"><div v-for="(field, index) in approvalFields(call)" :key="index"><dt>{{ field.label }}</dt><dd><pre>{{ field.content }}</pre></dd></div></dl></div><button class="primary" @click="approval">{{ t("Submit decisions") }} <Icon name="ArrowUpRight" :size="14" /></button></section>
           <section v-if="selected.status === 'waiting_human'" class="approval-panel"><div class="panel-title"><Icon name="MessageCircleQuestion" />{{ selected.human_input.title || t('Agent needs your input') }}</div><p>{{ selected.human_input.reason }}</p><h4>{{ selected.human_input.question }}</h4><div v-for="field in selected.human_input.fields" :key="field.id" class="field"><label :for="'human-' + field.id">{{ field.label }}{{ field.required ? ' *' : '' }}</label><div v-if="['single_select', 'multi_select'].includes(field.type)" :id="'human-' + field.id" class="human-options" role="group" :aria-label="field.label"><div v-for="o in field.options" :key="o.value" class="human-option-group"><button type="button" class="human-option" :class="{ selected: humanOptionSelected(field, o.value) }" :aria-pressed="humanOptionSelected(field, o.value)" @click="selectHumanOption(field, o.value, !humanOptionSelected(field, o.value))"><span>{{ customHumanOption(o) ? t('human.other') : o.label }}<small v-if="o.description">{{ o.description }}</small></span><Icon v-if="humanOptionSelected(field, o.value)" name="Check" :size="16" /></button><textarea v-if="customHumanOption(o) && humanOptionSelected(field, o.value)" v-model="humanOtherValues[field.id]" class="human-other-input" :aria-label="t('human.otherAnswer', { field: field.label })" :placeholder="t('human.otherPlaceholder')" rows="2" required></textarea></div></div><input v-else-if="field.type === 'boolean'" :id="'human-' + field.id" type="checkbox" v-model="humanValues[field.id]"><textarea v-else :id="'human-' + field.id" v-model="humanValues[field.id]" :placeholder="field.placeholder"></textarea></div><button class="primary" :disabled="!humanAnswerValid || humanSubmitting" @click="answer">{{ t("Continue") }} <Icon name="ArrowRight" :size="14" /></button></section>
           <section v-if="['paused', 'runtime_config_boundary'].includes(selected.status)" class="pause-panel"><Icon name="Pause" /><span>{{ t("Agent paused") }}</span><button class="primary" @click="action('resume')">{{ t("Continue") }}</button></section>
         </div>
@@ -747,20 +737,34 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
             <div v-if="attachments.length" class="file-attachments"><div v-for="(file, i) in attachments" :key="file.id" class="attachment-chip"><img v-if="file.url" :src="file.url" :alt="file.name"><Icon v-else name="FileText" :size="18" /><div><strong>{{ file.name }}</strong><small>{{ (file.size / 1024).toFixed(1) }} KB</small></div><button type="button" class="icon-button" :aria-label="t('upload.remove', { name: file.name })" @click="removeAttachment(i)"><Icon name="X" :size="13" /></button></div></div>
             <div class="composer-toolbar"><button type="button" class="icon-button add-context" :aria-label="t('upload.files')" :title="t('upload.files')" :disabled="uploading || sending || busy || waiting" @click="fileInput.click()"><Icon :name="uploading ? 'LoaderCircle' : 'Plus'" :class="{ spin: uploading }" :size="18" /></button>
               <div class="popover-anchor model-anchor">
-                <button type="button" class="text-button model-select" :title="modelLabel" @click.stop="toggle('model')"><Icon name="Brain" :size="14" /><span class="model-name">{{ modelLabel }}</span><span v-if="profile?.reasoning_efforts.length" class="model-current-effort">{{ effort || t('Default') }}</span><Icon name="ChevronDown" :size="12" /></button>
-                <div v-if="popup === 'model'" v-popover-placement class="popover model-popover" @click.stop>
-                  <template v-if="reasoningProfile">
-                    <div class="model-reasoning-heading"><button type="button" class="icon-button" :aria-label="t('model.back')" @click="reasoningModelId = ''"><Icon name="ArrowLeft" :size="14" /></button><div><strong>{{ t('Reasoning effort') }}</strong><small>{{ reasoningProfile.model }}</small></div></div>
-                    <button type="button" class="menu-row reasoning-option" @click="selectModel(reasoningProfile.id, '')"><span>{{ t('Default') }}</span><Icon v-if="!reasoningChoice" name="Check" :size="14" /></button>
-                    <button v-for="strength in sortReasoningEfforts(reasoningProfile.reasoning_efforts)" :key="strength" type="button" class="menu-row reasoning-option" @click="selectModel(reasoningProfile.id, strength)"><span>{{ strength }}</span><Icon v-if="reasoningChoice === strength" name="Check" :size="14" /></button>
-                  </template>
-                  <template v-else>
-                    <div class="popover-heading">{{ t('Select model') }}</div><div v-if="!profiles.length" class="popover-empty">{{ t('Add a model provider to start.') }}</div>
-                    <div v-for="p in profiles" :key="p.id" class="model-option-row"><button type="button" class="menu-row model-row" @click="selectModel(p.id, p.id === modelId ? effort : undefined)"><span>{{ p.model }}<small>{{ p.id }} · {{ p.api }}</small></span><span v-if="!p.configured" class="unconfigured">{{ t('未就绪') }}</span><Icon v-if="modelId === p.id" name="Check" :size="14" /></button><button v-if="p.reasoning_efforts.length" type="button" class="icon-button model-effort-edit" :aria-label="t('model.editEffort', { name: p.model })" :title="t('Reasoning effort')" @click.stop="reasoningModelId = p.id"><Icon name="Pencil" :size="14" /></button></div>
-                  </template>
+                <button ref="modelTrigger" type="button" class="text-button model-select dropdown-trigger" :title="modelLabel" :aria-expanded="popup === 'model'" :aria-controls="popup === 'model' ? modelPopupId : undefined" @click.stop="toggle('model')"><ProviderIcon v-if="modelProviderId" :provider="modelProviderId" :size="15" /><Icon v-else name="Brain" :size="14" /><span class="model-name">{{ modelLabel }}</span><span v-if="profile?.reasoning_efforts.length" class="model-current-effort">{{ effort || t('Default') }}</span><Icon name="ChevronDown" :size="12" class="dropdown-chevron" /></button>
+                <ModelPicker
+                  v-if="popup === 'model'"
+                  :id="modelPopupId"
+                  :profiles="profiles"
+                  :model-id="modelId"
+                  :effort="effort"
+                  @select="selectModel"
+                  @close="popup = ''; modelTrigger?.focus()"
+                />
+              </div>
+              <div class="popover-anchor permission-anchor">
+                <button type="button" class="text-button permission-select dropdown-trigger" :disabled="waiting || sending" :aria-expanded="popup === 'permission'" :aria-controls="popup === 'permission' ? permissionPopupId : undefined" @click.stop="toggle('permission')">
+                  <Icon name="ShieldCheck" :size="13" /><span class="permission-title">{{ t('Permission') }}</span><span>{{ effectivePermission }}</span><span v-if="pendingPermission" class="permission-pending">→ {{ pendingPermission }}</span><Icon name="ChevronDown" :size="11" class="dropdown-chevron" />
+                </button>
+                <div v-if="popup === 'permission'" :id="permissionPopupId" v-popover-placement="'.chat-page'" class="popover permission-popover dropdown-surface composer-menu-card" @click.stop>
+                  <div class="dropdown-heading">{{ t('Permission') }}</div>
+                  <div role="menu" :aria-label="t('Permission')">
+                    <button type="button" class="dropdown-item" role="menuitemradio" :aria-checked="(pendingPermission || effectivePermission) === 'ask'" @click="permission('ask')">
+                      <Icon name="ShieldCheck" :size="15" /><span class="dropdown-label">ask<small>{{ t('permission.askDescription') }}</small></span><Icon v-if="(pendingPermission || effectivePermission) === 'ask'" name="Check" class="dropdown-check" />
+                    </button>
+                    <button type="button" class="dropdown-item" role="menuitemradio" :aria-checked="(pendingPermission || effectivePermission) === 'allow'" @click="permission('allow')">
+                      <Icon name="Wrench" :size="15" /><span class="dropdown-label">allow<small>{{ t('permission.allowDescription') }}</small></span><Icon v-if="(pendingPermission || effectivePermission) === 'allow'" name="Check" class="dropdown-check" />
+                    </button>
+                  </div>
+                  <p v-if="pendingPermission" class="permission-note">{{ t('permission.pending') }}</p>
                 </div>
               </div>
-              <div class="popover-anchor permission-anchor"><button type="button" class="text-button permission-select" :disabled="waiting || sending" @click.stop="toggle('permission')"><Icon name="ShieldCheck" :size="13" /><span class="permission-title">{{ t('Permission') }}</span><span>{{ effectivePermission }}</span><span v-if="pendingPermission" class="permission-pending">→ {{ pendingPermission }}</span><Icon name="ChevronDown" :size="11" /></button><div v-if="popup === 'permission'" v-popover-placement class="popover permission-popover" @click.stop><div class="popover-heading">{{ t('Permission') }}</div><button class="menu-row" @click="permission('ask')"><Icon name="ShieldCheck" :size="15" /><span>ask<small>{{ t('permission.askDescription') }}</small></span><Icon v-if="(pendingPermission || effectivePermission) === 'ask'" name="Check" :size="14" /></button><button class="menu-row" @click="permission('allow')"><Icon name="Wrench" :size="15" /><span>allow<small>{{ t('permission.allowDescription') }}</small></span><Icon v-if="(pendingPermission || effectivePermission) === 'allow'" name="Check" :size="14" /></button><p v-if="pendingPermission" class="permission-note">{{ t('permission.pending') }}</p></div></div>
               <div class="composer-spacer"></div><button v-if="busy && draft.trim()" type="button" class="text-button queue-button" @click="queueFollowUp">{{ t("Queue") }}</button><button v-if="busy && !draft.trim() && !attachments.length" type="button" class="send-button stop-button" :disabled="selected.status !== 'running'" :aria-label="t('Stop')" :title="t('Stop')" @click="action('cancel')"><span class="stop-glyph"></span></button><button v-else type="submit" class="send-button" :disabled="(!draft.trim() && !attachments.length) || sending || waiting || uploading" :aria-label="busy ? t('追加指令') : t('发送任务')"><Icon :name="sending ? 'LoaderCircle' : (draft.trim() || attachments.length) ? 'ArrowUp' : 'AudioLines'" :size="17" :class="{ spin: sending }" /></button>
             </div>
           </form>
@@ -772,7 +776,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
         <section v-if="!selected" class="recent-chats" :class="{ 'is-pulling': historyPulling }">
           <div ref="recentScroller" class="recent-chats-scroller">
             <div class="recent-chats-track" :style="historyTrackStyle">
-              <template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 6)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div class="chat-run-meta"><span :title="t('task.duration')"><Icon name="Clock" :size="12" />{{ taskDuration(s, locale, cardNow) }}</span><span :title="t('usage.cost')"><Icon name="Coins" :size="12" />{{ taskCost(s, locale) }}</span></div></div><time class="chat-age" :datetime="s.created_at || undefined" :title="creationDate(s.created_at, locale)">{{ relativeCreation(s.created_at, locale, cardNow) }}</time></button></template>
+              <template v-if="recentSessions.length"><button v-for="s in recentSessions.slice(0, 6)" :key="s.id" class="chat-row" @click="openSession(s.id)"><div class="chat-thumbnail"><Icon :name="s.status === 'completed' ? 'Check' : ['failed', 'interrupted'].includes(s.status) ? 'CircleAlert' : s.status === 'running' ? 'LoaderCircle' : 'GitBranch'" :size="20" :class="{ spin: s.status === 'running' }" /><span v-if="s.branched_from" class="chat-branch" :title="t('分支')" :aria-label="t('分支')"><Icon name="GitBranch" :size="13" /></span><span class="status-pill" :class="s.status">{{ statusLabels[s.status] }}</span></div><div class="chat-info"><strong>{{ sessionTitle(s) }}</strong><div class="chat-run-meta"><span :title="t('task.duration')"><Icon name="Clock" :size="12" />{{ taskDuration(s, locale, cardNow) }}</span><span :title="t('usage.cost')">{{ taskCost(s, locale) }}</span></div></div><time class="chat-age" :datetime="s.created_at || undefined" :title="creationDate(s.created_at, locale)">{{ relativeCreation(s.created_at, locale, cardNow) }}</time></button></template>
               <div v-else-if="sessions.length" class="home-empty"><div class="empty-mark"><Icon name="History" :size="23" /></div><h3>{{ t("近 7 天没有对话") }}</h3><p>{{ t("更早的对话可以在历史对话中查看。") }}</p><button type="button" class="text-button home-history-link" @click="mainView = 'history'">{{ t("查看历史对话") }}<Icon name="ArrowRight" :size="13" /></button></div>
               <div v-else class="home-empty"><div class="empty-mark"><Icon name="MessageSquarePlus" :size="23" /></div><h3>{{ t("A little idea. A new beginning.") }}</h3><p>{{ t("Build something, explore a question, or create your next document.") }}</p><span>{{ t("Your chats will appear here.") }}</span></div>
             </div>
@@ -787,13 +791,26 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
 
     <FeaturePanels ref="featurePanels" :session="selected" :events="events" @open="artifactPanelOpen = $event" @context="artifactContext = $event" @error="error = $event" />
     <div v-if="modal" class="modal-backdrop" @click.self="closeModal">
-      <section class="modal" :class="{ 'wide-modal': modal === 'agent-settings' || modal === 'models' }" role="dialog" aria-modal="true" :aria-label="modal === 'features' ? t('Features') : modal === 'permission' ? t('permission.confirmTitle') : modal === 'models' ? t('模型配置') : t('Agent settings')">
+      <section class="modal" :class="{ 'wide-modal': modal === 'agent-settings' || modal === 'models', 'permission-modal': modal === 'permission' }" role="dialog" aria-modal="true" :aria-label="modal === 'features' ? t('Features') : modal === 'permission' ? t('permission.confirmTitle') : modal === 'models' ? t('模型配置') : t('Agent settings')">
         <header class="modal-header"><div><Icon :name="modal === 'models' ? 'Sparkles' : modal === 'files' ? 'Files' : modal === 'permission' ? 'ShieldCheck' : 'SlidersHorizontal'" :size="18" /><h2>{{ modal === 'features' ? t('Features') : modal === 'permission' ? t('permission.confirmTitle') : modal === 'models' ? t('Model settings') : modal === 'agent-settings' ? t('Agent settings') : modal === 'search' ? t('Search chats') : t('Files') }}</h2></div><button class="icon-button" :aria-label='t("关闭设置")' @click="closeModal"><Icon name="X" :size="18" /></button></header>
         <template v-if="modal === 'features'"><div class="modal-body"><p class="muted">{{ t('features.explain') }}</p><div v-for="feature in featuresList" :key="feature.id" class="feature-setting"><strong>{{ feature.name }}</strong><small>{{ feature.installed ? (feature.enabled ? t('Enabled') : t('Disabled')) : t('features.uninstalled') }}</small><button class="secondary" @click="setFeature(feature,!feature.enabled)">{{ !feature.installed ? t('features.install') : feature.enabled ? t('features.disable') : t('features.enable') }}</button><button v-if="feature.installed" class="text-button danger" @click="setFeature(feature,false,true)">{{ t('features.uninstall') }}</button></div></div><div v-if="error" class="modal-error">{{ error }}</div></template>
-        <template v-else-if="modal === 'permission'"><form @submit.prevent="permission('allow', allowConfirmation)"><div class="modal-body form-stack"><p class="muted">{{ t('permission.allowWarning') }}</p><div class="field"><label for="allow-confirmation">{{ t('permission.typeAllow') }}</label><input id="allow-confirmation" v-model="allowConfirmation" :aria-label="t('permission.typeAllow')" autocomplete="off" spellcheck="false" placeholder="ALLOW" autofocus></div></div><div v-if="error" class="modal-error" role="alert">{{ t(error) }}</div><footer class="modal-footer"><button type="button" class="secondary" @click="modal = ''">{{ t('Cancel') }}</button><button class="primary" :disabled="saving || allowConfirmation !== 'ALLOW'">{{ t('permission.enableAllow') }}</button></footer></form></template>
+        <form v-else-if="modal === 'permission'" @submit.prevent="confirmAllow">
+          <div class="modal-body form-stack">
+            <p class="muted">{{ t('permission.allowWarning') }}</p>
+            <label class="checkbox-label permission-confirmation">
+              <input v-model="allowConfirmed" type="checkbox" required autofocus :disabled="saving">
+              {{ t('permission.confirmAllow') }}
+            </label>
+          </div>
+          <div v-if="error" class="modal-error" role="alert">{{ t(error) }}</div>
+          <footer class="modal-footer">
+            <button type="button" class="secondary" @click="closeModal">{{ t('Cancel') }}</button>
+            <button type="submit" class="primary" :disabled="saving || !allowConfirmed">{{ t('permission.enableAllow') }}</button>
+          </footer>
+        </form>
         <template v-else-if="modal === 'agent-settings' && settingsEdit"><div class="modal-tabs"><button v-for="(label, key) in { general: t('General'), tools: t('Tools'), skills: t('Skills') }" :key="key" :class="{ active: configTab === key }" @click="configTab = key">{{ label }}</button><span>v{{ settingsEdit.revision }}</span></div><div class="modal-body">
           <div v-if="configTab === 'general'" class="form-stack"><div class="field"><label>{{ t("System prompt") }}</label><textarea v-model="settingsEdit.system_prompt" rows="5"></textarea></div><div class="field"><label>{{ t("Rules") }} <small>{{ t("每行一条规则") }}</small></label><textarea v-model="rulesText" rows="4"></textarea></div><div class="settings-note"><Icon name="Info" :size="14" />{{ t("配置保存后用于新会话；现有会话保留创建时的配置快照。") }}</div></div>
-          <div v-if="configTab === 'tools'"><fieldset ><div class="settings-intro"><h3>{{ t("Core tools") }}</h3><p>{{ t("使用平台内置工具，具有副作用的操作交由内核请求审批。") }}</p></div><div class="core-tools"><label v-for="(label, key) in toolLabels" :key="key" class="tool-toggle"><div><Icon :name="key === 'execute' ? 'Terminal' : key === 'task' ? 'Bot' : key === 'start_background_task' ? 'Workflow' : 'Wrench'" :size="15" /><span>{{ label }}<small>{{ key }}</small></span></div><input type="checkbox" :checked="settingsEdit.core_tools[key] !== false" @change="settingsEdit.core_tools[key] = $event.target.checked"></label></div><div class="settings-intro office-intro"><h3>{{ t("Additional tools") }}</h3><p>{{ t("编辑已注册工具的描述与 JSON Schema。参数名称和必填项需保留。") }}</p></div><div class="tool-catalog"><button v-for="tool in toolCatalog.filter(t => !settingsEdit.tools.some(w => w.name === t.name))" :key="tool.name" class="secondary" @click="addTool(tool)"><Icon name="Plus" :size="13" />{{ tool.name }}</button></div><p v-if="!settingsEdit.tools.length" class="muted">{{ t("没有额外的 Office 工具，仍可使用上方内核工具。") }}</p><details v-for="tool in settingsEdit.tools" :key="tool.name" class="tool-config"><summary><Icon name="FileBox" :size="16" />{{ tool.name }}<span class="spacer"></span><span>{{ tool.enabled ? t('Enabled') : t('Disabled') }}</span><Icon name="ChevronDown" :size="14" /></summary><div class="form-stack"><label class="checkbox-label"><input v-model="tool.enabled" type="checkbox">{{ t("启用此工具") }}</label><div class="field"><label>{{ t("Description") }}</label><textarea v-model="tool.description" rows="2"></textarea></div><div class="field"><label>JSON Schema</label><textarea class="code-input" v-model="toolSchemas[tool.name]" rows="12" spellcheck="false"></textarea></div></div></details></fieldset></div>
+          <div v-if="configTab === 'tools'"><fieldset ><div class="settings-intro"><h3>{{ t("Core tools") }}</h3><p>{{ t("使用平台内置工具，具有副作用的操作交由内核请求审批。") }}</p></div><div class="core-tools"><label v-for="(label, key) in toolLabels" :key="key" class="tool-toggle"><div><Icon :name="key === 'execute' ? 'Terminal' : key === 'task' ? 'Bot' : key === 'start_background_task' ? 'Workflow' : 'Wrench'" :size="15" /><span>{{ label }}<small>{{ key }}</small></span></div><input type="checkbox" :checked="settingsEdit.core_tools[key] !== false" @change="settingsEdit.core_tools[key] = $event.target.checked"></label></div></fieldset></div>
           <div v-if="configTab === 'tools'" class="mcp-settings"><div class="settings-intro"><h3>{{ t("MCP servers") }}</h3><p>{{ t('sandbox.mcpScope') }}</p></div><textarea class="code-input" v-model="mcpJson"  rows="9" spellcheck="false" :aria-label='t("MCP JSON 配置")'></textarea><p class="muted">{{ t('mcp.example') }}</p></div>
           <div v-if="configTab === 'skills'">
             <div class="settings-intro"><h3>{{ t('Skills') }}</h3><p>{{ t('skills.configureHint') }}</p></div>
@@ -812,7 +829,7 @@ onUnmounted(() => { unmounted = true; stopCommands?.(); source?.close(); clearIn
           </div>
         </div><div v-if="error" class="modal-error" role="alert">{{ t(error) }}</div><footer class="modal-footer"><span>{{ t("Applies to new chats") }}</span><button class="secondary" @click="modal = ''">{{ t("Cancel") }}</button><button class="primary" :disabled="saving" @click="saveSettings"><Icon v-if="saving" name="LoaderCircle" class="spin" :size="14" />{{ t("Save changes") }}</button></footer></template>
 
-        <template v-else-if="modal === 'models'"><div class="modal-tabs"><button :class="{ active: !advanced }" @click="advanced = false">{{ t("Providers & models") }}</button><button :class="{ active: advanced }" @click="advanced = true">{{ t("Advanced JSON") }}</button><span>v{{ modelConfig?.revision }}</span></div><div class="modal-body"><template v-if="!advanced"><div class="configured-models" v-if="profiles.length"><div v-for="p in profiles" :key="p.id"><Icon name="Sparkles" :size="16" /><div><strong>{{ p.model }}</strong><small>{{ p.id }} · {{ p.api }}</small></div><span class="model-ready" :class="{ ready: p.configured }">{{ p.configured ? t('Ready') : t('Key missing') }}</span></div></div><div class="settings-intro"><h3>{{ t("Add a model") }}</h3><p>{{ t("支持 Chat Completions 和 Responses 模型配置。") }}</p></div><div class="form-grid"><div class="field"><label>{{ t("来源名称") }}</label><input v-model="providerForm.provider" :placeholder="t('e.g. openai')"></div><div class="field"><label>{{ t("模型 ID") }}</label><input v-model="providerForm.model" :placeholder='t("Provider model ID")'></div><div class="field full"><label>Base URL</label><input v-model="providerForm.base_url" placeholder="https://your-provider.example/v1"></div><div class="field full"><label>API Key</label><input v-model="providerForm.api_key" type="password" autocomplete="new-password" :placeholder='t("API Key 或 ${ENV_VAR}")'><small>{{ t("密钥在服务端加密保存，读取时脱敏。") }}</small></div><div class="field"><label>{{ t("API 协议") }}</label><select v-model="providerForm.api"><option value="chat_completions">Chat Completions</option><option value="responses">Responses</option></select></div><div class="field"><label>{{ t("思考强度") }} <small>{{ t("逗号分隔") }}</small></label><input v-model="providerForm.efforts" placeholder="low, medium, high"></div><label class="checkbox-label full"><input v-model="providerForm.image" type="checkbox">{{ t("模型支持图片输入") }}</label></div></template><template v-else><p class="muted">{{ t("编辑完整 llm 配置，可删除模型、修改默认模型和模型参数。保留 __UNCHANGED_SECRET__ 可沿用已保存的密钥。") }}</p><textarea class="code-input advanced-json" v-model="modelJson" spellcheck="false" :aria-label='t("模型高级 JSON 配置")'></textarea></template></div><div v-if="error" class="modal-error" role="alert">{{ t(error) }}</div><footer class="modal-footer"><span>{{ profiles.length }} {{ t("models configured") }}</span><button class="secondary" @click="modal = ''">{{ t("Cancel") }}</button><button class="primary" :disabled="saving" @click="saveModels">{{ saving ? t('Saving…') : advanced ? t('Save configuration') : t('Add model') }}</button></footer></template>
+        <template v-else-if="modal === 'models'"><div class="modal-tabs"><button :class="{ active: !advanced }" @click="advanced = false">{{ t("Providers & models") }}</button><button :class="{ active: advanced }" @click="advanced = true">{{ t("Advanced JSON") }}</button><span>v{{ modelConfig?.revision }}</span></div><div class="modal-body"><template v-if="!advanced"><div class="configured-models" v-if="profiles.length"><div v-for="p in profiles" :key="p.id"><Icon name="Sparkles" :size="16" /><div><strong>{{ p.model }}</strong><small>{{ p.id }} · {{ p.api }}</small></div><span class="model-ready" :class="{ ready: p.configured }">{{ p.configured ? t('Ready') : t('Key missing') }}</span></div></div><div class="settings-intro"><h3>{{ t("Add a model") }}</h3><p>{{ t("支持 Chat Completions 和 Responses 模型配置。") }}</p></div><div class="form-grid"><div class="field"><label>{{ t("来源名称") }}</label><input v-model="providerForm.provider" :placeholder="t('e.g. openai')"></div><div class="field"><label>{{ t("模型 ID") }}</label><input v-model="providerForm.model" :placeholder='t("Provider model ID")'></div><div class="field full"><label>Base URL</label><input v-model="providerForm.base_url" placeholder="https://your-provider.example/v1"></div><div class="field full"><label>API Key</label><input v-model="providerForm.api_key" type="password" autocomplete="new-password" :placeholder='t("API Key 或 ${ENV_VAR}")'><small>{{ t("密钥在服务端加密保存，读取时脱敏。") }}</small></div><div class="field"><label>{{ t("API 协议") }}</label><select v-model="providerForm.api" class="select" :aria-label="t('API 协议')"><option value="chat_completions">Chat Completions</option><option value="responses">Responses</option></select></div><div class="field"><label>{{ t("思考强度") }} <small>{{ t("逗号分隔") }}</small></label><input v-model="providerForm.efforts" placeholder="low, medium, high"></div><label class="checkbox-label full"><input v-model="providerForm.image" type="checkbox">{{ t("模型支持图片输入") }}</label></div></template><template v-else><p class="muted">{{ t("编辑完整 llm 配置，可删除模型、修改默认模型和模型参数。保留 __UNCHANGED_SECRET__ 可沿用已保存的密钥。") }}</p><textarea class="code-input advanced-json" v-model="modelJson" spellcheck="false" :aria-label='t("模型高级 JSON 配置")'></textarea></template></div><div v-if="error" class="modal-error" role="alert">{{ t(error) }}</div><footer class="modal-footer"><span>{{ profiles.length }} {{ t("models configured") }}</span><button class="secondary" @click="modal = ''">{{ t("Cancel") }}</button><button class="primary" :disabled="saving" @click="saveModels">{{ saving ? t('Saving…') : advanced ? t('Save configuration') : t('Add model') }}</button></footer></template>
 
         <template v-else-if="modal === 'files'"><div class="modal-body"><p class="muted">{{ t("当前会话的文件库") }}</p><div v-if="!fileList.length" class="settings-empty"><Icon name="FolderOpen" :size="30" /><p>{{ t("No files yet.") }}</p></div><div v-for="file in fileList" :key="file.path" class="file-row"><Icon name="FileText" :size="16" /><span>{{ file.path }}</span><small>{{ (file.size / 1024).toFixed(1) }} KB</small><a :href="fileUrl(file.path)" download :aria-label="t('Download')"><Icon name="Download" :size="15" /></a></div></div></template>
         <template v-else-if="modal === 'search'"><div class="modal-body"><input v-model="search" class="search-input" autofocus :placeholder='t("Search chats…")'><button v-for="s in sessions.filter(s => sessionTitle(s).toLowerCase().includes(search.toLowerCase()))" :key="s.id" class="menu-row" @click="openSession(s.id); modal = ''"><Icon name="MessageSquare" /><span>{{ sessionTitle(s) }}<small>{{ s.model_id }}</small></span></button><p v-if="!sessions.length" class="muted">{{ t("No chats yet.") }}</p></div></template>

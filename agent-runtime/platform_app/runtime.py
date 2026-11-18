@@ -448,13 +448,12 @@ class Runtime:
         (root / 'mcp.json').write_text(json.dumps({'enabled': False, 'servers': {}}), encoding='utf-8')
         manager = MCPManager(root / 'mcp.json', trust_env=True)
         manager.load()
-        adapter = d.ToolAdapter(config, self.id)
         self.ensure_artifact_services()
         runner = None
         try:
             prepared = prepare_agent(settings=settings, model=model, checkpointer=store.checkpointer,
                 instructions=f'当前 Thread 私有目录：{context.workspace_root}。面向用户的文件必须写入 {context.files_root}；校验、渲染、截图等过程文件必须写入临时目录 {context.workspace_root / "tmp"}，不得作为输出文件交付。不得读取其他 Thread 或平台控制数据。\n\n' + '\n\n'.join([config['system_prompt'], '\n'.join(config['rules'])]), skills=['/agent-skills/', '/agent-skills/installed/'],
-                extra_tools=adapter.tools(), interrupt_on={t['name']: True for t in config['tools'] if t['enabled'] and t['name'] in d.TOOL_SCHEMAS} or None, mcp=manager)
+                mcp=manager)
             runner = AgentRunner(prepared=prepared, settings=settings, session_store=store,
                 thread_id=self.id, workspace=context.workspace_root, mcp_manager=manager,
                 on_event=self.core_event)

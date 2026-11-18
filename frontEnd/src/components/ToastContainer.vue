@@ -31,7 +31,7 @@ const typeIcon: Record<ToastType, IconName> = {
 </template>
 
 <style scoped>
-/* 通报条：恒定碳黑的磨砂玻璃，状态由左侧色条与代号表达 */
+/* 通报条：磨砂底板 + 左侧色条；成功/错误用状态色浅底，避免在深色登录页上融掉 */
 .toast-card {
   pointer-events: auto;
   display: flex;
@@ -39,35 +39,20 @@ const typeIcon: Record<ToastType, IconName> = {
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem 0.625rem 0;
-  border: 1px solid rgb(245 237 220 / 0.14);
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--color-line));
   border-radius: 10px;
-  background-color: rgb(26 26 24 / 0.86);
+  background-color: color-mix(in srgb, var(--tone) 14%, var(--color-card));
   backdrop-filter: blur(14px) saturate(1.2);
-  box-shadow: 0 14px 40px -12px rgb(0 0 0 / 0.55);
+  box-shadow: 0 14px 40px -12px rgb(0 0 0 / 0.35);
   font-size: 13px;
-  color: #f2ead9;
+  color: var(--color-ink);
   --tone: var(--color-steel);
 }
-/* 成功提示：只留图标和文字，不加底板；文字随主题取色，保证在浅色页面上可读 */
 .toast-success {
   --tone: var(--color-success);
-  justify-content: center;
-  padding-right: 0;
-  border-color: transparent;
-  background-color: transparent;
-  backdrop-filter: none;
-  box-shadow: none;
-  color: var(--color-ink);
-}
-.toast-success .toast-code {
-  padding-left: 0;
-  border-left: 0;
-}
-.toast-success .flex-1 {
-  flex: 0 1 auto;
 }
 .toast-error {
-  --tone: #e2695f;
+  --tone: var(--color-danger);
 }
 .toast-info {
   --tone: #9cb5c6;

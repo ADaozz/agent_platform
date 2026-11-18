@@ -27,7 +27,8 @@ async function show() {
   if (open.value) { close(); return }
   activeProvider.value = props.provider || props.providers[0]?.id || ''
   const rect = trigger.value!.getBoundingClientRect()
-  const width = Math.min(500, window.innerWidth - 24)
+  const cascadeWidth = parseFloat(getComputedStyle(trigger.value!).getPropertyValue('--dropdown-width'))
+  const width = Math.min(window.innerWidth - 24, activeProvider.value ? cascadeWidth : Math.max(168, rect.width))
   const below = window.innerHeight - rect.bottom - 18
   const above = rect.top - 18
   const upward = below < 200 && above > below
@@ -82,20 +83,34 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="usage-model-filter">
-    <button ref="trigger" type="button" class="filter-trigger" aria-haspopup="menu" :aria-expanded="open" :aria-controls="id" :aria-label="tr('筛选服务商和模型')" :title="label" @click="show" @keydown.down.prevent="show" @keydown.up.prevent="show">
-      <ProviderIcon v-if="provider" :provider="provider" :size="18" /><span>{{ label }}</span><AppIcon name="expand_more" />
+    <button ref="trigger" type="button" class="filter-trigger dropdown-trigger" aria-haspopup="menu" :aria-expanded="open" :aria-controls="open ? id : undefined" :aria-label="tr('筛选服务商和模型')" :title="label" @click="show" @keydown.down.prevent="show" @keydown.up.prevent="show">
+      <ProviderIcon v-if="provider" :provider="provider" :size="16" /><span>{{ label }}</span><AppIcon name="expand_more" class="dropdown-chevron" />
     </button>
     <Teleport to="body">
-      <div v-if="open" :id="id" ref="popup" class="usage-filter-popup" :style="position" @keydown="keydown">
-        <div ref="primary" class="provider-menu" role="menu" :aria-label="tr('服务商')">
-          <button role="menuitemradio" tabindex="-1" :aria-checked="!provider" data-provider="" @click="select('')">{{ tr('全部服务商') }}<AppIcon v-if="!provider" name="check_circle" /></button>
-          <button v-for="item in providers" :key="item.id" role="menuitem" tabindex="-1" aria-haspopup="menu" :aria-expanded="activeProvider === item.id" :aria-controls="`${id}-models`" :data-provider="item.id" :class="{ active: activeProvider === item.id }" @mouseenter="activeProvider = item.id" @focus="activeProvider = item.id" @click="activeProvider = item.id">
-            <ProviderIcon :provider="item.id" :size="20" /><span>{{ item.label }}</span><AppIcon name="chevron_right" />
-          </button>
-        </div>
-        <div v-if="activeProvider" :id="`${id}-models`" ref="secondary" class="model-menu" role="menu" :aria-label="activeLabel">
-          <button role="menuitemradio" tabindex="-1" :aria-checked="provider === activeProvider && !model" @click="select(activeProvider)">{{ tr('全部模型') }}<AppIcon v-if="provider === activeProvider && !model" name="check_circle" /></button>
-          <button v-for="item in models" :key="item" role="menuitemradio" tabindex="-1" :aria-checked="provider === activeProvider && model === item" @click="select(activeProvider, item)"><span>{{ item }}</span><AppIcon v-if="provider === activeProvider && model === item" name="check_circle" /></button>
+      <div v-if="open" :id="id" ref="popup" class="usage-filter-popup dropdown-surface dropdown-cascade" :style="position" @keydown="keydown">
+        <div class="dropdown-columns">
+          <div class="dropdown-column dropdown-branches">
+            <div class="dropdown-heading">{{ tr('服务商') }}</div>
+            <div ref="primary" role="menu" :aria-label="tr('服务商')">
+              <button type="button" class="dropdown-item" role="menuitemradio" tabindex="-1" :aria-checked="!provider" data-provider="" @click="select('')">
+                <span class="dropdown-label" :title="tr('全部服务商')">{{ tr('全部服务商') }}</span><AppIcon v-if="!provider" name="check" class="dropdown-check" />
+              </button>
+              <button v-for="item in providers" :key="item.id" type="button" class="dropdown-item" role="menuitem" tabindex="-1" aria-haspopup="menu" :aria-expanded="activeProvider === item.id" :aria-controls="activeProvider === item.id ? `${id}-models` : undefined" :data-provider="item.id" @mouseenter="activeProvider = item.id" @focus="activeProvider = item.id" @click="activeProvider = item.id">
+                <ProviderIcon :provider="item.id" :size="16" /><span class="dropdown-label" :title="item.label">{{ item.label }}</span><AppIcon name="chevron_right" class="dropdown-branch-arrow" />
+              </button>
+            </div>
+          </div>
+          <div v-if="activeProvider" :key="activeProvider" class="dropdown-column">
+            <div class="dropdown-heading" :title="activeLabel">{{ activeLabel }}</div>
+            <div :id="`${id}-models`" ref="secondary" role="menu" :aria-label="activeLabel">
+              <button type="button" class="dropdown-item" role="menuitemradio" tabindex="-1" :aria-checked="provider === activeProvider && !model" @click="select(activeProvider)">
+                <span class="dropdown-label">{{ tr('全部模型') }}</span><AppIcon v-if="provider === activeProvider && !model" name="check" class="dropdown-check" />
+              </button>
+              <button v-for="item in models" :key="item" type="button" class="dropdown-item" role="menuitemradio" tabindex="-1" :aria-checked="provider === activeProvider && model === item" @click="select(activeProvider, item)">
+                <span class="dropdown-label">{{ item }}</span><AppIcon v-if="provider === activeProvider && model === item" name="check" class="dropdown-check" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -106,16 +121,7 @@ onBeforeUnmount(() => {
 .usage-model-filter { min-width: 0; width: 100%; max-width: 100%; }
 .filter-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--field); color: var(--color-ink); font-size: 13px; text-align: left; }
 .filter-trigger > span:not(.provider-avatar) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.filter-trigger > .app-icon { flex-shrink: 0; color: var(--color-ink-muted); }
-.usage-filter-popup { position: fixed; z-index: 80; display: flex; overflow: hidden; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-card); box-shadow: var(--shadow-panel); color: var(--color-ink); }
-.provider-menu { flex: 0 0 165px; }
-.model-menu { flex: 1; min-width: 0; border-left: 1px solid var(--color-line); }
-.provider-menu, .model-menu { overflow-y: auto; padding: 4px; }
-.usage-filter-popup button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 8px; border-radius: 4px; color: var(--color-ink-secondary); font-size: 12px; text-align: left; }
-.usage-filter-popup button > span:not(.provider-avatar) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.usage-filter-popup button > .app-icon:last-child { margin-left: auto; flex-shrink: 0; font-size: 14px; }
-.usage-filter-popup button:is(:hover, :focus-visible, .active) { background: var(--color-hover); color: var(--color-ink); }
-.usage-filter-popup button[aria-checked='true'] { color: var(--color-primary); }
-button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-@media (max-width: 600px) { .provider-menu { flex-basis: 135px; } }
+.filter-trigger:hover,
+.filter-trigger[aria-expanded='true'] { border-color: var(--color-ink-faint); }
+.usage-filter-popup { position: fixed; z-index: 80; }
 </style>

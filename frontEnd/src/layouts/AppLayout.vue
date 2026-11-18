@@ -246,24 +246,25 @@ function handleLogout() {
       <template v-if="settingsMenuOpen">
         <div class="rail-flyout-scrim" aria-hidden="true" @click="closeSettingsMenu" />
         <div
-          class="rail-flyout"
+          class="rail-flyout dropdown-surface"
           role="menu"
           :aria-label="tr(SETTINGS_GROUP)"
           :style="flyoutStyle"
           @click.stop
         >
-          <div class="rail-flyout-head">{{ tr(SETTINGS_GROUP) }}</div>
+          <div class="dropdown-heading" aria-hidden="true">{{ tr(SETTINGS_GROUP) }}</div>
           <RouterLink
             v-for="m in visibleSettings"
             :key="m.path"
             :to="m.path"
             role="menuitem"
-            class="rail-flyout-item"
-            :class="{ 'rail-flyout-item-active': isMenuActive(m.path) }"
+            class="dropdown-item"
+            :aria-current="isMenuActive(m.path) ? 'page' : undefined"
             @click="closeSettingsMenu"
           >
-            <AppIcon :name="m.icon" class="!text-[17px]" />
-            <span class="min-w-0 flex-1 truncate">{{ tr(m.title) }}</span>
+            <AppIcon :name="m.icon" class="!text-[16px]" />
+            <span class="dropdown-label">{{ tr(m.title) }}</span>
+            <AppIcon v-if="isMenuActive(m.path)" name="check" class="dropdown-check" />
           </RouterLink>
         </div>
       </template>
@@ -356,51 +357,9 @@ function handleLogout() {
 .rail-flyout {
   position: fixed;
   z-index: 41;
-  display: flex;
   min-width: 11.5rem;
   max-width: 16rem;
-  flex-direction: column;
-  gap: 2px;
   overflow-y: auto;
-  padding: 0.375rem;
-  border: 1px solid var(--chrome-line);
-  border-radius: 12px;
-  background-color: var(--chrome-raised);
-  box-shadow: var(--shadow-panel);
-  color: var(--chrome-ink-2);
-}
-.rail-flyout-head {
-  padding: 0.4rem 0.75rem 0.35rem;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--chrome-ink-3);
-}
-.rail-flyout-item {
-  display: flex;
-  height: 2.25rem;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0 0.75rem;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--chrome-ink-2);
-  transition:
-    background-color 0.16s,
-    color 0.16s;
-}
-.rail-flyout-item:hover,
-.rail-flyout-item:focus-visible {
-  background-color: var(--chrome-glass);
-  color: var(--chrome-ink);
-  outline: none;
-}
-.rail-flyout-item-active {
-  background-color: var(--chrome-glass);
-  color: var(--chrome-ink);
-  font-weight: 500;
-}
-.rail-flyout-item-active > .app-icon:first-child {
-  color: var(--chrome-signal);
 }
 
 /* 导航项：圆角胶囊；悬停浮出玻璃底，左侧亮起信号橙标记 */

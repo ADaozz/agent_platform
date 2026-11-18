@@ -31,8 +31,16 @@ try{for(const [index,entry] of roots.entries()){
   await writeFile(path.join(folder,'index.html'),'<html><div id="app"></div><script type="module" src="./main.js"></script></html>')
   await writeFile(path.join(folder,'style.css'),await readFile(path.join(source,'style.css')))
   await writeFile(path.join(folder,'theme.css'),await readFile(path.join(source,'theme.css')))
-  await writeFile(path.join(folder,'main.js'),`import {createApp,h,ref} from 'vue';import Docx from '${entry.prefix}/features/docx/Panel.vue';import Pptx from '${entry.prefix}/features/pptx/Panel.vue';import './style.css';
-const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'running'});window.officePush=update=>events.value=[...events.value,{seq:events.value.length+1,type:format.value==='docx'?'document_checked':'presentation_review',...update}];window.officeFormat=value=>{events.value=[];format.value=value};window.officeSession=(status,id='fixture')=>session.value={id,status};window.officeErrors=[];createApp({setup(){return()=>h(format.value==='docx'?Docx:Pptx,{session:session.value,events:events.value,active:true,onError:message=>window.officeErrors.push(message)})}}).mount('#app');`)
+  await writeFile(path.join(folder,'main.js'),`import {createApp,h,ref} from 'vue';import Docx from '${entry.prefix}/features/docx/Panel.vue';import Pptx from '${entry.prefix}/features/pptx/Panel.vue';import FeaturePanels from '${entry.prefix}/FeaturePanels.vue';import './style.css';
+const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'running'}),panels=ref(null);
+window.officePush=update=>events.value=[...events.value,{seq:events.value.length+1,type:format.value==='docx'?'document_checked':'presentation_review',...update}];
+window.officeFormat=value=>{events.value=[];format.value=value};
+window.officeSession=(status,id='fixture')=>session.value={id,status};
+window.officePreviewReady=()=>panels.value?.latestFile?.path==='untracked.docx';
+window.officeDisableDocx=()=>session.value={...session.value,enabled_features:[]};
+window.officeOpenUntracked=()=>panels.value.openFile('untracked.docx');
+window.officeErrors=[];
+createApp({setup(){return()=>h(format.value==='docx'?Docx:format.value==='pptx'?Pptx:FeaturePanels,{ref:panels,session:session.value,events:events.value,active:true,onError:message=>window.officeErrors.push(message)})}}).mount('#app');`)
   server=spawn(process.execPath,[path.join(entry.root,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{cwd:entry.root,stdio:'ignore'})
   const deadline=Date.now()+20000
   while(Date.now()<deadline){try{if((await fetch(base)).ok)break}catch{}await new Promise(r=>setTimeout(r,100))}
@@ -42,6 +50,8 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   let doc=document(),deck=presentation(),failSteer=true,failRetry=false
   await page.route('**/*',async route=>{
    const request=route.request(),url=new URL(request.url()),name=url.pathname
+   if(name.endsWith('/features'))return route.fulfill({json:[{id:'docx',installed:true,enabled:true}]})
+   if(name.endsWith('/files'))return route.fulfill({json:[{path:'untracked.docx',modified_at:1}]})
    if(name.endsWith('.png')&&name.includes('/documents/'))return route.fulfill({body:name.endsWith('002.png')?png2:png1,contentType:'image/png'})
    if(!name.includes('/agent/sessions/'))return route.continue()
    if(request.method()==='GET')return route.fulfill({json:[]})
@@ -152,6 +162,18 @@ const events=ref([]),format=ref('docx'),session=ref({id:'fixture',status:'runnin
   await page.locator('.pptx-deck-review li').filter({hasText:'Deck density issue'}).getByRole('button',{name:'Ask the Agent to fix',exact:true}).click()
   await page.locator('.pptx-deck-review li').getByRole('button',{name:'Sent to the Agent'}).waitFor()
   assert.equal(calls.at(-1).body.artifact.slide_id,'s2');assert.equal(calls.at(-1).body.artifact.request_id,'whole-request')
+  await page.evaluate(()=>{window.officeErrors.length=0;window.officeFormat('preview')})
+  await page.waitForFunction(()=>window.officePreviewReady())
+  await page.evaluate(()=>window.officeOpenUntracked())
+  const previewError=page.locator('.file-preview-panel .file-preview-error').filter({hasText:'Preview unavailable'})
+  await previewError.waitFor()
+  assert.deepEqual(await page.evaluate(()=>window.officeErrors),[])
+  await page.locator('.file-preview-panel header button').click()
+  await page.evaluate(()=>window.officeDisableDocx())
+  await page.waitForFunction(()=>!window.officePreviewReady())
+  await page.evaluate(()=>window.officeOpenUntracked())
+  await previewError.waitFor()
+  assert.deepEqual(await page.evaluate(()=>window.officeErrors),[])
   assert.deepEqual(errors,[])
   await writeFile(path.join(output,entry.name+'-results.json'),JSON.stringify({passed:true,browserErrors:errors,actions:calls.map(c=>({path:c.name,artifact:c.body.artifact}))},null,2))
   console.log(entry.name+': independent panels, provenance, page/region location, running/idle delegation, agent review requests/errors, stale fences, PPTX highlights/dismissal passed')

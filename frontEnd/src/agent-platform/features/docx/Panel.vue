@@ -11,7 +11,7 @@ import {mergeDocument,previewKey} from './state'
 import {api} from '../../featureApi'
 import {API_BASE} from '../../runtime'
 const props=defineProps({session:Object,events:{type:Array,default:()=>[]},active:Boolean,files:{type:Array,default:()=>[]},openRequest:Object})
-const emit=defineEmits(['open','context','error','catalog','select-file'])
+const emit=defineEmits(['open','context','error','preview-error','catalog','select-file'])
 const selected=computed(()=>props.session)
 async function guard(fn){try{return await fn()}catch(error){emit('error',error.message)}}
 const documents = ref({}), activeDocumentId = ref(''), documentOpen = ref(false), renderedRevision = ref(null)
@@ -51,7 +51,7 @@ watch(()=>props.openRequest,async request=>{
   if(props.session?.id===id&&props.openRequest?.token===request.token){
    documentOpen.value=false
    emit('open',false)
-   emit('error',error.message)
+   emit('preview-error',error.message)
   }
  }
 },{immediate:true})

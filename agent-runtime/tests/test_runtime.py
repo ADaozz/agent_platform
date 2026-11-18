@@ -678,7 +678,7 @@ def test_global_config_freezes_session_snapshot(client, monkeypatch, tmp_path):
     monkeypatch.setattr(platform_app.agent_core.config, 'default_skills_dir', lambda: cli.parent)
     monkeypatch.setattr('platform_app.agent_core.sandbox.default_skills_dir', lambda: cli.parent)
     config = client.get('/api/settings').json()
-    assert {t['name'] for t in config['tools']} == set(d.TOOL_SCHEMAS)
+    assert config['tools'] == []
     assert any(s['name'] == 'cli-example' and s['enabled'] for s in config['native_skills'])
     session = client.post('/api/agent/sessions', json={'model_id': 'test/model'}).json()
     snapshot = d.get('session', session['id'])['config']

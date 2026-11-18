@@ -88,7 +88,7 @@ def settings():
 
 @app.get('/api/tool-catalog')
 def tool_catalog():
-    return [{'name': name, 'description': f'创建真实的 {name[7:].upper()} 文件并返回文件名。', 'schema': schema, 'enabled': True} for name, schema in d.TOOL_SCHEMAS.items()]
+    return []
 
 
 @app.put('/api/settings')
@@ -98,7 +98,9 @@ def update_settings(value: dict):
         if value.get('revision') != previous['revision']:
             raise HTTPException(409, '配置已更新，请刷新后重试')
         edits = {k: v for k, v in value.items() if k in ('system_prompt', 'rules', 'skills', 'tools', 'core_tools', 'mcp', 'skill_bindings')}
-        value = {**previous, **edits}
+        if isinstance(edits.get('tools'), list):
+            edits['tools'] = [tool for tool in edits['tools'] if not isinstance(tool, dict) or tool.get('name') not in d.REMOVED_TOOLS]
+        value = {**previous, 'tools': [], **edits}
         try:
             d.validate_config(value)
         except Exception as exc:
@@ -119,7 +121,7 @@ def platform_capabilities():
         'revision': value['revision'],
         'editable': capabilities_editable(),
         'core_tools': [{'name': name, 'enabled': core.get(name, True)} for name in d.CORE_TOOLS],
-        'tools': [{'name': tool['name'], 'description': tool.get('description', ''), 'enabled': tool.get('enabled', True)} for tool in value.get('tools', [])],
+        'tools': [],
         'skills': [{k: skill.get(k) for k in ('id', 'name', 'description', 'source', 'feature_id', 'enabled')} | {'available': skill.get('available', True)}
                    for skill in value['native_skills']],
     }
@@ -147,7 +149,7 @@ def update_platform_capabilities(value: CapabilityMounts):
         previous = d.get('settings', 'global')
         if value.revision != previous['revision']:
             raise HTTPException(409, '配置已更新，请刷新后重试')
-        if set(value.tools) - {tool['name'] for tool in previous.get('tools', [])}:
+        if value.tools:
             raise HTTPException(422, '工具未注册，请刷新后重试')
         unavailable = {s['id'] for s in d.native_skills() if s.get('available') is False}
         if any(enabled and key in unavailable for key, enabled in value.skill_bindings.items()):
@@ -155,7 +157,7 @@ def update_platform_capabilities(value: CapabilityMounts):
         updated = {**previous,
                    'core_tools': {**previous.get('core_tools', {}), **value.core_tools},
                    'skill_bindings': {**previous.get('skill_bindings', {}), **value.skill_bindings},
-                   'tools': [{**tool, 'enabled': value.tools.get(tool['name'], tool.get('enabled', True))} for tool in previous.get('tools', [])]}
+                   'tools': []}
         try:
             d.validate_config(updated)
         except Exception as exc:

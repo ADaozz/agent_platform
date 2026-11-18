@@ -32,7 +32,8 @@ function openFile(path){
   // Still show a closable pane so the user is not stuck with a blank reservation.
   shellPath.value=path;shellError.value=t('artifacts.previewUnavailable');shellOpen.value=true
   active.value='';open.value={};fileRequest.value=null
-  emit('open',true);emit('context',null);emit('error',shellError.value)
+  emit('open',true);emit('context',null)
+  if(feature!=='docx')emit('error',shellError.value)
   return
  }
  shellPath.value=path;shellError.value='';shellOpen.value=true
@@ -46,6 +47,9 @@ function closeShell(){
 }
 function onPanelError(message){
  emit('error',message)
+ showPreviewError(message)
+}
+function showPreviewError(message){
  // Keep a closable shell with the failure reason instead of an empty 48vw gap.
  if(shellOpen.value&&!contentOpen.value){
   shellError.value=message||t('artifacts.previewUnavailable')
@@ -67,7 +71,7 @@ onMounted(reload)
 defineExpose({reload,openFile,latestFile,close:closeShell})
 </script>
 <template>
- <component v-for="feature in visibleFeatures" :key="feature.id" :is="components[feature.id]" :session="session" :events="events" :active="active===feature.id" :files="previewFiles" :open-request="fileRequest?.feature===feature.id ? fileRequest : null" @catalog="catalogs[feature.id]=$event" @select-file="openFile" @open="setOpen(feature.id,$event)" @context="setContext(feature.id,$event)" @error="onPanelError" />
+ <component v-for="feature in visibleFeatures" :key="feature.id" :is="components[feature.id]" :session="session" :events="events" :active="active===feature.id" :files="previewFiles" :open-request="fileRequest?.feature===feature.id ? fileRequest : null" @catalog="catalogs[feature.id]=$event" @select-file="openFile" @open="setOpen(feature.id,$event)" @context="setContext(feature.id,$event)" @error="onPanelError" @preview-error="showPreviewError" />
  <FilePreview :session="session" :active="active==='file'" :request="fileRequest?.feature==='file'?fileRequest:null" :files="previewFiles" :events="events" @select-file="openFile" @open="setOpen('file',$event)" />
  <aside v-if="showShell" class="docx-panel file-preview-panel" :aria-label="t('filePreview.title')">
   <header class="docx-panel-header">

@@ -44,12 +44,12 @@ onUnmounted(() => document.removeEventListener('pointerdown', outside))
 
 <template>
   <div ref="root" class="preview-file-select" :class="{ opened }">
-    <button type="button" class="preview-file-trigger" role="combobox" :aria-label="t('artifacts.select')" aria-haspopup="listbox" :aria-expanded="opened" :aria-controls="opened ? menuId : undefined" :aria-activedescendant="opened ? `${menuId}-${focused}` : undefined" :disabled="!files.length" @click="opened ? close() : open()" @keydown="keydown">
-      <span :title="modelValue">{{ modelValue || t('artifacts.select') }}</span><Icon name="ChevronDown" :size="14" />
+    <button type="button" class="preview-file-trigger dropdown-trigger" role="combobox" :aria-label="t('artifacts.select')" aria-haspopup="listbox" :aria-expanded="opened" :aria-controls="opened ? menuId : undefined" :aria-activedescendant="opened ? `${menuId}-${focused}` : undefined" :disabled="!files.length" @click="opened ? close() : open()" @keydown="keydown">
+      <span :title="modelValue">{{ modelValue || t('artifacts.select') }}</span><Icon name="ChevronDown" :size="14" class="dropdown-chevron" />
     </button>
-    <div v-if="opened" :id="menuId" ref="menu" v-popover-placement class="popover preview-file-menu" role="listbox" :aria-label="t('artifacts.select')">
-      <button v-for="(file, index) in files" :id="`${menuId}-${index}`" :key="file.path" type="button" class="preview-file-option" :class="{ focused: focused === index, selected: file.path === modelValue }" role="option" :aria-selected="file.path === modelValue" tabindex="-1" @pointerenter="focused = index" @mousedown.prevent @click="choose(index)">
-        <Icon :name="fileType(file.path).icon" :size="16" :class="['file-icon', 'file-tone-' + fileType(file.path).tone]" /><span :title="file.path">{{ file.path }}</span><Icon v-if="file.path === modelValue" name="Check" :size="14" />
+    <div v-if="opened" :id="menuId" ref="menu" v-popover-placement class="popover preview-file-menu dropdown-surface" role="listbox" :aria-label="t('artifacts.select')">
+      <button v-for="(file, index) in files" :id="`${menuId}-${index}`" :key="file.path" type="button" class="preview-file-option dropdown-item" :class="{ focused: focused === index }" role="option" :aria-selected="file.path === modelValue" tabindex="-1" @pointerenter="focused = index" @mousedown.prevent @click="choose(index)">
+        <Icon :name="fileType(file.path).icon" :size="16" :class="['file-icon', 'file-tone-' + fileType(file.path).tone]" /><span class="dropdown-label" :title="file.path">{{ file.path }}</span><Icon v-if="file.path === modelValue" name="Check" class="dropdown-check" />
       </button>
     </div>
   </div>
@@ -61,12 +61,6 @@ onUnmounted(() => document.removeEventListener('pointerdown', outside))
 .preview-file-trigger{display:flex;align-items:center;gap:8px;width:auto;max-width:100%;min-width:0;min-height:32px;padding:5px 8px;text-align:left;border-radius:6px;color:var(--text-primary);background:transparent;font-size:12px}
 .preview-file-trigger:hover,.preview-file-select.opened .preview-file-trigger{background:var(--surface-hover)}
 .preview-file-trigger>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.preview-file-trigger>svg{color:var(--text-muted)}
 .preview-file-trigger:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
-.preview-file-menu{width:100%;min-width:240px;max-height:320px;padding:5px;background:var(--surface-raised);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px #0002;z-index:50;overflow:auto}
-.preview-file-option{display:flex;align-items:center;gap:9px;width:100%;min-height:36px;padding:8px 9px;text-align:left;border-radius:5px;color:var(--text-secondary);font-size:12px}
-.preview-file-option.focused{background:var(--surface-hover);color:var(--text-primary)}
-.preview-file-option.selected{color:var(--text-primary)}
-.preview-file-option>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.preview-file-option>svg:last-child{color:var(--text-primary)}
+.popover.preview-file-menu{width:max(100%, 240px);max-height:320px;z-index:50}
 </style>

@@ -1,38 +1,23 @@
-import copy
 import json
 import os
 import sqlite3
 import threading
 from pathlib import Path
-from uuid import uuid4
 import yaml
-
-from jsonschema import Draft202012Validator
 
 DATA = Path(os.environ.get('PLATFORM_DATA_DIR', '.platform')).resolve()
 LOCK = threading.RLock()
 CORE_TOOLS = ('ls', 'read_file', 'write_file', 'edit_file', 'delete', 'glob', 'grep', 'execute', 'task', 'start_background_task', 'read_subagent_log', 'request_human_input', 'web_search', 'web_fetch')
-REMOVED_TOOLS = ('write_todos',)
+REMOVED_TOOLS = ('write_todos', 'create_xlsx')
 
 
 def hidden_tools(config):
     return tuple(dict.fromkeys((*REMOVED_TOOLS, *(name for name, enabled in config.get('core_tools', {}).items() if not enabled))))
 
 
-def schema(properties, required):
-    return {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False}
-
-
-TEXT = {'type': 'string', 'minLength': 1}
-TOOL_SCHEMAS = {
-    'create_xlsx': schema({'title': TEXT, 'rows': {'type': 'array', 'items': {'type': 'array', 'items': {'type': ['string', 'number', 'boolean', 'null']}}}}, ['title', 'rows']),
-}
-
-
 def defaults():
     return dict(id='global', system_prompt='你是一个通用智能助理，根据任务选择可用工具和技能，完成工作并验证结果。',
-        rules=[], skills=[], core_tools={}, skill_bindings={}, mcp={'enabled': False, 'servers': {}},
-        tools=[{'name': name, 'description': f'创建真实的 {name[7:].upper()} 文件并返回文件名。', 'schema': copy.deepcopy(value), 'enabled': True} for name, value in TOOL_SCHEMAS.items()], revision=1)
+        rules=[], skills=[], core_tools={}, skill_bindings={}, mcp={'enabled': False, 'servers': {}}, tools=[], revision=1)
 
 
 def files_root(thread_id):
@@ -109,6 +94,7 @@ def native_skills():
 
 def effective_config():
     value = get('settings', 'global')
+    value['tools'] = []
     bindings = value.get('skill_bindings', {})
     value['native_skills'] = [{**skill, 'enabled': skill.get('available', True) and bindings.get(skill['id'], True)} for skill in native_skills()]
     return value
@@ -138,51 +124,5 @@ def validate_config(value):
     from platform_app.agent_core.mcp.config import parse_server
     for name, config in mcp.get('servers', {}).items():
         parse_server(name, config)
-    seen = set()
-    for tool in value.get('tools', []):
-        name = tool.get('name')
-        if name not in TOOL_SCHEMAS or name in seen:
-            raise ValueError('工具必须绑定唯一的已注册处理器')
-        seen.add(name)
-        if not isinstance(tool.get('description'), str) or not tool['description'].strip() or type(tool.get('enabled')) is not bool:
-            raise ValueError('工具需要 description 和 enabled')
-        s = tool.get('schema', {})
-        Draft202012Validator.check_schema(s)
-        # Descriptions and constraints are editable; handler arguments stay compatible.
-        original = TOOL_SCHEMAS[name]
-        if s.get('type') != 'object' or s.get('properties', {}).keys() != original['properties'].keys() or set(s.get('required', [])) != set(original['required']) or s.get('additionalProperties') is not False:
-            raise ValueError('schema 必须保留处理器参数与 required；可修改描述和约束')
-
-
-class ToolAdapter:
-    def __init__(self, config, thread_id):
-        self.config = copy.deepcopy(config)
-        self.root = files_root(thread_id)
-        self.root.mkdir(parents=True, exist_ok=True)
-
-    def execute(self, name, arguments):
-        tool = next((t for t in self.config['tools'] if t['name'] == name and t['enabled']), None)
-        if tool is None:
-            raise ValueError('尚未启用该工具')
-        Draft202012Validator(tool['schema']).validate(arguments)
-        Draft202012Validator(TOOL_SCHEMAS[name]).validate(arguments)
-        extension = name[7:]
-        path = self.root / f'{uuid4().hex[:12]}.{extension}'
-        if extension == 'xlsx':
-            from openpyxl import Workbook
-            doc = Workbook()
-            for row in arguments['rows']:
-                # Treat untrusted strings as text, never spreadsheet formulas.
-                doc.active.append(["'" + x if isinstance(x, str) and x.startswith(('=', '+', '-', '@')) else x for x in row])
-            doc.save(path)
-        return {'filename': path.name, 'type': extension}
-
-    def tools(self):
-        from langchain_core.tools import StructuredTool
-        tools = []
-        for tool in self.config['tools']:
-            if tool['enabled']:
-                def invoke(_name=tool['name'], **kwargs):
-                    return self.execute(_name, kwargs)
-                tools.append(StructuredTool.from_function(func=invoke, name=tool['name'], description=tool['description'], args_schema=tool['schema']))
-        return tools
+    if value.get('tools', []) != []:
+        raise ValueError('额外工具未注册')
