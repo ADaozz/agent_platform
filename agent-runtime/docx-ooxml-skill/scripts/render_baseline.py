@@ -119,7 +119,7 @@ def main():
                 save_page(colored_pdf, dest, index=index)
                 page_files.append(dest)
         _sheet(page_files, evidence / 'final-sheet.png')
-        report = dict(renderer='LibreOffice Writer', source='templates/business-report', pages_after_fill=pages,
+        report = dict(renderer='LibreOffice Writer', source='generated business-report fixture', pages_after_fill=pages,
             recolor_complete=result.get('recolor_complete'),
             images={name: dict(sha256=sha(evidence / name), bytes=(evidence / name).stat().st_size)
                 for name in ('before.png', 'filled.png', 'recolored.png', 'comparison.png', 'final-sheet.png')},

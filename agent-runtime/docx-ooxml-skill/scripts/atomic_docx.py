@@ -222,9 +222,10 @@ class DocumentStore(_shared.ArtifactStore):
                 raise ValueError('Checkpoint required before further changes')
             parts = o.read_parts(self.path)
             try:
-                parts, changed, extra = mutate(parts, op, Path(asset_root or self.path.parent))
+                parts, changed, extra = mutate(parts, op, Path(asset_root or self.path.parent), state.get('selected_design'))
             except (o.etree.XMLSyntaxError, KeyError, TypeError) as exc:
                 raise ValueError('Invalid atomic operation: ' + str(exc)) from exc
+            self._workflow('apply_planned_pagination', parts, state.get('document_plan'), state.get('selected_design'))
             return self.commit(c, state, packed(parts), request['operation_id'], request, changed, extra=extra)
 
     def _workflow(self, name, *args, **kwargs):
@@ -404,7 +405,7 @@ class DocumentStore(_shared.ArtifactStore):
             output, manifest = self.render_snapshot(revision)
             hashes = manifest['page_hashes']
             source = output / self.path.name
-            pages = review.review_pages(source, output, o, final=final, render=False)
+            pages = review.review_pages(source, output, o, final=final, render=False, design=current.get('selected_design'))
             failure = None
         except (OSError, ValueError, RuntimeError, ImportError, TimeoutError) as exc:
             pages, failure = [], type(exc).__name__ + ': ' + str(exc)[:300]
@@ -650,7 +651,7 @@ class DocumentStore(_shared.ArtifactStore):
                     'completed', editable=True)
 
 
-def mutate(parts, op, asset_root):
+def mutate(parts, op, asset_root, design=None):
     if not isinstance(op, dict) or len(json.dumps(op, ensure_ascii=False)) > 24000:
         raise ValueError('Operation exceeds bounded payload')
     parts = mark_blocks(parts)
@@ -670,6 +671,8 @@ def mutate(parts, op, asset_root):
                       'insert_table', 'insert_image_row')
     academic = _sibling('academic_blocks')
     rich = _sibling('rich_blocks')
+    table_design = (design or {}).get('table', {})
+    body_indent = (design or {}).get('styles', {}).get('Normal', {}).get('first_line_chars')
     if adding:
         if matches:
             raise ValueError('Duplicate block_id')
@@ -697,9 +700,9 @@ def mutate(parts, op, asset_root):
             node = o.etree.Element(o.q(o.W, 'tbl'))
             prop = o.etree.SubElement(node, o.q(o.W, 'tblPr'))
             o.etree.SubElement(prop, o.q(o.W, 'tblW'), attrib={o.q(o.W, 'w'): str(sum(widths)), o.q(o.W, 'type'): 'dxa'})
-            borders = o.etree.SubElement(prop, o.q(o.W, 'tblBorders'))
-            for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
-                o.etree.SubElement(borders, o.q(o.W, edge), attrib={o.q(o.W, 'val'): 'single', o.q(o.W, 'sz'): '4', o.q(o.W, 'color'): 'BCC4CC'})
+            border_style = table_design.get('borders', 'grid')
+            border_color = table_design['border_color'] if 'borders' in table_design else 'BCC4CC'
+            rich.table_borders(o, prop, border_style, border_color)
             o.etree.SubElement(prop, o.q(o.W, 'tblLayout'), attrib={o.q(o.W, 'type'): 'fixed'})
             grid = o.etree.SubElement(node, o.q(o.W, 'tblGrid'))
             for width in widths:
@@ -715,7 +718,11 @@ def mutate(parts, op, asset_root):
                     cp = o.etree.SubElement(cell, o.q(o.W, 'tcPr'))
                     o.etree.SubElement(cp, o.q(o.W, 'tcW'), attrib={o.q(o.W, 'w'): str(widths[column]), o.q(o.W, 'type'): 'dxa'})
                     if row_index == 0 and op.get('header', True):
-                        o.etree.SubElement(cp, o.q(o.W, 'shd'), attrib={o.q(o.W, 'fill'): 'F2F4F7'})
+                        if border_style == 'three_line':
+                            if len(rows) > 1:
+                                rich.table_header_rule(o, cp, border_color)
+                        else:
+                            o.etree.SubElement(cp, o.q(o.W, 'shd'), attrib={o.q(o.W, 'fill'): 'F2F4F7'})
                     p = o.etree.SubElement(cell, o.q(o.W, 'p'))
                     r = o.etree.SubElement(p, o.q(o.W, 'r'))
                     if row_index == 0 and op.get('header', True):
@@ -734,7 +741,7 @@ def mutate(parts, op, asset_root):
             else:
                 o.set_para_format(node, {'alignment': 'center', 'keep_next': bool(op.get('keep_with_next', True))})
         elif kind == 'insert_table':
-            node = rich.table(parts, root, op, o)
+            node = rich.table(parts, root, op, o, table_design if 'borders' in table_design else None)
         elif kind == 'insert_image_row':
             node = rich.image_row(parts, root, op, asset_root, o)
         elif kind == 'insert_equation':
@@ -742,7 +749,8 @@ def mutate(parts, op, asset_root):
         elif kind == 'insert_chart':
             node = academic.chart(parts, root, op, o)
         elif kind == 'insert_caption':
-            node = academic.caption(parts, root, op, o)
+            caption_design = (design or {}).get('components', {}).get('caption', {})
+            node = academic.caption(parts, root, op, o, caption_design.get('table_style'))
         elif kind == 'insert_toc':
             node = academic.toc(parts, root, op, o)
         else:
@@ -750,6 +758,10 @@ def mutate(parts, op, asset_root):
             node = nodes[0]
             if node.tag != o.q(o.W, 'p') or len(o.ptext(node)) > 3000 or len(list(node.iter(o.q(o.W, 'p')))) != 1:
                 raise ValueError('insert_block supports one bounded paragraph; use append_table for tables')
+        if body_indent and kind in (
+                'append_table', 'insert_table', 'insert_image_row', 'insert_image', 'insert_chart', 'insert_equation'):
+            for paragraph in node.iter(o.q(o.W, 'p')):
+                o.set_para_format(paragraph, {'clear_first_line_indent': True})
         node.set(BLOCK_ID, block_id)
         after_id = op.get('after_block_id')
         if after_id:
@@ -798,7 +810,7 @@ def mutate(parts, op, asset_root):
         elif kind == 'update_toc':
             academic.update_toc(parts, root, target, o)
         elif kind == 'set_table_cell':
-            rich.set_cell(parts, root, target, op, o)
+            rich.set_cell(parts, root, target, op, o, clear_first_line_indent=bool(body_indent))
         elif kind == 'format_text':
             rich.format_text(root, target, op, o)
         else:

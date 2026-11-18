@@ -14,7 +14,7 @@ def normalized(text):
     return re.sub(r'\s+', '', text)
 
 
-def analyze_pages(parts, pdf, engine, final=False):
+def analyze_pages(parts, pdf, engine, final=False, design=None):
     o = engine
     root = o.parse_xml(parts[o.MAIN])
     ns = o.NS
@@ -51,6 +51,7 @@ def analyze_pages(parts, pdf, engine, final=False):
             if header is None or not protected or keep_chain:
                 split_pages.update(hits)
     fonts_missing = []
+    font_warnings = []
     full_text = ''.join(texts)
     if re.search(r'[\u3400-\u9fff]', full_text):
         declared = set()
@@ -78,8 +79,17 @@ def analyze_pages(parts, pdf, engine, final=False):
                 fonts_missing.append('fontconfig unavailable: ' + font)
                 continue
             matched = subprocess.run(['fc-match', '-f', '%{family}', font], capture_output=True, text=True, timeout=5).stdout
-            if font.casefold() not in [f.strip() for f in matched.casefold().split(',')]:
-                fonts_missing.append(font)
+            if font.casefold() in [f.strip() for f in matched.casefold().split(',')]:
+                continue
+            fallback = (design or {}).get('components', {}).get('body', {}).get('preview_font_fallback')
+            body_font = (design or {}).get('styles', {}).get('Normal', {}).get('east_asia_font')
+            if fallback and font == body_font:
+                matched = subprocess.run(['fc-match', '-f', '%{family}', f'{font}:lang=zh-cn'],
+                                         capture_output=True, text=True, timeout=5).stdout
+                if fallback.casefold() in [f.strip() for f in matched.casefold().split(',')]:
+                    font_warnings.append(f'Preview substitutes {fallback} for {font}')
+                    continue
+            fonts_missing.append(font)
     block_samples = [(node.get('{urn:deep-agent:docx:blocks:v1}id'), normalized(o.ptext(node)))
         for node in root.iter() if node.get('{urn:deep-agent:docx:blocks:v1}id')]
     page_blocks = [[] for _ in texts]
@@ -122,7 +132,8 @@ def analyze_pages(parts, pdf, engine, final=False):
         block_ids = page_blocks[i]
         checks = dict(blank_page=blank, widow_orphan=widow_orphan, ooxml_valid=True, render_success=True, content_overflow=overflow,
             table_split=i in split_pages, heading_orphan=orphan, margins_abnormal=margin_abnormal,
-            fonts_missing=fonts_missing, visual_review='pending', warnings=['Table text cannot be uniquely mapped; inspect actual table layout'] if uncertain_tables else [])
+            fonts_missing=fonts_missing, visual_review='pending', warnings=font_warnings +
+            (['Table text cannot be uniquely mapped; inspect actual table layout'] if uncertain_tables else []))
         checks['automatic_passed'] = not (overflow or i in split_pages or orphan or margin_abnormal or fonts_missing or blank or widow_orphan)
         # Render fingerprint invalidates previous visual reviews after any reflow,
         # including images, font substitution, headers, and page renumbering.
@@ -133,7 +144,7 @@ def analyze_pages(parts, pdf, engine, final=False):
     return pages
 
 
-def review_pages(docx, output, engine, final=False, render=True):
+def review_pages(docx, output, engine, final=False, render=True, design=None):
     import pymupdf as fitz
     if render:
         engine.run_render(docx, output)
@@ -142,6 +153,6 @@ def review_pages(docx, output, engine, final=False, render=True):
     if not validation['ok']:
         raise ValueError('Structural validation failed')
     with fitz.open(output / 'preview.pdf') as pdf:
-        pages = analyze_pages(parts, pdf, engine, final)
+        pages = analyze_pages(parts, pdf, engine, final, design)
     (output / 'checks.json').write_text(json.dumps(pages, ensure_ascii=False, indent=2))
     return pages

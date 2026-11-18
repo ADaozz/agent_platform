@@ -121,7 +121,8 @@
               "toc",
               "body",
               "references",
-              "appendix"
+              "appendix",
+              "acknowledgments"
             ]
           },
           "single_page": {

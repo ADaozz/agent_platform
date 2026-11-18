@@ -179,4 +179,8 @@ def _load(name):
 
 
 if __name__ == '__main__':
-    print(build(Path(__file__).resolve().parents[1] / 'templates' / 'business-report'))
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', required=True, type=Path)
+    print(build(parser.parse_args().output))

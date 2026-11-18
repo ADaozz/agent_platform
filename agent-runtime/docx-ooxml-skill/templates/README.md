@@ -1,6 +1,6 @@
 # DOCX templates
 
-Only templates with a recorded redistribution license belong in this directory. `templates/business-report/` is original project content for technical verification.
+Use an uploaded DOCX as the template. For new documents without an upload, use the bundled [cn-thesis-general design](../design/cn-thesis-general/design.md).
 
 `import-template` analyzes a DOCX the user already has. It does not download templates and it does not copy an unlicensed file here.
 

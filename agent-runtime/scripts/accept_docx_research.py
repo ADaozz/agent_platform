@@ -28,7 +28,7 @@ def run(args):
         started=time.monotonic();result=fn();calls.append(dict(command=name,revision=result.get('revision'),duration_ms=round((time.monotonic()-started)*1000,2)));print(name,result.get('revision'),flush=True);return result
     def request(opid,**data):return dict(document_id='research',base_revision=store.metadata()['revision'],operation_id=opid,**data)
     if not args.review_existing:
-        call('init',lambda:store.init('research',design='cn-engineering-thesis'))
+        call('init',lambda:store.init('research',design='cn-thesis-general'))
         sections,batches=fixture.content('academic',args.sections,args.paragraphs)
         cover=dict(id='cover',title='科研报告封面',requirements='封面日期与标题同页',kind='cover',block_ids=['cover-title','cover-date'])
         abstract=dict(id='abstract',title='摘要',requirements='摘要与关键词',kind='abstract',block_ids=['abstract-h','abstract-p','abstract-keys'])
@@ -40,7 +40,7 @@ def run(args):
         table_rows=[['Control identifier','Verification procedure','Expected evidence']]+[[f'Run-{i:03d}',f'Measure reproducible observation {i:03d} under the baseline conditions.',f'Retain the measured outcome for protocol control {i:03d}.'] for i in range(1,60)]
         table_section=dict(id='matrix',title='验证矩阵',requirements='跨页重复表头、不拆行',kind='body',block_ids=['matrix-h','matrix-table'],tables=['matrix-table'])
         references=dict(id='references',title='参考文献',requirements='标注测试资料来源',kind='references',block_ids=['refs-h','refs-p'])
-        plan=dict(version=1,document_id='research',title='科研质量验收报告',page_target=30,design='cn-engineering-thesis',sections=[cover,abstract,toc]+sections+[table_section,references],references=[dict(id='methodology',text='Acceptance benchmark methodology; repository fixture, not an external research citation.')])
+        plan=dict(version=1,document_id='research',title='科研质量验收报告',page_target=30,design='cn-thesis-general',sections=[cover,abstract,toc]+sections+[table_section,references],references=[dict(id='methodology',text='Acceptance benchmark methodology; repository fixture, not an external research citation.')])
         call('validate-plan',lambda:adapter.engine._sibling('document_plan').validate(plan))
         call('save-plan',lambda:store.save_plan(request('plan',plan=plan)))
         batches=[[
@@ -49,8 +49,8 @@ def run(args):
           dict(type='append_paragraph',block_id='cover-date',style='CoverDate',text='2026 年 11 月 11 日')],
           [dict(type='append_paragraph',block_id='abstract-h',style='AbstractTitle',text='摘要'),dict(type='set_paragraph_format',block_id='abstract-h',page_break_before=True),dict(type='append_paragraph',block_id='abstract-p',style='AbstractBody',text='本报告用于验证可编辑科研文档的章节事务、公式图表、跨页表格、目录与质量检查闭环。报告内容是可复现的软件测试资料，不作为实际科研结论。确定性检查定位问题后仅局部修复，逐页与整稿视觉审查由主 Agent 查看渲染图后完成。'),dict(type='append_paragraph',block_id='abstract-keys',text='关键词：可编辑文档；局部修复；质量验收')],
           [dict(type='insert_toc',block_id='toc',levels=3)]]+batches+[
-          [dict(type='append_paragraph',block_id='matrix-h',style='Heading1',text=f'{args.sections+1}. Verification matrix'),dict(type='append_table',block_id='matrix-table',rows=table_rows,column_widths_twips=[1800,3800,3300],keep_together=False)],
-          [dict(type='append_paragraph',block_id='refs-h',style='Heading1',text=f'{args.sections+2}. References'),dict(type='append_paragraph',block_id='refs-p',style='Reference',text='[1] Repository acceptance fixture. Research document quality methodology. 2026. Synthetic test data, not a published research source.')]]
+          [dict(type='append_paragraph',block_id='matrix-h',style='Heading1',text='Verification matrix'),dict(type='append_table',block_id='matrix-table',rows=table_rows,column_widths_twips=[1800,3800,3300],keep_together=False)],
+          [dict(type='append_paragraph',block_id='refs-h',style='Heading1',text='References'),dict(type='append_paragraph',block_id='refs-p',style='Reference',text='[1] Repository acceptance fixture. Research document quality methodology. 2026. Synthetic test data, not a published research source.')]]
         for section,ops in zip(plan['sections'],batches):
             call('apply-section '+section['id'],lambda section=section,ops=ops:store.apply_section(request('section-'+section['id'],section_id=section['id'],operations=ops),args.output))
         diagnostic=call('check-document --final --diagnostic-only',lambda:store.check_document(final=True,auto_repair=False))

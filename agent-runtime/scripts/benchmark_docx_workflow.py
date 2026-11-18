@@ -34,8 +34,8 @@ def content(case,sections,paragraphs):
         topic,description=TOPICS[index%len(TOPICS)];prefix=f's{index+1}'
         operations=[]
         if index==0:operations.append(dict(type='insert_toc',block_id='toc',levels=3))
-        operations.append(dict(type='append_paragraph',block_id=prefix+'-h',style='Heading1',text=f'{index+1}. {topic}',ref_id=prefix+'-heading'))
-        operations.append(dict(type='append_paragraph',block_id=prefix+'-h2',style='Heading2',text=f'{index+1}.1 Evidence and method'))
+        operations.append(dict(type='append_paragraph',block_id=prefix+'-h',style='Heading1',text=topic,ref_id=prefix+'-heading'))
+        operations.append(dict(type='append_paragraph',block_id=prefix+'-h2',style='Heading2',text='Evidence and method'))
         for j in range(paragraphs):
             text=f'{topic}, observation {index+1}.{j+1}. {description} '
             text+=' '.join([
@@ -55,7 +55,7 @@ def content(case,sections,paragraphs):
             ])
         else:
             operations.extend([
-                dict(type='append_paragraph',block_id=prefix+'-h3',style='Heading3',text=f'{index+1}.1.1 Verification matrix'),
+                dict(type='append_paragraph',block_id=prefix+'-h3',style='Heading3',text='Verification matrix'),
                 dict(type='append_table',block_id=prefix+'-table',rows=[['Control','Verification procedure','Expected evidence']]+[
                     [f'{prefix} control {j+1}',f'Check snapshot integrity and revision consistency for observation {j+1}.',f'Retain the measured outcome and the owning team for {prefix}-{j+1}.'] for j in range(59)],column_widths_twips=[1700,3800,3300],keep_together=False)])
         blocks=[op['block_id'] for op in operations]
@@ -73,7 +73,7 @@ def run(output,case,sections,paragraphs,page_target):
         calls.append(dict(command=command,revision=result.get('revision'),duration_ms=round((time.monotonic()-start)*1000,2)))
         return result
     store=a.DocumentStore(output/f'{case}.docx')
-    call('init',lambda:store.init('report',design=case))
+    call('init',lambda:store.init('report',design='cn-thesis-general',quality_contract=1))
     planned,operations=content(case,sections,paragraphs)
     plan=dict(version=1,document_id='report',title=f'{case} acceptance report',page_target=page_target,sections=planned,references=[dict(id='methodology',text='Acceptance benchmark methodology; repository fixture.')])
     (output/'document-plan.json').write_text(json.dumps(plan,indent=2))
@@ -117,7 +117,7 @@ def run_legacy(output,case,sections,paragraphs,page_target):
         start=time.monotonic();result=fn()
         calls.append(dict(command=command,revision=result.get('revision'),duration_ms=round((time.monotonic()-start)*1000,2)))
         return result
-    call('init',lambda:store.init('report',design=case))
+    call('init',lambda:store.init('report',design='cn-thesis-general',quality_contract=1))
     _,batches=content(case,sections,paragraphs)
     for ops in batches:
         for op in ops:

@@ -327,9 +327,9 @@ def _layout(rows, columns):
     return layout
 
 
-def _borders(o, parent, tag, edges, color='BCC4CC'):
+def _borders(o, parent, tag, edges, color='BCC4CC', sides=('top', 'left', 'bottom', 'right', 'insideH', 'insideV')):
     borders = o.etree.SubElement(parent, o.q(o.W, tag))
-    for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+    for edge in sides:
         size = edges.get(edge)
         node = o.etree.SubElement(borders, o.q(o.W, edge))
         if size:
@@ -344,6 +344,15 @@ def _borders(o, parent, tag, edges, color='BCC4CC'):
 
 TABLE_EDGES = {'grid': {e: 4 for e in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV')},
                'horizontal': {'top': 4, 'bottom': 4, 'insideH': 4}, 'three_line': {'top': 12, 'bottom': 12}, 'none': {}}
+
+
+def table_borders(o, prop, style, color):
+    return _borders(o, prop, 'tblBorders', TABLE_EDGES[style], color)
+
+
+def table_header_rule(o, cell_props, color):
+    # Leave the other cell edges inherited so the header does not hide the table's top rule.
+    return _borders(o, cell_props, 'tcBorders', {'bottom': 6}, color, sides=('bottom',))
 
 
 def _cell_paragraph(o, spec, align, base):
@@ -361,7 +370,7 @@ def _cell_paragraph(o, spec, align, base):
     return paragraph
 
 
-def table(parts, root, op, o):
+def table(parts, root, op, o, table_design=None):
     columns, rows = op.get('columns'), op.get('rows')
     if not isinstance(columns, list) or not 1 <= len(columns) <= 12:
         raise ValueError('columns must list 1-12 column definitions')
@@ -383,7 +392,7 @@ def table(parts, root, op, o):
     header_rows = op.get('header_rows', 1)
     if type(header_rows) is not int or not 0 <= header_rows <= len(rows):
         raise ValueError('header_rows must be 0..row count')
-    style = op.get('borders', 'three_line')
+    style = op.get('borders', (table_design or {}).get('borders', 'three_line'))
     if style not in BORDER_STYLES:
         raise ValueError('borders must be one of ' + ', '.join(BORDER_STYLES))
     base = {'size': op['font_size']} if op.get('font_size') is not None else {}
@@ -393,7 +402,8 @@ def table(parts, root, op, o):
     prop = o.etree.SubElement(node, o.q(o.W, 'tblPr'))
     o.etree.SubElement(prop, o.q(o.W, 'tblW'), attrib={o.q(o.W, 'w'): str(sum(widths)), o.q(o.W, 'type'): 'dxa'})
     o.etree.SubElement(prop, o.q(o.W, 'jc')).set(o.q(o.W, 'val'), 'center')
-    _borders(o, prop, 'tblBorders', TABLE_EDGES[style], '1A1A1A' if style == 'three_line' else 'BCC4CC')
+    border_color = (table_design or {}).get('border_color', '1A1A1A' if style == 'three_line' else 'BCC4CC')
+    table_borders(o, prop, style, border_color)
     o.etree.SubElement(prop, o.q(o.W, 'tblLayout')).set(o.q(o.W, 'type'), 'fixed')
     grid = o.etree.SubElement(node, o.q(o.W, 'tblGrid'))
     for width in widths:
@@ -414,8 +424,8 @@ def table(parts, root, op, o):
                 merge = o.etree.SubElement(tcp, o.q(o.W, 'vMerge'))
                 if kind == 'cell':
                     merge.set(o.q(o.W, 'val'), 'restart')
-            if style == 'three_line' and r == header_rows - 1:
-                _borders(o, tcp, 'tcBorders', {'bottom': 6}, '1A1A1A')
+            if style == 'three_line' and r == header_rows - 1 and (not table_design or header_rows < len(rows)):
+                table_header_rule(o, tcp, border_color)
             if spec.get('fill'):
                 o.etree.SubElement(tcp, o.q(o.W, 'shd'), attrib={o.q(o.W, 'val'): 'clear', o.q(o.W, 'color'): 'auto', o.q(o.W, 'fill'): spec['fill'].upper()})
             o.etree.SubElement(tcp, o.q(o.W, 'vAlign')).set(o.q(o.W, 'val'), spec.get('valign', 'center'))
@@ -440,7 +450,7 @@ def _grid_cells(o, table_node):
             c += int(span.get(o.q(o.W, 'val'))) if span is not None else 1
 
 
-def set_cell(parts, root, target, op, o):
+def set_cell(parts, root, target, op, o, clear_first_line_indent=False):
     if target.tag != o.q(o.W, 'tbl'):
         raise ValueError('set_table_cell target must be a table block')
     row, column = op.get('row'), op.get('column')
@@ -467,7 +477,10 @@ def set_cell(parts, root, target, op, o):
     if 'text' in op or 'runs' in op:
         for paragraph in tc.findall(o.q(o.W, 'p')):
             tc.remove(paragraph)
-        tc.append(_cell_paragraph(o, spec, align, {}))
+        paragraph = _cell_paragraph(o, spec, align, {})
+        if clear_first_line_indent:
+            o.set_para_format(paragraph, {'clear_first_line_indent': True})
+        tc.append(paragraph)
     elif op.get('align') and old is not None:
         _cell_align(o, old, align)
 
@@ -602,6 +615,8 @@ def header_footer(parts, root, op, o):
     part = o.etree.Element(o.q(o.W, tag), nsmap={'w': o.W, 'r': o.R, 'm': M})
     paragraph = o.etree.SubElement(part, o.q(o.W, 'p'))
     prop = o.etree.SubElement(paragraph, o.q(o.W, 'pPr'))
+    if op.get('style'):
+        o.etree.SubElement(prop, o.q(o.W, 'pStyle'), {o.q(o.W, 'val'): op['style']})
     if op.get('border'):
         edge = o.etree.SubElement(o.etree.SubElement(prop, o.q(o.W, 'pBdr')), o.q(o.W, 'bottom' if which == 'header' else 'top'))
         for key, value in (('val', 'single'), ('sz', '6'), ('space', '1'), ('color', '808080')):

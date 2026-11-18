@@ -122,17 +122,21 @@ def _wrap_bookmark(o, root, name, nodes):
     return [start, *nodes, end]
 
 
-def caption(parts, root, op, o):
+def caption(parts, root, op, o, table_style=None):
     label, text = op.get('label', '图'), op.get('text', '')
     if not isinstance(label, str) or not LABEL.fullmatch(label):
         raise ValueError('Caption label must be 1-10 characters without spaces, such as 图 or 表')
     if not isinstance(text, str) or len(text) > 300 or '\n' in text:
         raise ValueError('Caption text must be one line of at most 300 characters')
-    ensure_styles(parts, o, ['Caption'])
+    style = table_style if table_style and label.casefold() in ('表', 'table') else 'Caption'
+    if style == 'Caption':
+        ensure_styles(parts, o, [style])
+    else:
+        o.require_style(parts, style)
     ensure_update_fields(parts, o)
     node = o.etree.Element(o.q(o.W, 'p'))
     prop = o.etree.SubElement(node, o.q(o.W, 'pPr'))
-    o.etree.SubElement(prop, o.q(o.W, 'pStyle')).set(o.q(o.W, 'val'), 'Caption')
+    o.etree.SubElement(prop, o.q(o.W, 'pStyle')).set(o.q(o.W, 'val'), style)
     if op.get('keep_with_next'):
         o.etree.SubElement(prop, o.q(o.W, 'keepNext'))
     numbered = [_run(o, label + ' '), _field(o, f'SEQ {label} \\* ARABIC', '1')]
@@ -227,6 +231,30 @@ def _heading_levels(parts, o, deepest):
     return levels
 
 
+def _heading_labels(parts, root, o):
+    """Reproduce the bundled Word list labels for the TOC's cached text."""
+    data = parts.get('word/numbering.xml')
+    if data is None:
+        return {}
+    ns = o.NS
+    numbering = o.parse_xml(data)
+    levels = numbering.xpath('./w:abstractNum[w:name/@w:val="Thesis headings"]/w:lvl', namespaces=ns)
+    formats = {level.xpath('string(w:pStyle/@w:val)', namespaces=ns):
+               (int(level.get(o.q(o.W, 'ilvl'))), level.xpath('string(w:lvlText/@w:val)', namespaces=ns))
+               for level in levels}
+    labels = {}
+    counters = [0, 0, 0]
+    for paragraph in root.xpath('./w:body/w:p[./w:pPr/w:pStyle]', namespaces=ns):
+        style = paragraph.xpath('string(./w:pPr/w:pStyle/@w:val)', namespaces=ns)
+        if style not in formats or paragraph.xpath('./w:pPr/w:numPr/w:numId[@w:val="0"]', namespaces=ns):
+            continue
+        index, pattern = formats[style]
+        counters[index] += 1
+        counters[index + 1:] = [0] * (2 - index)
+        labels[paragraph] = re.sub(r'%([1-3])', lambda m: str(max(1, counters[int(m[1]) - 1])), pattern)
+    return labels
+
+
 def _toc_entries(parts, root, o, deepest, container):
     """Bookmark every heading and return one TOC paragraph per heading."""
     for name, start in list(_bookmarks(root, o).items()):
@@ -237,6 +265,7 @@ def _toc_entries(parts, root, o, deepest, container):
                     end.getparent().remove(end)
             start.getparent().remove(start)
     levels = _heading_levels(parts, o, deepest)
+    labels = _heading_labels(parts, root, o)
     width = _text_width(root, o)
     entries = []
     for paragraph in root.iter(o.q(o.W, 'p')):
@@ -261,7 +290,8 @@ def _toc_entries(parts, root, o, deepest, container):
         tab.set(o.q(o.W, 'pos'), str(width))
         link = o.etree.SubElement(entry, o.q(o.W, 'hyperlink'))
         link.set(o.q(o.W, 'anchor'), name)
-        link.append(_run(o, text))
+        label = labels.get(paragraph)
+        link.append(_run(o, f'{label} {text}' if label else text))
         tab_run = o.etree.SubElement(link, o.q(o.W, 'r'))
         o.etree.SubElement(tab_run, o.q(o.W, 'tab'))
         link.append(_field(o, f'PAGEREF {name} \\h', ''))
@@ -283,6 +313,11 @@ def _fill_toc(parts, root, o, sdt):
     entries = _toc_entries(parts, root, o, deepest, sdt) or [o.etree.Element(o.q(o.W, 'p'))]
     if len(entries) == 1 and not len(entries[0]):
         entries[0].append(_run(o, '（添加标题后自动生成目录）'))
+    if not title:
+        styles = o.parse_xml(parts['word/styles.xml'])
+        page_break = styles.xpath('string(./w:style[@w:styleId="TOCHeading"]/w:pPr/w:pageBreakBefore/@w:val)', namespaces=o.NS)
+        if page_break in ('1', 'true', 'on'):
+            o.set_para_format(entries[0], {'page_break_before': True})
     begin, instr, separate, end = (o.etree.Element(o.q(o.W, 'r')) for _ in range(4))
     o.etree.SubElement(begin, o.q(o.W, 'fldChar')).set(o.q(o.W, 'fldCharType'), 'begin')
     text = o.etree.SubElement(instr, o.q(o.W, 'instrText'))

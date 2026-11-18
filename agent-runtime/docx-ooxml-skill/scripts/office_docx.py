@@ -428,7 +428,7 @@ def set_para_format(p, op):
         ppr = etree.Element(q(W, 'pPr'))
         p.insert(0, ppr)
     # Element ordering is part of the OOXML schema. Preserve its common ordering.
-    rank = {'pStyle': 0, 'keepNext': 1, 'keepLines': 2, 'pageBreakBefore': 3, 'widowControl': 4,
+    rank = {'pStyle': 0, 'keepNext': 1, 'keepLines': 2, 'pageBreakBefore': 3, 'widowControl': 4, 'numPr': 5,
             'spacing': 10, 'ind': 11, 'jc': 12, 'rPr': 50}
     def ensure(name):
         el = ppr.find(q(W, name))
@@ -454,6 +454,10 @@ def set_para_format(p, op):
                       ('keep_lines','keepLines'),('page_break_before','pageBreakBefore'),('widow_control','widowControl')]:
         if inp in op:
             ensure(name).set(q(W, 'val'), '1' if op[inp] else '0')
+    if op.get('clear_first_line_indent'):
+        indent = ensure('ind')
+        indent.set(q(W, 'firstLine'), '0')
+        indent.set(q(W, 'firstLineChars'), '0')
 
 
 def apply_plan(parts, plan, asset_root):

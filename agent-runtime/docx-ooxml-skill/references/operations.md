@@ -21,6 +21,7 @@ Every Agent edit is one `apply-one` request:
 Use these when the template has no suitable block.
 
 - `append_paragraph`: `block_id`, `text` (≤3000 characters, no newline), optional existing `style`, `after_block_id`. Write a cross-reference inline as `{{ref:<ref_id>}}`; it becomes a Word REF field showing the target's label and number, for example `如{{ref:fig-arch}}所示` renders "如图 1所示".
+  In `cn-thesis-general`, supply just the title text for `Heading1`, `Heading2` and `Heading3`. Word supplies the list number.
 - `append_table`: uniform `rows`, at most 60×8, cell text ≤300 characters. The first row repeats on every page. Tables of more than 10 rows may break across pages; set `keep_together` to override.
 - `insert_image`: workspace PNG/JPEG, optional `width_cm` and `alt`.
 - `insert_block`: one bounded paragraph XML fragment. Not the default way to add content.

@@ -5,7 +5,7 @@ of institutional/GB/T compliance. The editable DOCX retains native equations,
 charts/workbooks, TOC/cross-reference fields and a 60-row table.
 
 - Actual LibreOffice pagination: **23 pages**, revision **14**.
-- Design: `cn-engineering-thesis`; Chinese/Latin fonts configured separately.
+- Recorded design: `cn-engineering-thesis` (retired). New runs use `cn-thesis-general`.
 - Injected defects: cover date pushed to a second page, and empty/stale TOC page results.
 - Two local repair revisions followed by real re-render/recheck. The final
   deterministic check, including glyph/image/vector geometry, passed with no targets.

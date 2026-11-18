@@ -14,6 +14,7 @@ This skill does not register a new Agent tool. Run `scripts/office_docx.py` thro
 ## Deliverable location (hard rule)
 
 - `files/<name>.docx` is the **only working copy and the deliverable**, from `init` onward. The platform versions and previews only documents under `files/`; a document anywhere else is invisible to the user.
+- Choose the output path and `document_id` once, then reuse that pair for every write, repair and check. The platform binds the ID to the first file it sees. Reinitializing under another filename with that ID leaves the preview bound to the first file. Revise the existing document in place or restore a known-good revision at the same path. Use distinct IDs and paths only for separate requested deliverables.
 - Always pass the document as `files/<name>.docx`, operation requests as `tmp/<name>.json`, and `--asset-root tmp`. Do not write the document to `tmp/` or the workspace root, and do not build it elsewhere and copy it in at the end.
 - `files/` holds the deliverable and the user's uploads, nothing else. Every file there is shown to the user as output. One requested document means one `.docx` in `files/`: never create probe, test or draft documents there. To try an operation, apply it to the deliverable and, if it does not work, go back with `restore files/<name>.docx --revision <good> --base-revision <current> --operation-id <new id>`.
 - Intermediate material goes in `tmp/`: operation requests, scripts, figures and chart images (`tmp/assets/fig1.png`), downloaded sources and your own renders. Inserted images are embedded in the document, so their source files stay in `tmp/`. Only an image the user uploaded is inserted from `files/`, with `--asset-root files` for that operation.
@@ -21,35 +22,42 @@ This skill does not register a new Agent tool. Run `scripts/office_docx.py` thro
 
 ## When to create the document (hard rule)
 
-Create `files/<name>.docx` only when you are about to write the first real content. Until then, do the preparation with no deliverable: read sources, choose a template or style, and write `tmp/document-plan.json` then `validate-plan`. `init` is the start of writing, not a setup step. In that same stretch of work, `init`, `save-plan`, and the first `apply-section` (or the first real `apply-one`) run back to back. Do not call `init` and then research, plan, or wait while a blank document sits in `files/`. Every file under `files/` is shown to the user immediately; an empty package is not a placeholder. Editing a document the user already uploaded is not this case — that file already exists.
+Before creating `files/<name>.docx`, choose the template or style, validate a whole-document outline with `validate-plan`, and prepare the first section's real content and operation request. Research, write and prepare assets for later sections as those sections come up. Do not draft the whole document, generate all figures, or test formulas for later sections before the first write.
+
+As soon as the first section is ready, run `init`, `save-plan` and the first `apply-section` in consecutive calls. For a single atomic write, run `init` then the first real `apply-one`. Prepare the requests before `init` so the user sees real content promptly. When editing an uploaded document, start from the existing file.
 
 Prefer a template's sections, paragraphs, named styles, content controls and tables. Author a WordprocessingML fragment only when the template has no suitable block and the atomic operations cannot express the change. Do not claim a page was checked unless you inspected its LibreOffice render.
 
 ## Workflow (default for multi-section documents)
 
-1. Select an uploaded template first. With no template, run `list-styles` and
-   `inspect-style academic` (also consulting, technical, business). An explicit
+1. Select an uploaded template first. With no template, use the sole bundled
+   design, `cn-thesis-general`. Read it with `inspect-style cn-thesis-general`.
+   An explicit user-provided
    Design MD path is accepted; its `docx-design` JSON block maps to named Word
    paragraph/table styles and page dimensions. Do not create the file yet.
-2. Write `tmp/document-plan.json` and validate it with `validate-plan`. The plan
-   contains section requirements, stable block IDs, equations/figures/tables,
-   references and styles. Page count is a soft target; never manufacture fixed
-   pages. Do not create the file yet. `save-plan` needs the document, so it waits
-   until the next step.
+2. Write `tmp/document-plan.json` and validate it with `validate-plan`. Record
+   each section's purpose and stable block IDs. For the first section, check
+   that the request's block IDs and any explicit paragraph styles match the
+   plan. Refine later sections with `save-plan` before writing them when their
+   requirements, blocks, references or assets change. Page count is a soft
+   target. `save-plan` needs the document, so it waits until the next step.
 3. When the first section is ready to write, create the document and start
    writing immediately:
-   `init --document-id report --output files/report.docx --design academic`
+   `init --document-id report --output files/report.docx --design cn-thesis-general`
    (or `--template files/input.docx`; `--template` takes precedence and leaves
    all template styles intact, even if `--design` is present), then
    `save-plan files/report.docx tmp/plan-request.json`, then
    `apply-section files/report.docx tmp/section.json --asset-root tmp`.
    `apply-section` uses the existing atomic operations in memory, commits
    once and checkpoints the entire reflow once. Read `status` after each call.
+   Then prepare and write the next section on the same file and `document_id`.
    Validation/mutation failure rolls the entire transaction back. A render
    failure after a successful commit leaves that revision recoverable, reports
    the failure and blocks the next section until checked again.
 4. Run `check-document files/report.docx --final`. **Mandatory:** the current
    immutable revision must undergo actual PDF geometry/collision and layout checks.
+   Report visible defects. Normal hanging Chinese punctuation and sub-point image
+   margin rounding do not require repair.
    New documents use quality contract 2, including user templates. Final checks
    automatically run deterministic, Block-ID-local repair transactions without a
    fixed round cap, re-rendering and rechecking each time. `--diagnostic-only`
@@ -89,20 +97,44 @@ Prefer a template's sections, paragraphs, named styles, content controls and tab
    clearly labelled downloadable drafts. Persisted legacy contract 1 documents retain
    their old APIs and gates; do not select legacy mode to bypass acceptance.
 
-For domestic research documents without a template, inspect and select
-`cn-thesis-general`, `cn-engineering-thesis`, `cn-journal-paper` (default two
-columns; `init --columns 1` also supported), or `cn-research-report`. The original
-academic/technical/business/consulting designs remain available. Chinese/Latin
-fonts and named component styles are separate. Read sources and their verification
+The bundled `cn-thesis-general` design defines Chinese and Latin fonts
+separately and uses named component styles. Read sources and their verification
 scope; default sizes are design choices, not universal national mandates. Official
 institution/journal templates override generic designs. Do not assert GB/T citation
 compliance or bibliographic truth without actual source information.
 
-Declare section `kind` (cover/abstract/toc/body/references/appendix), `single_page`
-where appropriate, `numbering` format/start and any required `continued_label` in
-the plan. Use CoverTitle/CoverDate, AbstractTitle/AbstractBody, Caption, Equation,
-Reference and TableText styles. Numbering switches require real OOXML sections or
-a supplied template; if lossless section edits are unavailable, report the issue.
+For `cn-thesis-general`, insert the table caption (`insert_caption`, label
+`表` or `Table`) immediately before the table. It uses the centered 10.5 pt
+(`五号`) `TableCaption` style with a Song-style Chinese font. Use the school's
+font when specified. Tables default to three-line borders. Place any table note
+in a `TableNote` paragraph immediately after the table. Insert the centered
+figure caption immediately after the image. Keep the image and its caption on
+the same page, and use the table caption's keep-with-next style above the table.
+
+In `cn-thesis-general`, plan the TOC and references with `kind: toc` and
+`kind: references`. Use `insert_toc` with the title 目录 and two or three
+levels. The TOC2 and TOC3 indents (about one and two characters) are style
+defaults. Follow the school template or explicit user formatting when supplied.
+Give the TOC and references their own pages, including any continuation pages.
+Start the next component on a fresh page after the last page of the TOC or
+references, even if space remains. The body then flows normally. Start references
+and the following components with a heading paragraph so the planned workflow
+can apply the page break. When authoring without a plan, set `page_break_before: true`
+with `set_paragraph_format` on the references heading and the headings that
+follow these components. Use the native TOC field and the final rendered page
+number check to populate the page numbers from their actual destinations.
+
+Declare section `kind` (cover/abstract/toc/body/references/appendix/acknowledgments)
+and any required `continued_label` in the plan. Create a separate `abstract` entry
+for each language. Set `single_page` where required. In `cn-thesis-general`, plan-based authoring automatically
+hides the cover page number, uses continuous uppercase Roman numerals for the
+abstracts and TOC, and restarts Arabic numbering at 1 for the first body chapter.
+References, appendices and acknowledgments continue body numbering. The native
+PAGE field is centered in the footer in Times New Roman 10.5 pt. Use `numbering`
+only for explicit overrides. Switch numbering with a next-page section break.
+Use paragraph page breaks for new chapters, references and acknowledgments
+within the same numbering sequence. For Heading 2/3, keep the title with the
+next paragraph. Follow any school template supplied by the user.
 The final audit compares section numbering and rendered TOC destinations rather
 than treating visible leader dots as a valid TOC. Page targets remain soft goals.
 
@@ -130,10 +162,10 @@ python "$S" submit-review files/report.docx tmp/visual-review.json
 python "$S" finalize files/report.docx --base-revision N
 ```
 
-Blank path, only when nothing suitable exists:
+Built-in design path when no template is supplied:
 
 ```sh
-python "$S" init --document-id report --output files/report.docx
+python "$S" init --document-id report --output files/report.docx --design cn-thesis-general
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
 python "$S" check-document files/report.docx --final
 python "$S" review-images files/report.docx
@@ -163,7 +195,7 @@ Word repaginates. Do not insert page breaks to manufacture a page count.
 
 Reports with formulas, figures and references use these native operations, through apply-one or a planned apply-section transaction. Do not hand-build OMML, charts, fields or a ZIP in `tmp/` to get them.
 
-- Headings: `append_paragraph` with `Heading1`, `Heading2` or `Heading3` (multi-level headings feed the table of contents).
+- Headings: `append_paragraph` with `Heading1`, `Heading2` or `Heading3`. With `cn-thesis-general`, pass only the heading text. Word's multilevel list supplies chapter and section numbers, and the TOC refresh includes them. Use `Normal` for body text (12 pt, SimSun for Chinese, first-line indent of two characters).
 - `insert_toc`: a Word table of contents, rebuilt from the headings after every operation.
 - `insert_equation`: native, editable Office Math from LaTeX; `numbered: true` adds `(n)`.
 - `insert_chart`: a native Word chart with an embedded workbook (column, bar, line, area, pie, doughnut, scatter, bubble).

@@ -11,7 +11,7 @@ uniqueness, resource ownership and citation validation in `scripts/document_plan
 
 ```json
 {"version":1,"document_id":"report","title":"Research report","page_target":20,
- "design":"academic","references":[{"id":"source-1","text":"Author, title, year"}],
+ "design":"cn-thesis-general","references":[{"id":"source-1","text":"Author, title, year"}],
  "sections":[{"id":"intro","title":"Introduction","requirements":"Explain the evidence",
  "block_ids":["intro-h","intro-body"],"equations":[],"figures":[],"tables":[],
  "citations":["source-1"],"styles":["Heading1","Normal"]}]}
@@ -126,9 +126,10 @@ revision/design, repair attempts/unresolved targets, reviewed/issue pages and
 visual completion. Pending or unavailable reviews are drafts, never fake passes.
 
 A plan section may set `kind`, `single_page`, `numbering:{format,start}` and
-`continued_label`. These express component requirements; sections are authoring
-units and physical pages are review units. `numbering` audits real Word section
-properties; it does not silently insert new section boundaries into templates.
+`continued_label`. These express component requirements. In `cn-thesis-general`
+the plan applies native next-page section breaks for changes in page numbering.
+Use `numbering` for explicit overrides. Supplied Word templates retain their own
+section boundaries and numbering.
 
 ### Shared DOCX / PPTX repair progress policy
 

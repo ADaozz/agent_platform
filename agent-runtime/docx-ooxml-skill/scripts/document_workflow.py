@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+from copy import deepcopy
 from pathlib import Path
 import time
 
@@ -36,7 +37,137 @@ def save_plan(store,request,a):
         statuses=state.setdefault('sections',{})
         for k in affected:
             statuses[k]=dict(status='needs_review',reason='plan_changed')
-        return store.commit(c,state,store.path.read_bytes(),request['operation_id'],request,[],extra=dict(plan=plan,document_plan=plan,affected_sections=affected))
+        data=store.path.read_bytes()
+        if thesis_pagination(state.get('selected_design')):
+            parts=a.o.read_parts(store.path)
+            apply_planned_pagination(store,parts,plan,state['selected_design'],a)
+            data=a.packed(parts)
+        return store.commit(c,state,data,request['operation_id'],request,[],extra=dict(plan=plan,document_plan=plan,affected_sections=affected))
+
+
+def thesis_pagination(design):
+    return (design or {}).get('components', {}).get('pagination', {}).get('body_start')
+
+
+def apply_planned_pagination(_store, parts, plan, design, a, root=None):
+    """Apply page numbering to planned blocks in document order."""
+    if not plan or not thesis_pagination(design):
+        return
+    o = a.o
+    w = lambda name: o.q(o.W, name)
+    if root is None:
+        root = o.parse_xml(parts[o.MAIN])
+    body = root.find(w('body'))
+    final = body.find(w('sectPr'))
+    if final is None:
+        return
+    managed = o.q(a.BLOCK_NS, 'pageNumbering')
+    old_breaks = body.xpath('./w:p/w:pPr/w:sectPr', namespaces=o.NS)
+    if any(not props.get(managed) for props in old_breaks):
+        return
+    for props in old_breaks:
+        ppr = props.getparent()
+        paragraph = ppr.getparent()
+        if paragraph.get(managed):
+            body.remove(paragraph)
+        else:
+            ppr.remove(props)
+
+    pagination = design['components']['pagination']
+    footer = design['components']['footer']
+    planned = {block: section for section in plan['sections'] for block in section['block_ids']}
+    if design['components'].get('body', {}).get('heading_numbering'):
+        refresh_toc = False
+        for paragraph in body.findall(w('p')):
+            ppr = paragraph.find(w('pPr'))
+            if ppr is None:
+                continue
+            style = ppr.find(w('pStyle'))
+            num = ppr.find(w('numPr'))
+            section = planned.get(paragraph.get(a.BLOCK_ID), {})
+            unnumbered = section.get('kind', 'body') != 'body' and style is not None and style.get(w('val')) in (
+                'Heading1', 'Heading2', 'Heading3')
+            if unnumbered and num is None:
+                num = o.etree.Element(w('numPr'), {managed: '1'})
+                o.etree.SubElement(num, w('numId'), {w('val'): '0'})
+                preceding = {w(name) for name in ('pStyle', 'keepNext', 'keepLines', 'pageBreakBefore',
+                                                  'framePr', 'widowControl')}
+                position = next((i for i, child in enumerate(ppr) if child.tag not in preceding), len(ppr))
+                ppr.insert(position, num)
+                refresh_toc = True
+            elif not unnumbered and num is not None and num.get(managed):
+                ppr.remove(num)
+                refresh_toc = True
+        if refresh_toc:
+            a._sibling('academic_blocks').refresh_fields(parts, root, o)
+    groups = []
+    previous_section = None
+    previous_block = None
+    for block in body:
+        section = planned.get(block.get(a.BLOCK_ID))
+        if section is None:
+            if block is not final:
+                previous_block = block
+            continue
+        kind = section.get('kind', 'body')
+        fmt = pagination['cover'] if kind == 'cover' else (
+            pagination['front_matter'] if kind in ('abstract', 'toc') else pagination['body'])
+        start = pagination['body_start'] if fmt == pagination['body'] else 1
+        explicit = section.get('numbering')
+        if explicit:
+            fmt, start = explicit['format'], explicit.get('start', 1)
+        new_component = section is not previous_section
+        new_group = not groups or fmt != groups[-1][0] or (new_component and explicit is not None)
+        if new_group:
+            groups.append((fmt, start, previous_block))
+        if new_component:
+            paragraph = block if block.tag == w('p') else block.find(f'./{w("sdtContent")}/{w("p")}')
+            if paragraph is not None:
+                own_page = kind in ('abstract', 'toc', 'references', 'acknowledgments') or (
+                    previous_section and previous_section.get('kind') in ('toc', 'references'))
+                if new_group or own_page:
+                    o.set_para_format(paragraph, {'page_break_before': bool(own_page and not new_group)})
+        previous_section = section
+        previous_block = block
+
+    if not groups:
+        return
+    if any(fmt != 'none' for fmt, _, _ in groups) and final.find(w('footerReference')) is None:
+        a._sibling('rich_blocks').header_footer(parts, root, dict(
+            part='footer', align='center', style=footer['style'], runs=[dict(text='{{page}}')]), o)
+    base = deepcopy(final)
+    for name in ('type', 'pgNumType'):
+        node = base.find(w(name))
+        if node is not None:
+            base.remove(node)
+    for index, (fmt, start, _) in enumerate(groups):
+        props = deepcopy(base)
+        if index:
+            refs = len(props.findall(w('headerReference'))) + len(props.findall(w('footerReference')))
+            props.insert(refs, o.etree.Element(w('type'), {w('val'): 'nextPage'}))
+        if fmt == 'none':
+            for ref in props.findall(w('footerReference')):
+                props.remove(ref)
+        else:
+            numbering = o.etree.Element(w('pgNumType'), {w('fmt'): fmt, w('start'): str(start)})
+            following = props.find(w('cols'))
+            props.insert(props.index(following) if following is not None else len(props), numbering)
+        if index == len(groups) - 1:
+            body.replace(final, props)
+        else:
+            last_block = groups[index + 1][2]
+            if last_block.tag != w('p'):
+                paragraph = o.etree.Element(w('p'), {managed: '1'})
+                last_block.addnext(paragraph)
+                o.set_para_format(paragraph, dict(line_twips=1, space_before_twips=0, space_after_twips=0))
+                last_block = paragraph
+            ppr = last_block.find(w('pPr'))
+            if ppr is None:
+                ppr = o.etree.Element(w('pPr'))
+                last_block.insert(0, ppr)
+            props.set(managed, '1')
+            ppr.append(props)
+    parts[o.MAIN] = o.xml_bytes(root)
 
 
 def apply_section(store,request,asset_root,a):
@@ -50,8 +181,10 @@ def apply_section(store,request,asset_root,a):
         if state['gate']!='open':raise ValueError('Section checkpoint required: '+state['gate'])
         plan=state.get('document_plan')
         if not plan:raise ValueError('Save a validated document plan before apply-section')
-        section=next((s for s in plan['sections'] if s['id']==section_id),None)
-        if not section:raise ValueError('Section not in document plan')
+        section_index = next((i for i, section in enumerate(plan['sections']) if section['id'] == section_id), None)
+        if section_index is None:raise ValueError('Section not in document plan')
+        section = plan['sections'][section_index]
+        design = state.get('selected_design')
         allowed=set(section['block_ids']); styles=set(section.get('styles',[]))
         # Global edits belong to apply-one, never to an allegedly local section transaction.
         global_ops={'set_page','set_header_footer','document.recolor','part.replace_text','section.clone'}
@@ -78,7 +211,6 @@ def apply_section(store,request,asset_root,a):
                 if path not in resources:
                     resources.add(path);resource_size+=path.stat().st_size
                 if resource_size>limits.MAX_RESOURCE_BYTES:raise ValueError('Section resource budget exceeded')
-            design=state.get('selected_design')
             if design and design.get('version',1)>=2 and design['page'].get('columns',1)==2:
                 # Size only unspecified new components to the actual text column.
                 # Explicit user dimensions remain authoritative and are audited.
@@ -91,14 +223,13 @@ def apply_section(store,request,asset_root,a):
                 elif op['type']=='insert_image':op.setdefault('width_cm',round(width/567,2))
                 elif op['type']=='append_table' and 'column_widths_twips' not in op:
                     count=max(len(row) for row in op['rows']);op['column_widths_twips']=[width//count]*count
-            parts,ids,_=a.mutate(parts,op,base); changed.extend(ids)
+            parts,ids,_=a.mutate(parts,op,base,design); changed.extend(ids)
             if design and design.get('version',1)>=2 and op['type']=='insert_equation':
                 document=a.o.parse_xml(parts[a.o.MAIN]);node=document.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])[0]
                 prop=node.find(a.o.q(a.o.W,'pPr'))
                 if prop is None:prop=a.o.etree.Element(a.o.q(a.o.W,'pPr'));node.insert(0,prop)
                 prop.insert(0,a.o.etree.Element(a.o.q(a.o.W,'pStyle'),{a.o.q(a.o.W,'val'):'Equation'}))
                 parts[a.o.MAIN]=a.o.xml_bytes(document)
-            design=state.get('selected_design')
             if design and op.get('type') in ('append_table','insert_table'):
                 document=a.o.parse_xml(parts[a.o.MAIN]); table=document.xpath('//*[@b:id=$id]',namespaces={'b':a.BLOCK_NS},id=op['block_id'])[0]
                 pr=table.find(a.o.q(a.o.W,'tblPr'))
@@ -120,7 +251,18 @@ def apply_section(store,request,asset_root,a):
                 parts[a.o.MAIN]=a.o.xml_bytes(document)
             if sum(len(v) for v in parts.values())>64*1024*1024:raise ValueError('Section package size exceeds limit')
         # Forward references resolve after the final mutation, not at intermediate steps.
-        root=a.o.parse_xml(parts[a.o.MAIN]); unresolved=a._sibling('academic_blocks').refresh_fields(parts,root,a.o)
+        root = a.o.parse_xml(parts[a.o.MAIN])
+        components = (design or {}).get('components', {})
+        kind = section.get('kind', 'body')
+        previous = plan['sections'][section_index - 1] if section_index else {}
+        if not thesis_pagination(design) and (components.get(kind, {}).get('own_pages') or components.get(previous.get('kind'), {}).get('own_pages')):
+            body = root.find(a.o.q(a.o.W, 'body'))
+            first = next((block for block in body if block.get(a.BLOCK_ID) in allowed), None)
+            if first is not None and first.tag == a.o.q(a.o.W, 'p'):
+                a.o.set_para_format(first, {'page_break_before': True})
+                changed.append(first.get(a.BLOCK_ID))
+        unresolved = a._sibling('academic_blocks').refresh_fields(parts, root, a.o)
+        apply_planned_pagination(store, parts, plan, design, a, root)
         parts[a.o.MAIN]=a.o.xml_bytes(root)
         findings=inspect_parts(parts,a)
         blocking=[f for f in findings if f['code'] in ('invalid_equation','broken_chart','broken_relationship','duplicate_bookmark')]

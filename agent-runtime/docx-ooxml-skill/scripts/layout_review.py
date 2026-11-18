@@ -10,6 +10,9 @@ import io
 import re
 from collections import defaultdict
 
+MARGIN_ROUNDING_PT = 0.25
+HANGING_CJK_PUNCTUATION = '、。，；：！？'
+
 
 def norm(text):return re.sub(r'\s+','',text or '')
 
@@ -49,15 +52,25 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
         spans=[]
         for b in page.get_text('rawdict')['blocks']:
             for line in b.get('lines',[]):
-                for s in line['spans']:
-                    chars=s.get('chars',[]);s['text']=''.join(c['c'] for c in chars)
-                    ink=[c['bbox'] for c in chars if c['c'].strip()]
-                    if not ink:continue
+                visible = [(s, [c for c in s.get('chars', []) if c['c'].strip()]) for s in line['spans']]
+                visible = [(s, glyphs) for s, glyphs in visible if glyphs]
+                preceding_right = None
+                for i, (s, glyphs) in enumerate(visible):
+                    s['text']=''.join(c['c'] for c in s['chars'])
+                    ink=[c['bbox'] for c in glyphs]
                     # Justified trailing spaces have advance boxes outside margins,
                     # but no ink. Audit real non-space glyph bounds, not advances.
                     s['bbox']=(min(b[0] for b in ink),min(b[1] for b in ink),max(b[2] for b in ink),max(b[3] for b in ink))
                     s.pop('chars',None)
                     rec=source(s['text'],s['size']);item=dict(s,block_id=rec['id'] if rec else None,table=rec['table'] if rec else None)
+                    if (i == len(visible) - 1 and line.get('dir') == (1.0, 0.0)
+                            and glyphs[-1]['c'] in HANGING_CJK_PUNCTUATION):
+                        before = [box[2] for box in ink[:-1]]
+                        if preceding_right is not None:
+                            before.append(preceding_right)
+                        if before:
+                            item['hanging_punctuation'] = (max(before), ink[-1])
+                    preceding_right = max(preceding_right if preceding_right is not None else s['bbox'][2], s['bbox'][2])
                     spans.append(item)
                     if rec:placements[rec['id']].add(index+1)
         page_spans.append(spans)
@@ -119,13 +132,24 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
                 except (KeyError,OSError):pass
                 images.append(record)
     import pymupdf as fitz
+    margin_rounding = (-MARGIN_ROUNDING_PT, -MARGIN_ROUNDING_PT, MARGIN_ROUNDING_PT, MARGIN_ROUNDING_PT)
     for index,page in enumerate(pdf):
         spans=page_spans[index];area=region(page)
+        image_area = area + margin_rounding
+        image_page = page.rect + margin_rounding
         for s in spans:
             box=fitz.Rect(s['bbox'])
             if furniture(s,page):continue
             if not page.rect.contains(box) and (box.x0 < -1 or box.y0 < -1 or box.x1>page.rect.width+1 or box.y1>page.rect.height+1):add('content_clipped',index+1,s['block_id'],dict(bbox=list(box),page=list(page.rect)))
-            elif s['block_id'] and (box.x0<area.x0-3 or box.x1>area.x1+3 or box.y0<area.y0-3 or box.y1>area.y1+3):add('content_outside_margins',index+1,s['block_id'],dict(bbox=list(box),content_region=list(area)))
+            elif s['block_id']:
+                right = box.x1
+                if right > area.x1 + 3 and 'hanging_punctuation' in s:
+                    before, punctuation = s['hanging_punctuation']
+                    edge = area.x1 + MARGIN_ROUNDING_PT
+                    if before <= edge and punctuation[0] <= edge and right <= edge + s['size']:
+                        right = before
+                if box.x0<area.x0-3 or right>area.x1+3 or box.y0<area.y0-3 or box.y1>area.y1+3:
+                    add('content_outside_margins',index+1,s['block_id'],dict(bbox=list(box),content_region=list(area)))
         for image in page.get_image_info(hashes=True):
             rect=fitz.Rect(image['bbox']);matched=[r for r in images if r['digest'] and r['digest']==image.get('digest')]
             rec=matched[0] if len(matched)==1 else images[0] if len(images)==1 else None
@@ -133,8 +157,8 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
             if block:placements[block].add(index+1)
             if len(matched)==1 and block:
                 block_regions.setdefault(block,[]).append(dict(page=index+1,coordinate_space='normalized',source='pdf_image_digest',bbox=[rect.x0/page.rect.width,rect.y0/page.rect.height,rect.width/page.rect.width,rect.height/page.rect.height]))
-            if not page.rect.contains(rect):add('image_clipped',index+1,block,dict(bbox=list(rect)))
-            elif not area.contains(rect):add('image_outside_margins',index+1,block,dict(bbox=list(rect),content_region=list(area)))
+            if not image_page.contains(rect):add('image_clipped',index+1,block,dict(bbox=list(rect)))
+            elif not image_area.contains(rect):add('image_outside_margins',index+1,block,dict(bbox=list(rect),content_region=list(area)))
             if design and design.get('components',{}).get('pagination',{}).get('preserve_image_aspect') and rec and not rec['crop']:
                 aspect=(rect.width/max(rect.height,.1))/(image['width']/max(image['height'],1))
                 if not .75<=aspect<=1.33:add('image_distortion',index+1,block,dict(aspect_ratio_factor=round(aspect,3)))
@@ -185,6 +209,15 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
             if box is not None and (box.x0 < -1 or box.y0 < -1 or box.x1>page.rect.width+1 or box.y1>page.rect.height+1):
                 add('vector_clipped',page.number+1,None,dict(bbox=list(box)))
     def page_label(number):
+        pagination = (design or {}).get('components', {}).get('pagination', {})
+        if pagination.get('body_start') and has_page_field:
+            page = pdf[number - 1]
+            bottom = region(page).y1
+            labels = [s['text'].strip() for s in page_spans[number - 1]
+                      if s['bbox'][1] >= bottom and abs((s['bbox'][0] + s['bbox'][2]) / 2 - page.rect.width / 2) <= 2
+                      and re.fullmatch(r'[0-9]+|[IVXLCDMivxlcdm]+', s['text'].strip())]
+            if len(labels) == 1:
+                return labels[0]
         section=section_for(number)
         if not section or not section['pages']:return str(number)
         numbering=section['node'].find(o.q(o.W,'pgNumType'))
@@ -233,24 +266,31 @@ def inspect(parts,pdf,o,block_attribute,plan=None,design=None):
             expected=font_size(parent)
             for i,page in enumerate(pdf):
                 hits=page.search_for(text)
-                if hits and any(abs(s['size']-expected)<1 and norm(s['text']) in norm(text) for s in page_spans[i]):target_pages.append(i+1)
+                if hits and any(abs(s['size']-expected)<1 and (norm(s['text']) in norm(text) or norm(text) in norm(s['text'])) for s in page_spans[i]):target_pages.append(i+1)
             if not target_pages:add('toc_target_unmapped',None,identity,bookmark);continue
             destination=target_pages[-1]
             # Match rendered entry row (right-aligned page number may be its own span).
-            link=field.getparent();entry_text=''.join(t.text or '' for t in link.iter(o.q(o.W,'t')) if field not in t.iterancestors()) if link is not None else ''
             numeric=False
             for i,page in enumerate(pdf):
-                for box in page.search_for(entry_text) if entry_text else []:
-                    if abs((box.y1-box.y0)-(expected*1.4))<1 and i+1==destination:continue
-                    row=[s['text'] for s in page_spans[i] if abs((s['bbox'][1]+s['bbox'][3])/2-(box.y0+box.y1)/2)<max(3,box.height*.45) and s['bbox'][0]>=box.x0-2]
-                    if re.search(r'(?:\d+|[ivxlcdmIVXLCDM]+)$',norm(''.join(row))):numeric=True
+                for box in page.search_for(text) if text else []:
+                    row = [s for s in page_spans[i]
+                           if abs((s['bbox'][1]+s['bbox'][3])/2-(box.y0+box.y1)/2)<max(3,box.height*.45)
+                           and s['bbox'][2] >= box.x1 - 2]
+                    following = norm(''.join(s['text'] for s in row if s['bbox'][0] >= box.x1 - 2))
+                    row_text = norm(''.join(s['text'] for s in row))
+                    if (re.fullmatch(r'\.*(?:\d+|[ivxlcdmIVXLCDM]+)', following)
+                            or re.search(r'\.{2,}(?:\d+|[ivxlcdmIVXLCDM]+)$', row_text)):
+                        numeric = True
+                        break
+                if numeric:
+                    break
             cached=o.ptext(field).strip()
             if not numeric or not cached or cached!=page_label(destination):updates[bookmark]=page_label(destination)
         if updates:add('toc_page_results',min(toc_pages) if toc_pages else None,identity,dict(expected=updates),dict(type='refresh_toc_pages',block_id=identity,pages=updates) if identity else None)
-    # A TOC-looking paragraph with leader dots but no TOC/page field must not pass.
+    # Only TOC entry styles require page numbers. TOCHeading labels the directory itself.
     for p in paragraphs:
         style=p.xpath('string(./w:pPr/w:pStyle/@w:val)',namespaces=ns)
-        if style.startswith('TOC') and not p.xpath('.//w:fldSimple[contains(@w:instr,"PAGEREF")]|.//w:instrText[contains(text(),"PAGEREF")]',namespaces=ns) and not re.search(r'(?:\d+|[ivxlcdmIVXLCDM]+)\s*$',o.ptext(p)):
+        if re.fullmatch(r'TOC[1-9]', style, re.IGNORECASE) and not p.xpath('.//w:fldSimple[contains(@w:instr,"PAGEREF")]|.//w:instrText[contains(text(),"PAGEREF")]',namespaces=ns) and not re.search(r'(?:\d+|[ivxlcdmIVXLCDM]+)\s*$',o.ptext(p)):
             add('toc_page_numbers_missing',min(placements.get(p.get(block_attribute),{0})) or None,p.get(block_attribute),'Leader dots are not page numbers')
     section_map=[dict(id=c['id'],kind=c.get('kind','body'),pages=sorted(set().union(*(placements.get(b,set()) for b in c['block_ids'])))) for c in components]
     return dict(findings=findings,block_regions=block_regions,block_pages={k:sorted(v) for k,v in placements.items()},section_pages=section_map,detectors=['text_image_collision','text_collision','content_regions','cover_pagination','toc_results','section_numbering','image_geometry','table_continuations'])

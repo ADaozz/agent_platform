@@ -26,7 +26,7 @@ def validate(plan):
     for section in sections:
         if not isinstance(section,dict) or set(section)-{'id','title','requirements','block_ids','equations','figures','tables','citations','styles','kind','single_page','numbering','continued_label'} or not {'id','title','requirements','block_ids'} <= set(section):
             raise ValueError('Unknown or missing section fields')
-        if section.get('kind','body') not in ('cover','abstract','toc','body','references','appendix'):raise ValueError('Invalid section component kind')
+        if section.get('kind','body') not in ('cover','abstract','toc','body','references','appendix','acknowledgments'):raise ValueError('Invalid section component kind')
         if 'single_page' in section and type(section['single_page']) is not bool:raise ValueError('Invalid single_page')
         if 'numbering' in section:
             n=section['numbering']

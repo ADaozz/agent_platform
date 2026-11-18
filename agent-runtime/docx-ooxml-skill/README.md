@@ -10,7 +10,7 @@ Usage: follow `SKILL.md`. Run from the task workspace root (the directory contai
 
 ```bash
 S=scripts/office_docx.py
-python "$S" init --document-id report --output files/report.docx
+python "$S" init --document-id report --output files/report.docx --design cn-thesis-general
 python "$S" apply-one files/report.docx tmp/operation.json --asset-root tmp
 python "$S" check-document files/report.docx --final
 python "$S" finalize files/report.docx --base-revision N
@@ -28,7 +28,7 @@ New CLI documents require final OOXML/PDF geometry checks, local repairs with pr
 all-page visual review and a separate whole-document visual review. The platform
 shows the three statuses independently. Missing models remain Unavailable; pending
 reviews and visual issues remain downloadable drafts. Uploaded templates retain
-their styles. Four optional CN designs document separate Chinese/Latin fonts and
+their styles. The bundled `cn-thesis-general` design documents separate Chinese/Latin fonts and
 the source/verification scope of national and institutional requirements.
 
 Reproduce the long-document acceptance (LibreOffice and CJK fonts required):

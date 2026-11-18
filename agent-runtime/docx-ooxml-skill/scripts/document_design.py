@@ -4,6 +4,46 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1] / 'design'
+TOC_STYLE_NAMES = {'TOCHeading': 'TOC Heading', 'TOC1': 'toc 1', 'TOC2': 'toc 2', 'TOC3': 'toc 3'}
+HEADING_LIST_NAME = 'Thesis headings'
+
+
+def _add_heading_numbering(parts, styles, o):
+    w = lambda name: o.q(o.W, name)
+    part = 'word/numbering.xml'
+    numbering = o.parse_xml(parts[part]) if part in parts else o.etree.Element(w('numbering'), nsmap={'w': o.W})
+    abstract_id = str(1 + max((int(node.get(w('abstractNumId'))) for node in numbering.findall(w('abstractNum'))), default=-1))
+    num_id = str(1 + max((int(node.get(w('numId'))) for node in numbering.findall(w('num'))), default=0))
+    abstract = o.etree.Element(w('abstractNum'), {w('abstractNumId'): abstract_id})
+    first_num = numbering.find(w('num'))
+    numbering.insert(numbering.index(first_num) if first_num is not None else len(numbering), abstract)
+    o.etree.SubElement(abstract, w('multiLevelType'), {w('val'): 'multilevel'})
+    o.etree.SubElement(abstract, w('name'), {w('val'): HEADING_LIST_NAME})
+    for index, pattern in enumerate(('第%1章', '%1.%2', '%1.%2.%3')):
+        style_id = f'Heading{index + 1}'
+        level = o.etree.SubElement(abstract, w('lvl'), {w('ilvl'): str(index)})
+        for name, value in [('start', '1'), ('numFmt', 'decimal'), ('pStyle', style_id),
+                            ('suff', 'space'), ('lvlText', pattern), ('lvlJc', 'left')]:
+            o.etree.SubElement(level, w(name), {w('val'): value})
+        style = styles.xpath('./w:style[@w:styleId=$id]/w:pPr', namespaces=o.NS, id=style_id)[0]
+        control = o.etree.Element(w('numPr'))
+        o.etree.SubElement(control, w('ilvl'), {w('val'): str(index)})
+        o.etree.SubElement(control, w('numId'), {w('val'): num_id})
+        spacing = style.find(w('spacing'))
+        style.insert(style.index(spacing) if spacing is not None else 0, control)
+    instance = o.etree.SubElement(numbering, w('num'), {w('numId'): num_id})
+    o.etree.SubElement(instance, w('abstractNumId'), {w('val'): abstract_id})
+    if part not in parts:
+        rels = o.parse_xml(parts[o.DOC_RELS])
+        used = {node.get('Id') for node in rels}
+        rid = next(f'rId{i}' for i in range(1, len(used) + 2) if f'rId{i}' not in used)
+        o.etree.SubElement(rels, o.q(o.RELS, 'Relationship'), Id=rid, Type=f'{o.R}/numbering', Target='numbering.xml')
+        parts[o.DOC_RELS] = o.xml_bytes(rels)
+        types = o.parse_xml(parts[o.CT_FILE])
+        o.etree.SubElement(types, o.q(o.CT, 'Override'), PartName='/' + part,
+                           ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml')
+        parts[o.CT_FILE] = o.xml_bytes(types)
+    parts[part] = o.xml_bytes(numbering)
 
 
 def list_styles():
@@ -45,14 +85,15 @@ def apply(parts, config, o):
         if old is None:old=o.etree.SubElement(section,o.q(o.W,'cols'))
         old.set(o.q(o.W,'num'),str(columns));old.set(o.q(o.W,'space'),str(page.get('column_space_twips',420)))
     styles = o.parse_xml(parts['word/styles.xml'])
-    allowed = {'font','size_half_points','color','line_twips','space_after_twips','space_before_twips','keep_next','east_asia_font','bold','alignment','line_rule','widow_control','hanging_indent_twips'}
+    allowed = {'font','size_half_points','color','line_twips','space_after_twips','space_before_twips','keep_next','east_asia_font','bold','alignment','line_rule','widow_control','hanging_indent_twips','indent_twips','first_line_chars','page_break_before'}
     for name, values in config['styles'].items():
         if not isinstance(values,dict) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9]{0,79}',name) or set(values)-allowed:
             raise ValueError('Unsupported named style parameters')
         style = next((s for s in styles if s.get(o.q(o.W,'styleId'))==name),None)
         if style is None:
             style=o.etree.SubElement(styles,o.q(o.W,'style'),{o.q(o.W,'type'):'paragraph',o.q(o.W,'styleId'):name})
-            o.etree.SubElement(style,o.q(o.W,'name'),{o.q(o.W,'val'):name})
+            display_name = TOC_STYLE_NAMES.get(name, name) if 'TOCHeading' in config['styles'] else name
+            o.etree.SubElement(style,o.q(o.W,'name'),{o.q(o.W,'val'):display_name})
         for tag in ('rPr','pPr'):
             old=style.find(o.q(o.W,tag))
             if old is not None: style.remove(old)
@@ -83,6 +124,14 @@ def apply(parts, config, o):
             elif k=='hanging_indent_twips':
                 if type(v) is not int or not 0<=v<=2400:raise ValueError('Invalid hanging indent')
                 o.etree.SubElement(pp,o.q(o.W,'ind'),{o.q(o.W,'left'):str(v),o.q(o.W,'hanging'):str(v)})
+            elif k=='indent_twips':
+                if type(v) is not int or not 0<=v<=2400:raise ValueError('Invalid left indent')
+                o.etree.SubElement(pp,o.q(o.W,'ind'),{o.q(o.W,'left'):str(v)})
+            elif k=='first_line_chars':
+                if type(v) is not int or not 0 <= v <= 10:raise ValueError('Invalid first-line indent')
+            elif k=='page_break_before':
+                if type(v) is not bool:raise ValueError('Invalid page_break_before')
+                o.etree.SubElement(pp,o.q(o.W,'pageBreakBefore'),{o.q(o.W,'val'):'1' if v else '0'})
             elif k=='keep_next':
                 if type(v) is not bool: raise ValueError('Invalid keep_next')
                 o.etree.SubElement(pp,o.q(o.W,'keepNext'),{o.q(o.W,'val'):'1' if v else '0'})
@@ -95,17 +144,42 @@ def apply(parts, config, o):
                     spacing.set(o.q(o.W,'line' if k=='line_twips' else 'before' if k=='space_before_twips' else 'after'),str(v))
         if values.get('east_asia_font'):
             rp.find(o.q(o.W,'rFonts')).set(o.q(o.W,'eastAsia'),values['east_asia_font'])
+        chars = values.get('first_line_chars')
+        if chars is None and 'first_line_chars' in config['styles'].get('Normal', {}) and 'hanging_indent_twips' not in values:
+            chars = 0
+        if chars is not None:
+            indent = pp.find(o.q(o.W, 'ind'))
+            if indent is None:
+                indent = o.etree.SubElement(pp, o.q(o.W, 'ind'))
+            indent.set(o.q(o.W, 'firstLineChars'), str(chars * 100))
+            indent.set(o.q(o.W, 'firstLine'), str(chars * values.get('size_half_points', 24) * 10))
         if name.startswith('Heading') and name[-1:] in '123456789':
             o.etree.SubElement(pp,o.q(o.W,'outlineLvl'),{o.q(o.W,'val'):str(int(name[-1])-1)})
+    if config.get('components', {}).get('body', {}).get('heading_numbering'):
+        _add_heading_numbering(parts, styles, o)
+    # Style properties are read from JSON in any order. Write them in OOXML order.
+    paragraph_order = {o.q(o.W, name): rank for rank, name in enumerate(
+        ('keepNext', 'pageBreakBefore', 'widowControl', 'numPr', 'spacing', 'ind', 'jc', 'outlineLvl'))}
+    for name in config['styles']:
+        props = styles.xpath('./w:style[@w:styleId=$id]/w:pPr', namespaces=o.NS, id=name)[0]
+        props[:] = sorted(props, key=lambda node: paragraph_order[node.tag])
     table=config['table']
-    if set(table) != {'style_id','header_fill','border_color'} or not isinstance(table['style_id'],str) or not re.fullmatch('[A-Za-z][A-Za-z0-9]{0,79}',table['style_id']):
+    required = {'style_id', 'header_fill', 'border_color'}
+    if not required <= table.keys() or table.keys() - required - {'borders'} or not isinstance(table['style_id'],str) or not re.fullmatch('[A-Za-z][A-Za-z0-9]{0,79}',table['style_id']):
         raise ValueError('Invalid table style')
+    if table.get('borders', 'grid') not in ('grid', 'three_line'):
+        raise ValueError('Design table borders must be grid or three_line')
     if any(not isinstance(table[k],str) or not re.fullmatch('[0-9A-Fa-f]{6}',table[k]) for k in ('header_fill','border_color')): raise ValueError('Invalid table colour')
     ts=o.etree.SubElement(styles,o.q(o.W,'style'),{o.q(o.W,'type'):'table',o.q(o.W,'styleId'):table['style_id']})
     o.etree.SubElement(ts,o.q(o.W,'name'),{o.q(o.W,'val'):table['style_id']})
     pr=o.etree.SubElement(ts,o.q(o.W,'tblPr')); borders=o.etree.SubElement(pr,o.q(o.W,'tblBorders'))
+    three_line = table.get('borders') == 'three_line'
     for side in ('top','bottom','left','right','insideH','insideV'):
-        o.etree.SubElement(borders,o.q(o.W,side),{o.q(o.W,'val'):'single',o.q(o.W,'sz'):'4',o.q(o.W,'color'):table['border_color']})
+        attrs = {o.q(o.W, 'val'): 'nil'}
+        if not three_line or side in ('top', 'bottom'):
+            attrs = {o.q(o.W, 'val'): 'single', o.q(o.W, 'sz'): '12' if three_line else '4',
+                     o.q(o.W, 'color'): table['border_color']}
+        o.etree.SubElement(borders, o.q(o.W, side), attrs)
     conditional=o.etree.SubElement(ts,o.q(o.W,'tblStylePr'),{o.q(o.W,'type'):'firstRow'})
     cell=o.etree.SubElement(conditional,o.q(o.W,'tcPr'))
     o.etree.SubElement(cell,o.q(o.W,'shd'),{o.q(o.W,'fill'):table['header_fill']})

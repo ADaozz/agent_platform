@@ -35,7 +35,7 @@ def fake_render(monkeypatch):
 @pytest.fixture
 def store(tmp_path,monkeypatch):
     fake_render(monkeypatch)
-    result=a.DocumentStore(tmp_path/'report.docx');result.init('report',design='academic')
+    result=a.DocumentStore(tmp_path/'report.docx');result.init('report',design='cn-thesis-general',quality_contract=1)
     result.save_plan(request(0,'plan-1',plan=plan()))
     return result
 

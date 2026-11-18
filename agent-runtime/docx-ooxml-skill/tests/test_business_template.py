@@ -130,7 +130,7 @@ def test_business_docx_libreoffice_evidence(tmp_path, monkeypatch):
     _contact_sheet(page_files, evidence / 'final-sheet.png')
     baseline.comparison(evidence / 'before.png', evidence / 'recolored.png', evidence / 'comparison.png')
     report = dict(
-        renderer='LibreOffice Writer', source='templates/business-report',
+        renderer='LibreOffice Writer', source='generated business-report fixture',
         pages=pages, recolor_complete=colored.get('recolor_complete'),
         header='正式项目报告' in part_text(store.path, 'word/header1.xml'),
         images={name: dict(bytes=(evidence / name).stat().st_size)

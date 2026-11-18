@@ -17,8 +17,8 @@ def envelope(store,name,**data):
     s=store.metadata();return dict(document_id=s['document_id'],base_revision=s['revision'],operation_id=name,**data)
 
 
-def make_store(tmp_path,sections,design='cn-thesis-general'):
-    store=a.DocumentStore(tmp_path/'report.docx');store.init('report',design=design)
+def make_store(tmp_path,sections,columns=None):
+    store=a.DocumentStore(tmp_path/'report.docx');store.init('report',design='cn-thesis-general',columns=columns)
     plan=dict(version=1,document_id='report',title='科研报告',sections=sections)
     store.save_plan(envelope(store,'plan',plan=plan));return store
 
@@ -27,16 +27,60 @@ def section(identity,blocks,kind='body',**extra):
     return dict(id=identity,title=identity,requirements='检查组件与排版',block_ids=blocks,kind=kind,**extra)
 
 
-@pytest.mark.parametrize('identity',['cn-thesis-general','cn-engineering-thesis','cn-journal-paper','cn-research-report'])
-def test_cn_designs_select_apply_and_define_separate_fonts(tmp_path,identity):
-    store=a.DocumentStore(tmp_path/(identity+'.docx'));store.init('report',design=identity)
+def test_bundled_design_defines_separate_chinese_and_latin_fonts(tmp_path):
+    assert [style['id'] for style in a._sibling('document_design').list_styles()] == ['cn-thesis-general']
+    store=a.DocumentStore(tmp_path/'report.docx');store.init('report',design='cn-thesis-general')
     parts=a.o.read_parts(store.path);styles=a.o.parse_xml(parts['word/styles.xml'])
     normal=styles.xpath('//w:style[@w:styleId="Normal"]',namespaces=a.o.NS)[0]
-    assert normal.xpath('string(./w:rPr/w:rFonts/@w:eastAsia)',namespaces=a.o.NS)=='Noto Serif CJK SC'
+    assert normal.xpath('string(./w:rPr/w:rFonts/@w:eastAsia)',namespaces=a.o.NS)=='SimSun'
     assert normal.xpath('string(./w:rPr/w:rFonts/@w:ascii)',namespaces=a.o.NS)=='Liberation Serif'
+    assert normal.xpath('string(./w:rPr/w:sz/@w:val)', namespaces=a.o.NS) == '24'
+    assert normal.xpath('string(./w:pPr/w:ind/@w:firstLineChars)', namespaces=a.o.NS) == '200'
+    numbering = a.o.parse_xml(parts['word/numbering.xml'])
+    assert numbering.xpath('//w:lvl/w:pStyle/@w:val', namespaces=a.o.NS) == ['Heading1', 'Heading2', 'Heading3']
+    assert numbering.xpath('//w:lvl/w:lvlText/@w:val', namespaces=a.o.NS) == ['第%1章', '%1.%2', '%1.%2.%3']
+    assert styles.xpath('//w:style/w:pPr/w:numPr/w:numId/@w:val', namespaces=a.o.NS) == ['1', '1', '1']
     config=store.metadata()['selected_design']
     assert config['sources'] and {'cover','abstract','toc','equation','citations','references','pagination'}<=config['components'].keys()
     assert store.metadata()['quality_contract']==2
+
+
+def test_general_thesis_table_and_caption_defaults(tmp_path):
+    from PIL import Image
+
+    Image.new('RGB', (160, 80), '#abc4d6').save(tmp_path / 'figure.png')
+    store = make_store(tmp_path, [section('body', ['title', 'table', 'note', 'figure', 'figure-title', 'complex-table'])])
+    store.apply_one(envelope(store, 'title', operation=dict(
+        type='insert_caption', block_id='title', label='表', text='样本统计')))
+    store.apply_section(envelope(store, 'body', section_id='body', operations=[
+        dict(type='append_table', block_id='table', rows=[['分组', '人数'], ['甲组', '24'], ['乙组', '12']]),
+        dict(type='append_paragraph', block_id='note', style='TableNote', text='注：示例数据。'),
+        dict(type='insert_image', block_id='figure', path='figure.png', width_cm=4),
+        dict(type='insert_caption', block_id='figure-title', label='图', text='样本分布'),
+        dict(type='insert_table', block_id='complex-table', columns=[{}, {}], header_rows=2,
+             rows=[[dict(text='分组信息', colspan=2)], ['分组', '人数'], ['甲组', '24']]),
+    ]), asset_root=tmp_path)
+
+    parts = a.o.read_parts(store.path)
+    styles = a.o.parse_xml(parts['word/styles.xml'])
+    root = a.o.parse_xml(parts[a.o.MAIN])
+    ns = {**a.o.NS, 'b': a.BLOCK_NS}
+    blocks = root.xpath('/w:document/w:body/*[@b:id]', namespaces=ns)
+    assert [node.get(a.BLOCK_ID) for node in blocks] == ['title', 'table', 'note', 'figure', 'figure-title', 'complex-table']
+    for block, style_id in [(blocks[0], 'TableCaption'), (blocks[2], 'TableNote'), (blocks[4], 'Caption')]:
+        assert block.xpath('string(w:pPr/w:pStyle/@w:val)', namespaces=ns) == style_id
+        if style_id == 'TableNote':
+            continue
+        style = styles.xpath('w:style[@w:styleId=$id]', id=style_id, namespaces=ns)[0]
+        assert style.xpath('string(w:pPr/w:jc/@w:val)', namespaces=ns) == 'center'
+        assert style.xpath('string(w:rPr/w:sz/@w:val)', namespaces=ns) == '21'
+        assert style.xpath('string(w:rPr/w:rFonts/@w:eastAsia)', namespaces=ns) == 'Noto Serif CJK SC'
+    for table, last_header in [(blocks[1], 1), (blocks[5], 2)]:
+        borders = table.xpath('w:tblPr/w:tblBorders/*[@w:val="single"]', namespaces=ns)
+        assert [a.o.etree.QName(border).localname for border in borders] == ['top', 'bottom']
+        ruled_rows = table.xpath('w:tr[w:tc/w:tcPr/w:tcBorders/w:bottom[@w:val="single"]]', namespaces=ns)
+        assert ruled_rows == table.xpath('w:tr[$row]', row=last_header, namespaces=ns)
+        assert not table.xpath('w:tr/w:tc/w:tcPr/w:tcBorders/w:top', namespaces=ns)
 
 
 @pytest.mark.skipif(not shutil.which('libreoffice'),reason='LibreOffice required')
@@ -58,23 +102,154 @@ def test_cover_date_overflow_is_detected_and_locally_repaired(tmp_path):
 
 @pytest.mark.skipif(not shutil.which('libreoffice'),reason='LibreOffice required')
 def test_native_toc_empty_page_cache_is_repaired_against_real_pdf(tmp_path):
-    store=make_store(tmp_path,[section('toc',['toc'],'toc'),section('body',['h','p'])])
-    store.apply_section(envelope(store,'toc',section_id='toc',operations=[dict(type='insert_toc',block_id='toc',levels=3)]))
-    store.apply_section(envelope(store,'body',section_id='body',operations=[dict(type='append_paragraph',block_id='h',style='Heading1',text='1 研究方法'),dict(type='append_paragraph',block_id='p',text='正文介绍研究对象、可追踪的实验方法与检查结果。')]))
+    store = make_store(tmp_path, [
+        section('abstract', ['abstract'], 'abstract'),
+        section('toc', ['toc'], 'toc'),
+        section('body', ['h', 'h2', 'h3', 'p']),
+        section('references', ['references', 'reference'], 'references'),
+        section('appendix', ['appendix', 'appendix-text'], 'appendix'),
+    ])
+    store.apply_section(envelope(store, 'abstract', section_id='abstract', operations=[
+        dict(type='append_paragraph', block_id='abstract', text='摘要介绍本研究的主要问题。'),
+    ]))
+    store.apply_section(envelope(store, 'toc', section_id='toc', operations=[
+        dict(type='insert_toc', block_id='toc', levels=3),
+    ]))
+    store.apply_section(envelope(store, 'body', section_id='body', operations=[
+        dict(type='append_paragraph', block_id='h', style='Heading1', text='研究方法'),
+        dict(type='append_paragraph', block_id='h2', style='Heading2', text='实验步骤'),
+        dict(type='append_paragraph', block_id='h3', style='Heading3', text='样本选择'),
+        dict(type='append_paragraph', block_id='p', text='正文介绍研究对象、可追踪的实验方法与检查结果。'),
+    ]))
+    store.apply_section(envelope(store, 'references', section_id='references', operations=[
+        dict(type='append_paragraph', block_id='references', style='Heading1', text='参考文献'),
+        dict(type='append_paragraph', block_id='reference', style='Reference', text='示例参考文献条目。'),
+    ]))
+    store.apply_section(envelope(store, 'appendix', section_id='appendix', operations=[
+        dict(type='append_paragraph', block_id='appendix', style='Heading1', text='附录材料'),
+        dict(type='append_paragraph', block_id='appendix-text', text='附录列出研究补充材料。'),
+    ]))
     check=store.check_document(final=True,auto_repair=False)
     assert any(t['code']=='toc_page_results' for t in check['repair_targets'])
     result=store.repair_document(check['revision'],'toc-repair')
     assert result['recheck']['passed'],result['recheck']['repair_targets']
-    root=a.o.parse_xml(a.o.read_parts(store.path)[a.o.MAIN])
-    assert root.xpath('//w:fldSimple[contains(@w:instr,"PAGEREF")]//w:t[text()="1"]',namespaces=a.o.NS)
+    assert len(result['recheck']['pages']) == 5
+    parts = a.o.read_parts(store.path)
+    root = a.o.parse_xml(parts[a.o.MAIN])
+    ns = a.o.NS
+    assert root.xpath('//w:fldSimple[contains(@w:instr,"PAGEREF")]//w:t/text()', namespaces=ns) == ['1', '1', '1', '2', '3']
+    assert root.xpath('//w:sdt//w:hyperlink/w:r/w:t/text()', namespaces=ns) == [
+        '第1章 研究方法', '1.1 实验步骤', '1.1.1 样本选择', '参考文献', '附录材料']
+    import pymupdf
+    with pymupdf.open(store.render_directory(result['recheck']['revision']) / 'preview.pdf') as pdf:
+        body = pdf[2]
+        for label in ('第1章研究方法', '1.1实验步骤', '1.1.1样本选择'):
+            assert label in ''.join(body.get_text().split())
+        first_line = body.search_for('正文介绍研究对象')[0]
+        assert first_line.x0 == pytest.approx(72 + 24, abs=0.6)
+    assert len(root.xpath('//w:sdt//w:tab[@w:val="right" and @w:leader="dot"]', namespaces=ns)) == 5
+    styles = a.o.parse_xml(parts['word/styles.xml'])
+    heading = styles.xpath('w:style[@w:styleId="TOCHeading"]', namespaces=ns)[0]
+    assert heading.xpath('string(w:pPr/w:jc/@w:val)', namespaces=ns) == 'center'
+    assert heading.xpath('string(w:rPr/w:sz/@w:val)', namespaces=ns) == '32'
+    assert heading.xpath('string(w:rPr/w:rFonts/@w:eastAsia)', namespaces=ns) == 'Noto Sans CJK SC'
+    for level, size, indent in [(1, '24', ''), (2, '24', '240'), (3, '21', '420')]:
+        style = styles.xpath('w:style[@w:styleId=$id]', id=f'TOC{level}', namespaces=ns)[0]
+        assert style.xpath('string(w:pPr/w:ind/@w:left)', namespaces=ns) == indent
+        assert style.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=ns) == '300'
+        assert style.xpath('string(w:rPr/w:sz/@w:val)', namespaces=ns) == size
+
+
+@pytest.mark.skipif(not shutil.which('libreoffice'), reason='LibreOffice required')
+def test_toc_continuation_pages_are_separate_from_body(tmp_path):
+    import pymupdf
+
+    body = [section(f'body-{i}', [f'{kind}-{n}' for n in range(i * 25, (i + 1) * 25)
+                                  for kind in ('heading', 'text')]) for i in range(2)]
+    store = make_store(tmp_path, [section('toc', ['toc'], 'toc'), *body])
+    store.apply_section(envelope(store, 'toc', section_id='toc', operations=[
+        dict(type='insert_toc', block_id='toc', levels=2),
+    ]))
+    for i, part in enumerate(body):
+        operations = []
+        for n in range(i * 25, (i + 1) * 25):
+            operations.extend([
+                dict(type='append_paragraph', block_id=f'heading-{n}', style='Heading1' if n in (0, 25) else 'Heading2',
+                     text=f'{n + 1:02d} 目录条目测试'),
+                dict(type='append_paragraph', block_id=f'text-{n}', text=f'正文专用内容标记 {n + 1:02d}'),
+            ])
+        store.apply_section(envelope(store, part['id'], section_id=part['id'], operations=operations))
+
+    render = store.render_directory(store.metadata()['revision'])
+    with pymupdf.open(render / 'preview.pdf') as pdf:
+        pages = [page.get_text() for page in pdf]
+    first_body = next(i for i, text in enumerate(pages) if '正文专用内容标记 01' in text)
+    assert first_body >= 2
+    assert '目录\n' in pages[0]
+    assert all('正文专用内容标记' not in text and '目录条目测试' in text for text in pages[:first_body])
+    assert '第1章' in pages[first_body]
+    assert pages[first_body].index('01 目录条目测试') < pages[first_body].index('正文专用内容标记 01')
+
+
+@pytest.mark.skipif(not shutil.which('libreoffice'), reason='LibreOffice required')
+def test_thesis_page_numbers_continue_and_use_next_page_breaks(tmp_path):
+    import pymupdf
+
+    content = [
+        ('cover', '封面', 'CoverTitle'),
+        ('abstract', '中文摘要', 'AbstractTitle'),
+        ('abstract', 'Abstract', 'AbstractTitle'),
+        ('toc', '目录', 'TOCHeading'),
+        ('body', '绪论', 'Heading1'),
+        ('body', '研究方法', 'Heading1'),
+        ('references', '参考文献', 'Normal'),
+        ('appendix', '附录内容', 'Heading1'),
+        ('acknowledgments', '致谢', 'Normal'),
+    ]
+    text_kinds = {'body', 'references', 'appendix', 'acknowledgments'}
+    store = make_store(tmp_path, [section(f's-{i}', [f'p-{i}', f't-{i}'] if kind in text_kinds else [f'p-{i}'], kind)
+                                  for i, (kind, _, _) in enumerate(content)])
+    for i, (kind, title, style) in enumerate(content):
+        op = (dict(type='insert_toc', block_id=f'p-{i}', levels=2) if kind == 'toc'
+              else dict(type='append_paragraph', block_id=f'p-{i}', style=style, text=title))
+        operations = [op]
+        if kind in text_kinds:
+            operations.append(dict(type='append_paragraph', block_id=f't-{i}', text=f'第 {i} 部分的页码排版测试内容。'))
+        store.apply_section(envelope(store, f'op-{i}', section_id=f's-{i}', operations=operations))
+
+    parts = a.o.read_parts(store.path)
+    doc = a.o.parse_xml(parts[a.o.MAIN])
+    ns = a.o.NS
+    assert doc.xpath('//w:sectPr/w:type/@w:val', namespaces=ns) == ['nextPage', 'nextPage']
+    assert doc.xpath('//w:sectPr/w:pgNumType/@w:fmt', namespaces=ns) == ['upperRoman', 'decimal']
+    assert doc.xpath('//w:sectPr/w:pgNumType/@w:start', namespaces=ns) == ['1', '1']
+    assert not doc.xpath('(//w:sectPr)[1]/w:footerReference', namespaces=ns)
+    footer = a.o.parse_xml(parts['word/footer1.xml'])
+    assert footer.xpath('normalize-space(//w:fldSimple/@w:instr)', namespaces=ns) == 'PAGE'
+    assert footer.xpath('string(//w:jc/@w:val)', namespaces=ns) == 'center'
+    style = a.o.parse_xml(parts['word/styles.xml']).xpath('w:style[@w:styleId="Footer"]', namespaces=ns)[0]
+    assert style.xpath('string(w:rPr/w:rFonts/@w:ascii)', namespaces=ns) == 'Times New Roman'
+    assert style.xpath('string(w:rPr/w:sz/@w:val)', namespaces=ns) == '21'
+
+    render = store.render_directory(store.metadata()['revision'])
+    with pymupdf.open(render / 'preview.pdf') as pdf:
+        assert len(pdf) == len(content)
+        for page, (kind, heading, _), label in zip(pdf, content, ['', 'I', 'II', 'III', '1', '2', '3', '4', '5']):
+            assert heading in page.get_text()
+            if kind == 'body':
+                assert f'第{label}章{heading}' in ''.join(page.get_text().split())
+            assert page.get_text(clip=(0, page.rect.height - 70, page.rect.width, page.rect.height)).strip() == label
 
 
 def test_leader_dots_without_page_fields_cannot_pass(tmp_path):
-    store=make_store(tmp_path,[section('toc',['fake'],'toc')])
-    store.apply_section(envelope(store,'fake',section_id='toc',operations=[dict(type='append_paragraph',block_id='fake',style='TOC1',text='研究方法 ............')]))
+    store=make_store(tmp_path,[section('toc',['toc-heading','fake'],'toc')])
+    store.apply_section(envelope(store,'fake',section_id='toc',operations=[
+        dict(type='append_paragraph',block_id='toc-heading',style='TOCHeading',text='目录'),
+        dict(type='append_paragraph',block_id='fake',style='TOC1',text='研究方法 ............'),
+    ]))
     result=store.check_document(final=True)
     assert not result['passed']
-    assert any(t['code']=='toc_page_numbers_missing' for t in result['repair_targets'])
+    assert [t['block_id'] for t in result['repair_targets'] if t['code']=='toc_page_numbers_missing'] == ['fake']
     with pytest.raises(ValueError):store.finalize(store.metadata()['revision'])
     assert store.path.exists() and not store.metadata()['finalized']
 
@@ -102,6 +277,27 @@ def test_collision_detection_and_normal_wrapping_geometry(tmp_path):
     normal=fitz.open();p=normal.new_page();p.insert_image(fitz.Rect(72,72,172,172),filename=str(tmp_path/'figure.png'));p.insert_text((190,110),'Independent text box')
     result=a._sibling('layout_review').inspect(parts,normal,a.o,a.BLOCK_ID)
     assert not any(t['code'].endswith('collision') for t in result['findings'])
+
+
+def test_margin_check_allows_hanging_punctuation_and_image_rounding(tmp_path):
+    import pymupdf as fitz
+    from PIL import Image
+
+    parts = a.o.default_package()
+    with fitz.open() as pdf:
+        page = pdf.new_page()
+        right = page.rect.width - 72
+        for block_id, text, y, shift in [('hanging', '行末标点。', 150, 0), ('overflow', '正文越界。', 200, 6)]:
+            parts, _, _ = a.mutate(parts, dict(type='append_paragraph', block_id=block_id, text=text), tmp_path)
+            page.insert_text((right - 48 + shift, y), text, fontsize=12, fontname='china-s')
+        figure = tmp_path / 'figure.png'
+        Image.new('RGB', (20, 20), 'blue').save(figure)
+        for x, y in [(80, 71.95), (120, 70), (160, -1)]:
+            page.insert_image(fitz.Rect(x, y, x + 20, y + 20), filename=str(figure))
+        findings = a._sibling('layout_review').inspect(parts, pdf, a.o, a.BLOCK_ID)['findings']
+    assert [f['block_id'] for f in findings if f['code'] == 'content_outside_margins'] == ['overflow']
+    assert [f['detail']['bbox'][0] for f in findings if f['code'] == 'image_outside_margins'] == [120]
+    assert [f['detail']['bbox'][0] for f in findings if f['code'] == 'image_clipped'] == [160]
 
 
 def test_delivery_has_three_independent_states_and_never_accepts_unknown():
@@ -225,9 +421,9 @@ def test_interrupted_repair_replays_committed_step_and_preserves_revision(tmp_pa
     assert result['recheck']['passed'] and result['revision']==revision and result['repair_attempts']==1
 
 
-def test_journal_accepts_one_and_two_column_designs(tmp_path):
+def test_design_accepts_one_and_two_column_overrides(tmp_path):
     for columns in (1,2):
-        store=a.DocumentStore(tmp_path/f'journal-{columns}.docx');store.init('journal',design='cn-journal-paper',columns=columns)
+        store=a.DocumentStore(tmp_path/f'columns-{columns}.docx');store.init('report',design='cn-thesis-general',columns=columns)
         root=a.o.parse_xml(a.o.read_parts(store.path)[a.o.MAIN])
         assert root.xpath('string(//w:sectPr/w:cols/@w:num)',namespaces=a.o.NS)==str(columns)
 
@@ -277,16 +473,15 @@ def test_unused_template_style_font_does_not_block_chinese_layout(tmp_path):
     assert result['passed'],result['repair_targets']
 
 
-@pytest.mark.parametrize('identity',['cn-thesis-general','cn-engineering-thesis','cn-journal-paper','cn-research-report'])
-def test_all_cn_designs_pass_real_final_document_check(tmp_path,identity):
-    store=make_store(tmp_path,[section('body',['h','p'])],design=identity)
+def test_bundled_design_passes_real_final_document_check(tmp_path):
+    store=make_store(tmp_path,[section('body',['h','p'])])
     store.apply_section(envelope(store,'body',section_id='body',operations=[dict(type='append_paragraph',block_id='h',style='Heading1',text='1 科研方法'),dict(type='append_paragraph',block_id='p',text='本节按选定设计组织研究方法、数据记录及验证过程。中文与 Latin text 分别使用指定字体。')]))
     result=store.check_document(final=True)
     assert result['passed'] and result['collision_check_executed'],result['repair_targets']
 
 
-def test_two_column_journal_sizes_default_components_to_column(tmp_path):
-    store=make_store(tmp_path,[section('body',['h','p','eq','chart','table'],equations=['eq'],figures=['chart'],tables=['table'])],design='cn-journal-paper')
+def test_two_column_design_sizes_default_components_to_column(tmp_path):
+    store=make_store(tmp_path,[section('body',['h','p','eq','chart','table'],equations=['eq'],figures=['chart'],tables=['table'])],columns=2)
     store.apply_section(envelope(store,'body',section_id='body',operations=[dict(type='append_paragraph',block_id='h',style='Heading1',text='1 双栏研究'),dict(type='append_paragraph',block_id='p',text='期刊图表与公式应适应实际栏宽。'),dict(type='insert_equation',block_id='eq',latex=r'E=mc^2',numbered=True),dict(type='insert_chart',block_id='chart',chart=dict(type='column',categories=['A','B'],series=[dict(name='Result',values=[1,2])])),dict(type='append_table',block_id='table',rows=[['Identifier','Observation'],['Run A','Result A'],['Run B','Result B']])]))
     root=a.o.parse_xml(a.o.read_parts(store.path)[a.o.MAIN]);width=a._sibling('academic_blocks')._text_width(root,a.o)
     assert 3000<width<4500
