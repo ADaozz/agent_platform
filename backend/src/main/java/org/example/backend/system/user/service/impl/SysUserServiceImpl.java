@@ -86,6 +86,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUserEntity
     }
 
     @Override
+    // 按邮箱查询用户
+    public SysUserEntity getByEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return null;
+        }
+        LambdaQueryWrapper<SysUserEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUserEntity::getEmail, email);
+        return sysUserMapper.selectOne(wrapper);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     // 创建用户并分配角色
     public void createUser(SysUserCreateDTO dto) {

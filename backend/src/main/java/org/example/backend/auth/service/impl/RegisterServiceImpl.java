@@ -82,6 +82,9 @@ public class RegisterServiceImpl implements RegisterService {
         if (!StringUtils.hasText(mailFrom)) {
             throw new BusinessException(Module.ModuleType.AUTH, "邮件服务未配置，请联系管理员", null);
         }
+        if (sysUserService.getByEmail(normalizedEmail) != null) {
+            throw new BusinessException(Module.ModuleType.AUTH, "该邮箱已注册", null);
+        }
 
         String intervalKey = INTERVAL_KEY_PREFIX + normalizedEmail;
         if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(intervalKey))) {
@@ -117,13 +120,17 @@ public class RegisterServiceImpl implements RegisterService {
         if (!dto.getPassWord().equals(dto.getConfirmPassWord())) {
             throw new BusinessException(Module.ModuleType.AUTH, "两次输入的密码不一致", null);
         }
+        String passwordError = PasswordUtils.validateRegisterPassword(dto.getPassWord());
+        if (passwordError != null) {
+            throw new BusinessException(Module.ModuleType.AUTH, passwordError, null);
+        }
 
         String userName = dto.getUserName().trim();
         String normalizedEmail = normalizeEmail(dto.getEmail());
         if (sysUserService.getByUserName(userName) != null) {
             throw new BusinessException(Module.ModuleType.AUTH, "用户名已存在", null);
         }
-        if (getByEmail(normalizedEmail) != null) {
+        if (sysUserService.getByEmail(normalizedEmail) != null) {
             throw new BusinessException(Module.ModuleType.AUTH, "该邮箱已注册", null);
         }
 
@@ -190,12 +197,6 @@ public class RegisterServiceImpl implements RegisterService {
             log.error("加载注册验证码邮件模板失败", e);
             throw new BusinessException(Module.ModuleType.AUTH, "验证码发送失败，请稍后重试", null);
         }
-    }
-
-    private SysUserEntity getByEmail(String email) {
-        LambdaQueryWrapper<SysUserEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysUserEntity::getEmail, email);
-        return sysUserService.getOne(wrapper);
     }
 
     private SysRoleEntity getDefaultRole() {
